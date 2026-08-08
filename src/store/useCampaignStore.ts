@@ -2,8 +2,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { inventories as seedInventories } from '@/data/demo';
-import type { Inventory } from '@/domain/types';
+import { inventories as seedInventories, items as seedItems } from '@/data/demo';
+import type { Inventory, ItemDefinition } from '@/domain/types';
 import type { CampaignPresetId } from '@/config/campaignPresets';
 
 type SidebarTab = 'party' | 'combat' | 'inventory' | 'npc' | 'notes';
@@ -23,6 +23,7 @@ interface CampaignStore {
   workshopOpen: boolean;
   builderOpen: boolean;
   inventories: Inventory[];
+  itemDefinitions: ItemDefinition[];
   notes: string[];
   combatRound: number;
   combatTurn: number;
@@ -34,6 +35,9 @@ interface CampaignStore {
   setWorkshopTab: (tab: WorkshopTab) => void;
   setWorkshopOpen: (value: boolean) => void;
   setBuilderOpen: (value: boolean) => void;
+  upsertItem: (item: ItemDefinition) => void;
+  duplicateItem: (id: string) => void;
+  deleteItem: (id: string) => void;
   giveItem: (actorId: string, definitionId: string, quantity: number) => void;
   moveItem: (inventoryId: string, instanceId: string, targetContainerId: string) => void;
   addNote: (text: string) => void;
@@ -44,6 +48,7 @@ interface CampaignStore {
 }
 
 const cloneInventories = (value: Inventory[]) => JSON.parse(JSON.stringify(value)) as Inventory[];
+const cloneItems = (value: ItemDefinition[]) => JSON.parse(JSON.stringify(value)) as ItemDefinition[];
 
 export const useCampaignStore = create<CampaignStore>()(
   persist(
@@ -56,6 +61,7 @@ export const useCampaignStore = create<CampaignStore>()(
       workshopOpen: true,
       builderOpen: false,
       inventories: cloneInventories(seedInventories),
+      itemDefinitions: cloneItems(seedItems),
       notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
       combatRound: 1,
       combatTurn: 0,
@@ -67,6 +73,35 @@ export const useCampaignStore = create<CampaignStore>()(
       setWorkshopTab: (workshopTab) => set({ workshopTab }),
       setWorkshopOpen: (workshopOpen) => set({ workshopOpen }),
       setBuilderOpen: (builderOpen) => set({ builderOpen }),
+
+      upsertItem: (item) => set((state) => {
+        const exists = state.itemDefinitions.some((x) => x.id === item.id);
+        return {
+          itemDefinitions: exists ? state.itemDefinitions.map((x) => x.id === item.id ? item : x) : [item, ...state.itemDefinitions],
+          selectedItemId: item.id,
+          builderOpen: false,
+          lastAction: { label: exists ? `Изменён предмет: ${item.name}` : `Создан предмет: ${item.name}` }
+        };
+      }),
+
+      duplicateItem: (id) => set((state) => {
+        const source = state.itemDefinitions.find((x) => x.id === id);
+        if (!source) return state;
+        const copy: ItemDefinition = {
+          ...JSON.parse(JSON.stringify(source)),
+          id: `${source.id}-copy-${Date.now()}`,
+          name: `${source.name} — копия`,
+          source: 'Собственный'
+        };
+        return { itemDefinitions: [copy, ...state.itemDefinitions], selectedItemId: copy.id, lastAction: { label: `Создана копия: ${source.name}` } };
+      }),
+
+      deleteItem: (id) => set((state) => {
+        const source = state.itemDefinitions.find((x) => x.id === id);
+        if (!source || state.itemDefinitions.length <= 1) return state;
+        const next = state.itemDefinitions.filter((x) => x.id !== id);
+        return { itemDefinitions: next, selectedItemId: next[0].id, builderOpen: false, lastAction: { label: `Удалён предмет: ${source.name}` } };
+      }),
 
       giveItem: (actorId, definitionId, quantity) => {
         if (!Number.isFinite(quantity) || quantity <= 0) return;
@@ -114,7 +149,7 @@ export const useCampaignStore = create<CampaignStore>()(
       addNote: (text) => {
         const clean = text.trim();
         if (!clean) return;
-        set((state) => ({ notes: [clean, ...state.notes] }));
+        set((state) => ({ notes: [clean, ...state.notes], lastAction: { label: 'Добавлена заметка' } }));
       },
       removeNote: (index) => set((state) => ({ notes: state.notes.filter((_, i) => i !== index) })),
 
@@ -134,6 +169,7 @@ export const useCampaignStore = create<CampaignStore>()(
         workshopOpen: true,
         builderOpen: false,
         inventories: cloneInventories(seedInventories),
+        itemDefinitions: cloneItems(seedItems),
         notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
         combatRound: 1,
         combatTurn: 0,
@@ -152,6 +188,7 @@ export const useCampaignStore = create<CampaignStore>()(
         workshopTab: state.workshopTab,
         workshopOpen: state.workshopOpen,
         inventories: state.inventories,
+        itemDefinitions: state.itemDefinitions,
         notes: state.notes,
         combatRound: state.combatRound,
         combatTurn: state.combatTurn,
