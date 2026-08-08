@@ -33,6 +33,28 @@
 .theme-surface .builder-section h3,
 .theme-surface .inspector-header h2 { color: var(--gold-2); }
 
+.member-table { border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; }
+.member-row { display: grid; grid-template-columns: 42px minmax(0,1fr) 180px; gap: 10px; align-items: center; padding: 9px; border-top: 1px solid var(--line-soft); background: #12100d; }
+.member-row:first-child { border-top: 0; }
+.member-avatar { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid #463522; border-radius: 7px; background: #211a13; color: #dec28e; font-weight: 800; }
+.member-row strong, .member-row small { display: block; }
+.member-row small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.permission-table { min-width: 680px; overflow: hidden; border: 1px solid var(--line-soft); border-radius: 8px; }
+.permission-head, .permission-row { display: grid; grid-template-columns: minmax(180px,1.4fr) repeat(5,minmax(78px,1fr)); align-items: center; }
+.permission-head { background: #19150f; }
+.permission-row { border-top: 1px solid var(--line-soft); background: #11100d; }
+.permission-head > *, .permission-row > * { padding: 9px; border-left: 1px solid var(--line-soft); font-size: 10px; text-align: center; }
+.permission-head > *:first-child, .permission-row > *:first-child { border-left: 0; text-align: left; }
+.permission-head b { color: #d6b778; }
+.permission-row span:first-child { color: #b8a78e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.settings-card:has(.permission-table) { overflow-x: auto; }
+.scene-settings-list { display: grid; gap: 7px; }
+.scene-settings-list > div { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 9px; border: 1px solid var(--line-soft); border-radius: 8px; background: #12100d; }
+.scene-thumb { width: 48px; height: 42px; display: grid; place-items: center; border: 1px solid #423522; border-radius: 6px; background: #1c1812; font-size: 22px; }
+.scene-settings-list strong, .scene-settings-list small { display: block; }
+.scene-settings-list small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.export-area { width: 100%; min-height: 230px; margin: 0 0 10px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #0d0c0a; color: #bfb39e; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; outline: none; }
+
 @media (max-width: 900px) {
   .hub-page,
   .settings-page {
@@ -40,4 +62,6 @@
     min-height: 100vh;
     overflow: visible;
   }
+  .member-row { grid-template-columns: 42px 1fr; }
+  .member-row .control { grid-column: 1 / -1; }
 }
