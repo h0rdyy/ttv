@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './mvp.css';
+import './v1.css';
 
 export const metadata: Metadata = {
   title: 'TTV — Панель мастера',
