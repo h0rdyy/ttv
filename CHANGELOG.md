@@ -2,19 +2,22 @@
 
 ## 0.1.0 — First playable GM MVP
 
+Release verification passed dependency installation, TypeScript typecheck and production Next.js build.
+
 ### Campaign
-- Campaign Hub.
-- Demo campaign routes.
-- Three runtime presets: medieval fantasy, grimdark, sci-fi.
-- Campaign settings screen.
-- Theme switching through CSS variables.
+- Campaign Hub and demo campaign routes.
+- Three runtime presets: medieval fantasy, grimdark and sci-fi.
+- Campaign settings with local role/permission views.
+- Runtime theme switching through CSS variables.
+- Full local campaign snapshot import/export.
 
 ### DM play screen
-- Map workspace with tokens.
+- Map workspace with persistent draggable tokens.
+- Grid and basic fog controls.
 - Party sidebar.
-- Combat tracker with rounds and turns.
-- Inventory viewer with container drag & drop.
-- NPC sidebar.
+- Combat tracker with persisted rounds and turns.
+- Inventory viewer with container drag & drop and weight calculation.
+- NPC sidebar including custom campaign NPCs.
 - Persistent GM notes.
 - Keyboard shortcuts.
 
@@ -23,23 +26,24 @@
 - Item search and filters.
 - Item inspector.
 - Create/edit/duplicate/delete item flow.
-- Structured custom properties.
-- Structured effects.
+- Structured custom properties and effects.
 - Quick item delivery to a selected hero.
-- NPC workshop.
+- Persistent custom NPC creation/editing and scene placement.
 - Loot builder and delivery.
-- Roll tables and roll history.
+- Persistent editable roll tables and roll history.
 
 ### Architecture
 - Generic Actor model.
 - ItemDefinition / ItemInstance separation.
 - Inventory / Container model.
+- Scene / Token model.
+- RollTable model.
 - Game System registry.
 - Setting Pack registry.
 - Campaign preset/theme registry.
 - Role/permission matrix.
-- Zustand local persistence adapter.
+- Zustand local persistence adapters.
 - CI typecheck + production build workflow.
 
 ### Known scope boundaries
-v0.1 is intentionally a single-GM local/browser MVP. Accounts, PostgreSQL, realtime networking, server-side scene persistence and multiplayer permission enforcement are planned for the server phase after the gameplay/domain model stabilizes.
+v0.1 is intentionally a single-GM local/browser MVP. Accounts, PostgreSQL, realtime networking, multiple server-persisted scenes, asset storage and multiplayer permission enforcement are planned for the server phase after the gameplay/domain model stabilizes.
