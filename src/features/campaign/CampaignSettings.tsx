@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { campaignPresets, type CampaignPresetId } from '@/config/campaignPresets';
 import { permissionsFor, type CampaignRole } from '@/core/permissions';
+import { applyCampaignSnapshot, parseCampaignSnapshot } from '@/core/snapshot';
 import { scene } from '@/data/demo';
 import { useCampaignStore } from '@/store/useCampaignStore';
 
@@ -22,7 +23,6 @@ export function CampaignSettings() {
   const [members, setMembers] = useState(initialMembers);
   const [importText, setImportText] = useState('');
   const [importMessage, setImportMessage] = useState('');
-  const active = campaignPresets.find((x) => x.id === presetId) ?? campaignPresets[0];
 
   const exportJson = useMemo(() => JSON.stringify({
     version: 1,
@@ -35,13 +35,13 @@ export function CampaignSettings() {
 
   const updateRole = (id: string, role: CampaignRole) => setMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
 
-  const validateImport = () => {
+  const importSnapshot = () => {
     try {
-      const parsed = JSON.parse(importText) as { version?: number };
-      if (parsed.version !== 1) throw new Error('Unsupported version');
-      setImportMessage('✓ JSON распознан как совместимый экспорт v0.1. Полное серверное применение импорта запланировано после storage adapter API.');
+      const parsed = parseCampaignSnapshot(importText);
+      applyCampaignSnapshot(parsed);
+      setImportMessage('✓ Снимок v0.1 импортирован. Библиотека, инвентари, заметки, бой и пресет восстановлены.');
     } catch {
-      setImportMessage('Не удалось прочитать JSON v0.1.');
+      setImportMessage('Не удалось импортировать JSON: формат не соответствует снимку v0.1.');
     }
   };
 
@@ -78,7 +78,7 @@ export function CampaignSettings() {
               importText={importText}
               importMessage={importMessage}
               onImportText={setImportText}
-              onValidate={validateImport}
+              onImport={importSnapshot}
               onReset={() => { resetDemo(); setImportMessage('Демо-состояние сброшено к исходным данным.'); }}
             />
           )}
@@ -173,7 +173,7 @@ function ScenesSettings() {
   </>;
 }
 
-function ImportSettings({ exportJson, importText, importMessage, onImportText, onValidate, onReset }: { exportJson: string; importText: string; importMessage: string; onImportText: (value: string) => void; onValidate: () => void; onReset: () => void }) {
+function ImportSettings({ exportJson, importText, importMessage, onImportText, onImport, onReset }: { exportJson: string; importText: string; importMessage: string; onImportText: (value: string) => void; onImport: () => void; onReset: () => void }) {
   return <>
     <div className="settings-card">
       <span className="eyebrow">ЭКСПОРТ</span><h2>Снимок локальной кампании</h2>
@@ -181,9 +181,9 @@ function ImportSettings({ exportJson, importText, importMessage, onImportText, o
       <button className="button" onClick={() => navigator.clipboard?.writeText(exportJson)}>Копировать JSON</button>
     </div>
     <div className="settings-card">
-      <span className="eyebrow">ИМПОРТ</span><h2>Проверка JSON</h2>
+      <span className="eyebrow">ИМПОРТ</span><h2>Восстановить снимок v0.1</h2>
       <textarea className="export-area" value={importText} onChange={(event) => onImportText(event.target.value)} placeholder="Вставьте экспорт v0.1..." />
-      <div className="module-actions"><button className="button primary" onClick={onValidate}>Проверить</button><button className="button danger" onClick={onReset}>Сбросить демо</button></div>
+      <div className="module-actions"><button className="button primary" onClick={onImport}>Импортировать</button><button className="button danger" onClick={onReset}>Сбросить демо</button></div>
       {importMessage && <p className="settings-help">{importMessage}</p>}
     </div>
   </>;
