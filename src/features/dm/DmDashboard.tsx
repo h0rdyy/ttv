@@ -36,6 +36,9 @@ export function DmDashboard() {
     sidebarTab,
     workshopTab,
     workshopOpen,
+    mapGrid,
+    mapFog,
+    tokenPositions,
     inventories,
     itemDefinitions,
     lastAction,
@@ -45,13 +48,16 @@ export function DmDashboard() {
     setWorkshopTab,
     setWorkshopOpen,
     setBuilderOpen,
+    toggleMapGrid,
+    toggleMapFog,
+    moveToken,
     moveItem,
     undo,
   } = useCampaignStore();
 
   const [draggedInstance, setDraggedInstance] = useState<{ inventoryId: string; instanceId: string } | null>(null);
+  const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
   const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? actors[0];
-  const selectedItem = itemDefinitions.find((item) => item.id === selectedItemId) ?? itemDefinitions[0];
   const inventory = inventories.find((value) => value.ownerActorId === selectedActor.id);
   const preset = getCampaignPreset(presetId);
 
@@ -78,11 +84,22 @@ export function DmDashboard() {
         setWorkshopOpen(true);
         setWorkshopTab('items');
       }
-      if (event.key === 'Escape') setBuilderOpen(false);
+      if (event.key === 'Escape') {
+        setBuilderOpen(false);
+        setDraggingTokenId(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [setBuilderOpen, setWorkshopOpen, setWorkshopTab]);
+
+  const moveDraggingToken = (event: React.PointerEvent<HTMLElement>) => {
+    if (!draggingTokenId) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    moveToken(draggingTokenId, x, y);
+  };
 
   return (
     <div className="app-shell">
@@ -93,8 +110,8 @@ export function DmDashboard() {
           <small>{preset.icon} {preset.name}</small>
         </div>
         <div className="top-actions map-actions">
-          <button className="button">▦ Сетка</button>
-          <button className="button">♟ Туман</button>
+          <button className={`button ${mapGrid ? 'active' : ''}`} onClick={toggleMapGrid}>▦ Сетка</button>
+          <button className={`button ${mapFog ? 'active' : ''}`} onClick={toggleMapFog}>♟ Туман</button>
           <button className="button">⌖ Метка</button>
           <button className="button">⌁ Линейка</button>
           <button className="button">▣ Сцена</button>
@@ -110,11 +127,18 @@ export function DmDashboard() {
       </header>
 
       <main className="workspace">
-        <section className="map-stage">
+        <section
+          className={`map-stage ${mapGrid ? '' : 'grid-off'} ${draggingTokenId ? 'token-dragging' : ''}`}
+          onPointerMove={moveDraggingToken}
+          onPointerUp={() => setDraggingTokenId(null)}
+          onPointerCancel={() => setDraggingTokenId(null)}
+          onPointerLeave={() => setDraggingTokenId(null)}
+        >
           <div className="map-river" />
           <div className="map-ruin" />
           <div className="map-location location-a">Старая башня</div>
           <div className="map-location location-b">Лесная дорога</div>
+          {mapFog && <div className="fog-layer" />}
 
           <div className="map-tools">
             {['↖', '✋', '◇', '✎', '⌕', '◉'].map((icon) => <button className="map-tool" key={icon}>{icon}</button>)}
@@ -125,11 +149,18 @@ export function DmDashboard() {
             if (!actor) return null;
             const hp = actor.systemData.hp;
             const hpPct = hp ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
+            const position = tokenPositions[token.id] ?? { x: token.x, y: token.y };
             return (
               <button
                 key={token.id}
                 className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''}`}
-                style={{ left: `${token.x}%`, top: `${token.y}%` }}
+                style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  setDraggingTokenId(token.id);
+                  if (actor.type === 'player') setActor(actor.id);
+                  else setSidebarTab('combat');
+                }}
                 onClick={() => {
                   if (actor.type === 'player') setActor(actor.id);
                   else setSidebarTab('combat');
