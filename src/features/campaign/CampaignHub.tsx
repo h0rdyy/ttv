@@ -14,7 +14,10 @@ export function CampaignHub() {
           <div className="brand">✥ TTV</div>
           <p>Универсальная tabletop-платформа</p>
         </div>
-        <Link className="button" href="/campaign/demo/play">Открыть последнюю кампанию</Link>
+        <div className="hub-actions">
+          <Link className="button" href="/campaign/demo/player">Посмотреть как игрок</Link>
+          <Link className="button primary" href="/campaign/demo/play">Открыть как мастер</Link>
+        </div>
       </header>
 
       <section className="hub-hero">
@@ -28,7 +31,8 @@ export function CampaignHub() {
           <div><span className="eyebrow">ДЕМО-КАМПАНИЯ</span><h2>Королевские пустоши</h2></div>
           <div className="hub-actions">
             <Link className="button" href="/campaign/demo/settings">Настройки</Link>
-            <Link className="button primary" href="/campaign/demo/play">Продолжить игру</Link>
+            <Link className="button" href="/campaign/demo/player">Игрок</Link>
+            <Link className="button primary" href="/campaign/demo/play">Мастер</Link>
           </div>
         </div>
 
