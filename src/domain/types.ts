@@ -139,6 +139,13 @@ export interface JournalNote {
   createdAt: string;
 }
 
+export interface RollTable {
+  id: string;
+  campaignId: string;
+  name: string;
+  rows: string[];
+}
+
 export interface FieldSchema {
   key: string;
   label: string;
