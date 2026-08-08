@@ -1,0 +1,16 @@
+.hub-page,
+.settings-page {
+  height: 100vh;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 900px) {
+  .hub-page,
+  .settings-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+}
