@@ -6,6 +6,33 @@
   overflow-x: hidden;
 }
 
+.theme-surface .app-shell { background: var(--bg); }
+.theme-surface .topbar { background: color-mix(in srgb, var(--panel) 95%, #000 5%); border-color: var(--line-soft); }
+.theme-surface .session-sidebar { background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 82%, #000 18%)); border-color: var(--line); }
+.theme-surface .workshop-panel { background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 78%, #000 22%)); border-color: var(--line); }
+.theme-surface .workshop-header,
+.theme-surface .sidebar-tabs,
+.theme-surface .undo-bar { border-color: var(--line-soft); }
+.theme-surface .button,
+.theme-surface .control { border-color: var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+.theme-surface .button.active,
+.theme-surface .button:hover { border-color: var(--gold); }
+.theme-surface .item-card,
+.theme-surface .party-card,
+.theme-surface .npc-card,
+.theme-surface .note-card,
+.theme-surface .inventory-container,
+.theme-surface .module-row,
+.theme-surface .builder-section,
+.theme-surface .settings-kv > div { background: var(--panel); border-color: var(--line-soft); }
+.theme-surface .item-card.selected,
+.theme-surface .party-card.selected,
+.theme-surface .module-row.selected { border-color: var(--gold); }
+.theme-surface .workshop-title,
+.theme-surface .sidebar-heading,
+.theme-surface .builder-section h3,
+.theme-surface .inspector-header h2 { color: var(--gold-2); }
+
 @media (max-width: 900px) {
   .hub-page,
   .settings-page {
