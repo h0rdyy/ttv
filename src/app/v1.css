@@ -33,6 +33,10 @@
 .theme-surface .builder-section h3,
 .theme-surface .inspector-header h2 { color: var(--gold-2); }
 
+.button:disabled,
+.control:disabled { opacity: .42; cursor: not-allowed; filter: grayscale(.35); }
+.button:disabled:hover { border-color: var(--line); color: #d9c8aa; }
+
 .map-stage.grid-off {
   background-image: radial-gradient(circle at 24% 32%,rgba(53,82,45,.42),transparent 25%), radial-gradient(circle at 70% 28%,rgba(100,81,43,.25),transparent 22%), linear-gradient(135deg,#4a4930 0%,#6d6041 38%,#574830 68%,#2d3327 100%);
   background-size: auto, auto, auto;
@@ -65,6 +69,15 @@
 .scene-settings-list strong, .scene-settings-list small { display: block; }
 .scene-settings-list small { margin-top: 4px; color: var(--muted); font-size: 10px; }
 .export-area { width: 100%; min-height: 230px; margin: 0 0 10px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #0d0c0a; color: #bfb39e; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; outline: none; }
+
+.table-title-input { width: min(520px,100%); border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--gold-2); font: 18px Georgia, serif; outline: none; }
+.table-title-input:focus { border-bottom-color: var(--line); }
+.compact-actions { margin: 0; }
+.editable-table > div { grid-template-columns: 34px minmax(0,1fr) 30px; align-items: center; }
+.editable-table input { width: 100%; border: 0; background: transparent; color: var(--text); outline: none; }
+.editable-table input:focus { color: #f0d6a7; }
+.table-add-row { margin-top: 8px; }
+.system-json { margin: 0; padding: 10px; overflow: auto; border: 1px solid var(--line-soft); border-radius: 6px; background: #0c0b09; color: #b9ab95; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 @media (max-width: 900px) {
   .hub-page,
