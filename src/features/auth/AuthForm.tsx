@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
-export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
+export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'login' | 'register'; nextPath?: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextPath = searchParams.get('next') || '/campaigns/online';
+  const safeNext = nextPath.startsWith('/') ? nextPath : '/campaigns/online';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -28,7 +27,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           password,
           options: {
             data: { display_name: displayName },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
           },
         });
         if (error) throw error;
@@ -41,7 +40,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         if (error) throw error;
       }
 
-      router.push(nextPath.startsWith('/') ? nextPath : '/campaigns/online');
+      router.push(safeNext);
       router.refresh();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Не удалось выполнить вход.');
@@ -50,8 +49,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     }
   };
 
-  const registerHref = `/register?next=${encodeURIComponent(nextPath)}`;
-  const loginHref = `/login?next=${encodeURIComponent(nextPath)}`;
+  const registerHref = `/register?next=${encodeURIComponent(safeNext)}`;
+  const loginHref = `/login?next=${encodeURIComponent(safeNext)}`;
 
   return (
     <main className="auth-page">
