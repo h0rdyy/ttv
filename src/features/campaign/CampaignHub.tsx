@@ -15,15 +15,17 @@ export function CampaignHub() {
           <p>Универсальная tabletop-платформа</p>
         </div>
         <div className="hub-actions">
-          <Link className="button" href="/campaign/demo/player">Посмотреть как игрок</Link>
-          <Link className="button primary" href="/campaign/demo/play">Открыть как мастер</Link>
+          <Link className="button" href="/login">Войти</Link>
+          <Link className="button" href="/campaigns/online">Онлайн-кампании</Link>
+          <Link className="button" href="/campaign/demo/player">Демо игрока</Link>
+          <Link className="button primary" href="/campaign/demo/play">Демо мастера</Link>
         </div>
       </header>
 
       <section className="hub-hero">
-        <span className="eyebrow">ПЕРВАЯ ВЕРСИЯ</span>
+        <span className="eyebrow">v0.2 · ONLINE FOUNDATION</span>
         <h1>Кампании без привязки к одной системе</h1>
-        <p>Карта, персонажи, предметы, инвентари, бой и мастерская ДМа остаются общими. Правила, сеттинг и внешний вид подключаются отдельно.</p>
+        <p>Локальное демо остаётся доступным без аккаунта. Онлайн-режим уже использует Supabase Auth, PostgreSQL и серверные RLS-права.</p>
       </section>
 
       <section className="hub-section">
