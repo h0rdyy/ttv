@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { InvitePanel } from './InvitePanel';
 
 export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: string; mode: 'gm' | 'player' }) {
   const supabase = await createClient();
@@ -36,9 +37,10 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
           <div><b>Auth</b><span>✓ реальный пользователь</span></div>
           <div><b>PostgreSQL</b><span>✓ кампания на сервере</span></div>
           <div><b>RLS</b><span>✓ роль проверена БД</span></div>
-          <div><b>Gameplay sync</b><span>следующий блок v0.2</span></div>
+          <div><b>Invites</b><span>{gmAllowed ? '✓ можно пригласить игрока' : '✓ вход по роли игрока'}</span></div>
         </div>
-        <p className="room-note">Этот экран специально не подменяет серверные данные локальным demo-state. Следующим блоком подключаем Actors / Scenes / Inventory этой кампании к игровому UI, после чего здесь появится сам стол.</p>
+        {gmAllowed && mode === 'gm' && <InvitePanel campaignId={campaignId} />}
+        <p className="room-note">Следующий блок подключит Actors / Scenes / Inventory этой серверной кампании к игровому столу. Локальный demo-state сюда намеренно не подмешивается.</p>
       </section>
     </main>
   );
