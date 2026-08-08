@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { inventories as seedInventories, items as seedItems } from '@/data/demo';
+import { inventories as seedInventories, items as seedItems, scene } from '@/data/demo';
 import type { Inventory, ItemDefinition } from '@/domain/types';
 import type { CampaignPresetId } from '@/config/campaignPresets';
 
@@ -14,6 +14,11 @@ interface ActionRecord {
   undo?: () => void;
 }
 
+interface TokenPosition {
+  x: number;
+  y: number;
+}
+
 interface CampaignStore {
   presetId: CampaignPresetId;
   selectedActorId: string;
@@ -22,6 +27,9 @@ interface CampaignStore {
   workshopTab: WorkshopTab;
   workshopOpen: boolean;
   builderOpen: boolean;
+  mapGrid: boolean;
+  mapFog: boolean;
+  tokenPositions: Record<string, TokenPosition>;
   inventories: Inventory[];
   itemDefinitions: ItemDefinition[];
   notes: string[];
@@ -35,6 +43,9 @@ interface CampaignStore {
   setWorkshopTab: (tab: WorkshopTab) => void;
   setWorkshopOpen: (value: boolean) => void;
   setBuilderOpen: (value: boolean) => void;
+  toggleMapGrid: () => void;
+  toggleMapFog: () => void;
+  moveToken: (tokenId: string, x: number, y: number) => void;
   upsertItem: (item: ItemDefinition) => void;
   duplicateItem: (id: string) => void;
   deleteItem: (id: string) => void;
@@ -49,6 +60,7 @@ interface CampaignStore {
 
 const cloneInventories = (value: Inventory[]) => JSON.parse(JSON.stringify(value)) as Inventory[];
 const cloneItems = (value: ItemDefinition[]) => JSON.parse(JSON.stringify(value)) as ItemDefinition[];
+const seedTokenPositions = () => Object.fromEntries(scene.tokens.map((token) => [token.id, { x: token.x, y: token.y }])) as Record<string, TokenPosition>;
 
 export const useCampaignStore = create<CampaignStore>()(
   persist(
@@ -60,6 +72,9 @@ export const useCampaignStore = create<CampaignStore>()(
       workshopTab: 'items',
       workshopOpen: true,
       builderOpen: false,
+      mapGrid: true,
+      mapFog: false,
+      tokenPositions: seedTokenPositions(),
       inventories: cloneInventories(seedInventories),
       itemDefinitions: cloneItems(seedItems),
       notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
@@ -73,6 +88,11 @@ export const useCampaignStore = create<CampaignStore>()(
       setWorkshopTab: (workshopTab) => set({ workshopTab }),
       setWorkshopOpen: (workshopOpen) => set({ workshopOpen }),
       setBuilderOpen: (builderOpen) => set({ builderOpen }),
+      toggleMapGrid: () => set((state) => ({ mapGrid: !state.mapGrid })),
+      toggleMapFog: () => set((state) => ({ mapFog: !state.mapFog })),
+      moveToken: (tokenId, x, y) => set((state) => ({
+        tokenPositions: { ...state.tokenPositions, [tokenId]: { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) } },
+      })),
 
       upsertItem: (item) => set((state) => {
         const exists = state.itemDefinitions.some((x) => x.id === item.id);
@@ -168,6 +188,9 @@ export const useCampaignStore = create<CampaignStore>()(
         workshopTab: 'items',
         workshopOpen: true,
         builderOpen: false,
+        mapGrid: true,
+        mapFog: false,
+        tokenPositions: seedTokenPositions(),
         inventories: cloneInventories(seedInventories),
         itemDefinitions: cloneItems(seedItems),
         notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
@@ -187,6 +210,9 @@ export const useCampaignStore = create<CampaignStore>()(
         sidebarTab: state.sidebarTab,
         workshopTab: state.workshopTab,
         workshopOpen: state.workshopOpen,
+        mapGrid: state.mapGrid,
+        mapFog: state.mapFog,
+        tokenPositions: state.tokenPositions,
         inventories: state.inventories,
         itemDefinitions: state.itemDefinitions,
         notes: state.notes,
