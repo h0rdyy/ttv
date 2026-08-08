@@ -1,7 +1,7 @@
 export type ActorType = 'player' | 'npc' | 'creature' | 'vehicle' | 'companion' | 'summon';
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'very-rare' | 'legendary' | 'artifact';
-
-export type ThemeId = 'dark-fantasy' | 'grimdark' | 'medieval';
+export type ThemeId = 'dark-fantasy' | 'grimdark' | 'medieval' | 'sci-fi';
+export type CampaignRole = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 
 export interface ResourceValue {
   current: number;
@@ -21,6 +21,7 @@ export interface Actor {
     level?: number;
   };
   inventoryId?: string;
+  tags?: string[];
 }
 
 export interface ItemEffect {
@@ -47,6 +48,7 @@ export interface ItemDefinition {
   source?: string;
   properties: Record<string, unknown>;
   effects: ItemEffect[];
+  tags?: string[];
 }
 
 export interface ItemInstance {
@@ -79,7 +81,10 @@ export interface SceneToken {
   actorId: string;
   x: number;
   y: number;
+  size?: number;
+  rotation?: number;
   enemy?: boolean;
+  hidden?: boolean;
 }
 
 export interface Scene {
@@ -87,6 +92,15 @@ export interface Scene {
   campaignId: string;
   name: string;
   tokens: SceneToken[];
+  systemData?: Record<string, unknown>;
+}
+
+export interface CampaignMember {
+  id: string;
+  campaignId: string;
+  displayName: string;
+  role: CampaignRole;
+  actorIds?: string[];
 }
 
 export interface Campaign {
@@ -95,6 +109,34 @@ export interface Campaign {
   systemId: string;
   settingId: string;
   themeId: ThemeId;
+  description?: string;
+}
+
+export interface CombatParticipant {
+  id: string;
+  actorId: string;
+  initiative: number;
+  defeated?: boolean;
+  systemData?: Record<string, unknown>;
+}
+
+export interface CombatEncounter {
+  id: string;
+  campaignId: string;
+  sceneId?: string;
+  round: number;
+  turn: number;
+  participants: CombatParticipant[];
+  active: boolean;
+}
+
+export interface JournalNote {
+  id: string;
+  campaignId: string;
+  title?: string;
+  body: string;
+  pinned?: boolean;
+  createdAt: string;
 }
 
 export interface FieldSchema {
@@ -102,6 +144,8 @@ export interface FieldSchema {
   label: string;
   type: 'text' | 'number' | 'select' | 'textarea';
   options?: string[];
+  placeholder?: string;
+  required?: boolean;
 }
 
 export interface BuilderSectionSchema {
@@ -114,4 +158,13 @@ export interface GameSystemDefinition {
   id: string;
   name: string;
   itemBuilder: Record<string, BuilderSectionSchema[]>;
+}
+
+export interface CampaignEvent<TPayload extends Record<string, unknown> = Record<string, unknown>> {
+  id: string;
+  campaignId: string;
+  type: string;
+  createdAt: string;
+  actorId?: string;
+  payload: TPayload;
 }
