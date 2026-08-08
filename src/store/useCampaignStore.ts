@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { inventories as seedInventories, items as seedItems, scene } from '@/data/demo';
-import type { Inventory, ItemDefinition } from '@/domain/types';
+import type { Actor, Inventory, ItemDefinition, SceneToken } from '@/domain/types';
 import type { CampaignPresetId } from '@/config/campaignPresets';
 
 type SidebarTab = 'party' | 'combat' | 'inventory' | 'npc' | 'notes';
@@ -30,6 +30,8 @@ interface CampaignStore {
   mapGrid: boolean;
   mapFog: boolean;
   tokenPositions: Record<string, TokenPosition>;
+  customActors: Actor[];
+  customTokens: SceneToken[];
   inventories: Inventory[];
   itemDefinitions: ItemDefinition[];
   notes: string[];
@@ -46,6 +48,9 @@ interface CampaignStore {
   toggleMapGrid: () => void;
   toggleMapFog: () => void;
   moveToken: (tokenId: string, x: number, y: number) => void;
+  upsertActor: (actor: Actor) => void;
+  deleteActor: (actorId: string) => void;
+  addActorToScene: (actorId: string) => void;
   upsertItem: (item: ItemDefinition) => void;
   duplicateItem: (id: string) => void;
   deleteItem: (id: string) => void;
@@ -75,6 +80,8 @@ export const useCampaignStore = create<CampaignStore>()(
       mapGrid: true,
       mapFog: false,
       tokenPositions: seedTokenPositions(),
+      customActors: [],
+      customTokens: [],
       inventories: cloneInventories(seedInventories),
       itemDefinitions: cloneItems(seedItems),
       notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
@@ -93,6 +100,32 @@ export const useCampaignStore = create<CampaignStore>()(
       moveToken: (tokenId, x, y) => set((state) => ({
         tokenPositions: { ...state.tokenPositions, [tokenId]: { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) } },
       })),
+
+      upsertActor: (actor) => set((state) => {
+        const exists = state.customActors.some((value) => value.id === actor.id);
+        return {
+          customActors: exists ? state.customActors.map((value) => value.id === actor.id ? actor : value) : [actor, ...state.customActors],
+          lastAction: { label: exists ? `Изменён NPC: ${actor.name}` : `Создан NPC: ${actor.name}` },
+        };
+      }),
+
+      deleteActor: (actorId) => set((state) => ({
+        customActors: state.customActors.filter((actor) => actor.id !== actorId),
+        customTokens: state.customTokens.filter((token) => token.actorId !== actorId),
+        lastAction: { label: 'NPC удалён' },
+      })),
+
+      addActorToScene: (actorId) => set((state) => {
+        const actor = state.customActors.find((value) => value.id === actorId);
+        if (!actor) return state;
+        const tokenId = `custom-token-${actorId}-${Date.now()}`;
+        const token: SceneToken = { id: tokenId, actorId, x: 50, y: 50, enemy: actor.type !== 'player' };
+        return {
+          customTokens: [...state.customTokens, token],
+          tokenPositions: { ...state.tokenPositions, [tokenId]: { x: 50, y: 50 } },
+          lastAction: { label: `${actor.name} добавлен на сцену` },
+        };
+      }),
 
       upsertItem: (item) => set((state) => {
         const exists = state.itemDefinitions.some((x) => x.id === item.id);
@@ -191,6 +224,8 @@ export const useCampaignStore = create<CampaignStore>()(
         mapGrid: true,
         mapFog: false,
         tokenPositions: seedTokenPositions(),
+        customActors: [],
+        customTokens: [],
         inventories: cloneInventories(seedInventories),
         itemDefinitions: cloneItems(seedItems),
         notes: ['Игроки встретили торговца Брина.', 'Король подозревает Альвиса.', 'Код двери в старой башне: 4217.'],
@@ -213,6 +248,8 @@ export const useCampaignStore = create<CampaignStore>()(
         mapGrid: state.mapGrid,
         mapFog: state.mapFog,
         tokenPositions: state.tokenPositions,
+        customActors: state.customActors,
+        customTokens: state.customTokens,
         inventories: state.inventories,
         itemDefinitions: state.itemDefinitions,
         notes: state.notes,
