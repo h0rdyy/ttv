@@ -42,5 +42,17 @@ export const themeRegistry: Record<ThemeId, ThemeDefinition> = {
       '--gold': '#bf985c',
       '--gold-2': '#ead09c'
     }
+  },
+  'sci-fi': {
+    id: 'sci-fi',
+    name: 'Научная фантастика',
+    cssVariables: {
+      '--bg': '#071014',
+      '--panel': '#0c151a',
+      '--panel-2': '#111d23',
+      '--line': '#294651',
+      '--gold': '#55a2ad',
+      '--gold-2': '#8bd2da'
+    }
   }
 };
