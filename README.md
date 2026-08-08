@@ -1,25 +1,43 @@
 # TTV — tabletop campaign platform
 
-Универсальный каркас VTT/GM-платформы для кампаний с разными игровыми системами и сеттингами: от средневекового фэнтези до grimdark/sci-fi.
+TTV — универсальный каркас VTT/GM-платформы для кампаний с разными игровыми системами и сеттингами: от средневекового фэнтези и grimdark до sci-fi.
 
-## Что уже реализовано
+Первая версия специально не привязана к D&D, Warhammer или другой конкретной системе. Core работает через общие сущности, а правила, сеттинг и визуальная тема подключаются отдельными слоями.
+
+## v0.1 — что готово
 
 - Next.js + React + TypeScript.
-- Feature-first структура.
+- Zustand с локальным persistence.
+- Campaign Hub `/campaigns`.
+- Demo campaign `/campaign/demo/play`.
+- Campaign settings `/campaign/demo/settings`.
+- Три пресета: средневековое фэнтези, grimdark и sci-fi.
+- Runtime theme tokens через CSS variables.
 - Универсальные сущности `Actor`, `ItemDefinition`, `ItemInstance`, `Inventory`, `Scene`, `GameSystem`.
-- Рабочая DM-страница с картой и токенами.
-- Правая session-панель: группа, бой, инвентарь, NPC, заметки.
+- Карта и токены.
+- Session sidebar: группа, бой, инвентарь, NPC, заметки.
 - Переключение выбранного героя между разделами.
-- Инвентарь с контейнерами и drag & drop между ними.
+- Инвентарь с контейнерами и drag & drop.
+- Подсчёт веса инвентаря.
 - Контекстный просмотр выбранного предмета.
 - Мастерская ДМа поверх карты.
-- Библиотека предметов с поиском и фильтрами.
-- Просмотр предмета и упрощённый item builder.
+- Persistent библиотека предметов.
+- Поиск и фильтры предметов.
+- Создание и редактирование предметов.
+- Дублирование и удаление предметов.
+- Структурированные properties/effects.
 - Быстрая выдача предмета персонажу.
-- Undo для операций с инвентарём.
-- Горячие клавиши: `/` поиск, `N` новый предмет, `E` редактирование, `Esc` выход из билдера.
-- Демо-данные кампании.
-- Основа schema-driven Game System для разных систем правил.
+- NPC workshop.
+- Loot builder со случайным предметом и выдачей.
+- Roll tables с историей бросков.
+- Combat tracker с раундами и очередью хода.
+- Заметки ДМа.
+- Undo для операций инвентаря.
+- Горячие клавиши: `/` поиск, `N` новый предмет, `E` редактирование, `G` выдача/мастерская, `Esc` выход из билдера.
+- Permission model: Owner / GM / Assistant GM / Player / Spectator.
+- Реестр Game Systems.
+- Реестр Setting Packs.
+- GitHub Actions: typecheck + production build.
 
 ## Запуск
 
@@ -28,18 +46,23 @@ npm install
 npm run dev
 ```
 
-После запуска открыть `http://localhost:3000`.
+Открыть:
 
-Для production-проверки:
+```text
+http://localhost:3000
+```
+
+Главная автоматически переводит на `/campaigns`.
+
+Production-проверка:
 
 ```bash
+npm run typecheck
 npm run build
 npm run start
 ```
 
 ## Архитектурный принцип
-
-Core приложения не должен зависеть от D&D/Warhammer/другой конкретной системы.
 
 ```text
 Platform Core
@@ -49,73 +72,98 @@ Platform Core
   = Campaign
 ```
 
-`Actor` используется и для героя, и для NPC, и для существа, и для транспорта. Игровые характеристики живут в `systemData`, а конкретная игровая система определяет schema и правила отображения.
+Core ничего не должен знать о конкретных характеристиках системы правил. Вместо этого он знает:
+
+```text
+Actor
+Item
+Inventory
+Scene
+Token
+Combat
+Journal
+Permission
+```
+
+`Actor` используется для персонажа игрока, NPC, существа, транспорта, спутника и призыва. Специфичные игровые характеристики лежат в `systemData`.
 
 Предметы разделены на:
 
-- `ItemDefinition` — шаблон/описание предмета.
-- `ItemInstance` — конкретный экземпляр в инвентаре.
+- `ItemDefinition` — шаблон предмета в библиотеке кампании;
+- `ItemInstance` — конкретный экземпляр в контейнере/инвентаре.
 
-Это позволяет независимо изменять предметы кампании и состояние конкретных экземпляров.
+Подробное описание архитектуры: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-## Текущая структура
+## Структура v0.1
 
 ```text
 src/
 ├── app/
+│   ├── campaigns/
+│   │   └── page.tsx
+│   ├── campaign/demo/
+│   │   ├── play/page.tsx
+│   │   └── settings/page.tsx
 │   ├── globals.css
+│   ├── mvp.css
 │   ├── layout.tsx
 │   └── page.tsx
+├── config/
+│   └── campaignPresets.ts
+├── core/
+│   └── permissions.ts
 ├── data/
 │   └── demo.ts
 ├── domain/
 │   └── types.ts
 ├── features/
+│   ├── campaign/
+│   │   ├── CampaignHub.tsx
+│   │   ├── CampaignSettings.tsx
+│   │   └── CampaignThemeSurface.tsx
 │   └── dm/
-│       └── DmDashboard.tsx
+│       ├── DmDashboard.tsx
+│       └── workshop/
+│           ├── ItemWorkshop.tsx
+│           ├── NpcWorkshop.tsx
+│           ├── LootWorkshop.tsx
+│           └── TablesWorkshop.tsx
+├── settings/
+│   └── registry.ts
 ├── store/
 │   └── useCampaignStore.ts
 └── systems/
-    └── generic-fantasy.ts
+    ├── generic-fantasy.ts
+    └── registry.ts
 ```
 
-## Следующие архитектурные модули
+## Persistence в первой версии
 
-```text
-features/
-├── map/
-├── actors/
-├── items/
-├── inventory/
-├── combat/
-├── workshop/
-├── journal/
-├── scenes/
-└── compendium/
+v0.1 — single-GM browser MVP. Состояние хранится через Zustand persist в `localStorage`:
 
-systems/
-├── core/
-├── generic/
-├── generic-fantasy/
-└── warhammer-like/
+- выбранный сеттинг/тема;
+- библиотека предметов;
+- инвентари;
+- заметки;
+- состояние боя;
+- выбранные объекты интерфейса.
 
-themes/
-├── dark-fantasy/
-├── grimdark/
-└── medieval/
-```
+Это намеренное решение: сначала стабилизируется игровой flow и доменная модель, затем storage adapter заменяется на API/PostgreSQL без переписывания UI.
 
-## Ближайшие задачи
+## Следующий этап после v0.1
 
-1. Разнести `DmDashboard` на feature-компоненты.
-2. Подключить persistence/API вместо demo data.
-3. Добавить PostgreSQL и серверную модель кампании.
-4. Реализовать permissions: Owner / GM / Assistant GM / Player / Spectator.
-5. Добавить realtime события для токенов, HP, инвентаря и боя.
-6. Реализовать Theme Provider и Setting Pack API.
-7. Сделать полноценный schema-driven builder для предметов и Actor.
-8. Добавить Compendium → Campaign Library → Inventory pipeline.
+- backend + PostgreSQL;
+- аккаунты и авторизация;
+- создание нескольких настоящих кампаний;
+- campaign members и object-level permissions;
+- realtime/WebSocket;
+- scene persistence;
+- walls/light/fog data model;
+- server event log + полноценный undo;
+- compendium import pipeline;
+- schema-driven Actor builder;
+- пользовательские Game Systems / Setting Packs.
 
-## Важно
+## Контент
 
-Демо использует вымышленные generic-fantasy данные и не содержит официального защищённого контента конкретной настольной системы.
+Демо использует только вымышленные generic данные и не содержит официальных текстов, иллюстраций или правил конкретной коммерческой настольной системы.
