@@ -1,5 +1,5 @@
-import { DmDashboard } from '@/features/dm/DmDashboard';
+import { redirect } from 'next/navigation';
 
 export default function HomePage() {
-  return <DmDashboard />;
+  redirect('/campaigns');
 }
