@@ -1,45 +1,32 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-
-interface RollTable {
-  id: string;
-  name: string;
-  rows: string[];
-}
-
-const seedTables: RollTable[] = [
-  {
-    id: 'road',
-    name: 'Случайная встреча — дорога',
-    rows: ['Пустая дорога и следы повозки', 'Патруль из трёх стражников', 'Раненый путник просит помощи', 'Разбойники готовят засаду', 'Торговый караван', 'Необычный след ведёт в лес']
-  },
-  {
-    id: 'tavern',
-    name: 'Слухи в таверне',
-    rows: ['В старой шахте снова видели огни', 'Королевский сборщик налогов пропал', 'Купец ищет охрану', 'На мосту появился новый разбойничий знак', 'Священник покупает редкие травы', 'Ночью слышны колокола заброшенной часовни']
-  },
-  {
-    id: 'loot',
-    name: 'Мелкие находки',
-    rows: ['Сломанный серебряный медальон', 'Ключ без замка', '11 серебряных монет', 'Карта с пометкой углём', 'Пузырёк неизвестного масла', 'Письмо с сорванной печатью']
-  }
-];
+import type { RollTable } from '@/domain/types';
+import { useRollTableStore } from '@/store/useRollTableStore';
 
 export function TablesWorkshop() {
-  const [tables, setTables] = useState(seedTables);
-  const [selectedId, setSelectedId] = useState(seedTables[0].id);
+  const { tables, upsert, remove } = useRollTableStore();
+  const [selectedId, setSelectedId] = useState(tables[0]?.id ?? '');
   const [history, setHistory] = useState<string[]>([]);
   const selected = useMemo(() => tables.find((table) => table.id === selectedId) ?? tables[0], [tables, selectedId]);
 
   const createTable = () => {
-    const table: RollTable = { id: `table-${Date.now()}`, name: 'Новая таблица', rows: ['Первый результат', 'Второй результат'] };
-    setTables((value) => [table, ...value]);
+    const table: RollTable = {
+      id: `table-${Date.now()}`,
+      campaignId: 'royal-wastes',
+      name: 'Новая таблица',
+      rows: ['Первый результат', 'Второй результат'],
+    };
+    upsert(table);
     setSelectedId(table.id);
     setHistory([]);
   };
 
-  const updateSelected = (patch: Partial<RollTable>) => setTables((value) => value.map((table) => table.id === selected.id ? { ...table, ...patch } : table));
+  if (!selected) {
+    return <div className="placeholder-panel"><h2>Нет таблиц</h2><button className="button primary" onClick={createTable}>Создать таблицу</button></div>;
+  }
+
+  const updateSelected = (patch: Partial<RollTable>) => upsert({ ...selected, ...patch });
 
   const roll = () => {
     if (!selected.rows.length) return;
@@ -49,9 +36,9 @@ export function TablesWorkshop() {
 
   const removeTable = () => {
     if (tables.length <= 1) return;
-    const next = tables.filter((table) => table.id !== selected.id);
-    setTables(next);
-    setSelectedId(next[0].id);
+    const next = tables.find((table) => table.id !== selected.id);
+    remove(selected.id);
+    setSelectedId(next?.id ?? '');
     setHistory([]);
   };
 
@@ -73,7 +60,7 @@ export function TablesWorkshop() {
         <div className="inspector-header">
           <div>
             <input className="table-title-input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} />
-            <p>Бросок d{Math.max(1, selected.rows.length)}</p>
+            <p>Бросок d{Math.max(1, selected.rows.length)} · сохраняется автоматически</p>
           </div>
           <div className="module-actions compact-actions"><button className="button primary" onClick={roll} disabled={!selected.rows.length}>🎲 Бросить</button><button className="button danger" onClick={removeTable} disabled={tables.length <= 1}>Удалить</button></div>
         </div>
