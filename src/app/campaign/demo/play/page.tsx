@@ -1,5 +1,10 @@
 import { DmDashboard } from '@/features/dm/DmDashboard';
+import { CampaignThemeSurface } from '@/features/campaign/CampaignThemeSurface';
 
 export default function CampaignPlayPage() {
-  return <DmDashboard />;
+  return (
+    <CampaignThemeSurface>
+      <DmDashboard />
+    </CampaignThemeSurface>
+  );
 }
