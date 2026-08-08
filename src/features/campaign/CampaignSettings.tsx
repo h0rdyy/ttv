@@ -7,6 +7,7 @@ import { permissionsFor, type CampaignRole } from '@/core/permissions';
 import { applyCampaignSnapshot, parseCampaignSnapshot } from '@/core/snapshot';
 import { scene } from '@/data/demo';
 import { useCampaignStore } from '@/store/useCampaignStore';
+import { useRollTableStore } from '@/store/useRollTableStore';
 
 type SettingsTab = 'general' | 'members' | 'permissions' | 'scenes' | 'import';
 
@@ -18,7 +19,12 @@ const initialMembers: { id: string; name: string; role: CampaignRole; character?
 ];
 
 export function CampaignSettings() {
-  const { presetId, setPresetId, itemDefinitions, inventories, notes, combatRound, combatTurn, resetDemo } = useCampaignStore();
+  const {
+    presetId, setPresetId, itemDefinitions, inventories, notes, combatRound, combatTurn,
+    mapGrid, mapFog, tokenPositions, customActors, customTokens, resetDemo,
+  } = useCampaignStore();
+  const rollTables = useRollTableStore((state) => state.tables);
+  const resetRollTables = useRollTableStore((state) => state.reset);
   const [tab, setTab] = useState<SettingsTab>('general');
   const [members, setMembers] = useState(initialMembers);
   const [importText, setImportText] = useState('');
@@ -31,7 +37,14 @@ export function CampaignSettings() {
     inventories,
     notes,
     combat: { round: combatRound, turn: combatTurn },
-  }, null, 2), [presetId, itemDefinitions, inventories, notes, combatRound, combatTurn]);
+    map: { grid: mapGrid, fog: mapFog, tokenPositions },
+    customActors,
+    customTokens,
+    rollTables,
+  }, null, 2), [
+    presetId, itemDefinitions, inventories, notes, combatRound, combatTurn,
+    mapGrid, mapFog, tokenPositions, customActors, customTokens, rollTables,
+  ]);
 
   const updateRole = (id: string, role: CampaignRole) => setMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
 
@@ -39,10 +52,16 @@ export function CampaignSettings() {
     try {
       const parsed = parseCampaignSnapshot(importText);
       applyCampaignSnapshot(parsed);
-      setImportMessage('✓ Снимок v0.1 импортирован. Библиотека, инвентари, заметки, бой и пресет восстановлены.');
+      setImportMessage('✓ Снимок v0.1 импортирован. Восстановлены библиотека, инвентари, NPC, карта, таблицы, заметки, бой и пресет.');
     } catch {
       setImportMessage('Не удалось импортировать JSON: формат не соответствует снимку v0.1.');
     }
+  };
+
+  const resetAll = () => {
+    resetDemo();
+    resetRollTables();
+    setImportMessage('Демо-состояние полностью сброшено к исходным данным.');
   };
 
   return (
@@ -79,7 +98,7 @@ export function CampaignSettings() {
               importMessage={importMessage}
               onImportText={setImportText}
               onImport={importSnapshot}
-              onReset={() => { resetDemo(); setImportMessage('Демо-состояние сброшено к исходным данным.'); }}
+              onReset={resetAll}
             />
           )}
         </section>
@@ -125,7 +144,7 @@ function GeneralSettings({ activeId, onPreset }: { activeId: CampaignPresetId; o
       <span className="eyebrow">MVP</span>
       <h2>Что входит в первую версию</h2>
       <div className="check-grid">
-        {['Карта и токены','Группа и Actor','Инвентарь и контейнеры','Бой','Мастерская предметов','NPC','Лут','Таблицы','Заметки','Темы и сеттинги','Undo действий','Локальное сохранение'].map((item) => <div key={item}>✓ {item}</div>)}
+        {['Карта и токены','Группа и Actor','Инвентарь и контейнеры','Бой','Мастерская предметов','NPC','Лут','Таблицы','Заметки','Темы и сеттинги','Undo действий','Импорт / экспорт'].map((item) => <div key={item}>✓ {item}</div>)}
       </div>
     </div>
   </>;
@@ -133,7 +152,7 @@ function GeneralSettings({ activeId, onPreset }: { activeId: CampaignPresetId; o
 
 function MembersSettings({ members, onRole }: { members: typeof initialMembers; onRole: (id: string, role: CampaignRole) => void }) {
   return <div className="settings-card">
-    <div className="hub-section-head"><div><span className="eyebrow">УЧАСТНИКИ</span><h2>Роли кампании</h2></div><button className="button">＋ Пригласить</button></div>
+    <div className="hub-section-head"><div><span className="eyebrow">УЧАСТНИКИ</span><h2>Роли кампании</h2></div><button className="button" disabled title="Появится после подключения auth/backend">＋ Пригласить</button></div>
     <div className="member-table">
       {members.map((member) => <div className="member-row" key={member.id}>
         <span className="member-avatar">{member.name.slice(0,1)}</span>
@@ -162,21 +181,21 @@ function PermissionsSettings() {
 function ScenesSettings() {
   return <>
     <div className="settings-card">
-      <div className="hub-section-head"><div><span className="eyebrow">СЦЕНЫ</span><h2>Сцены кампании</h2></div><button className="button">＋ Новая сцена</button></div>
+      <div className="hub-section-head"><div><span className="eyebrow">СЦЕНЫ</span><h2>Сцены кампании</h2></div><button className="button" disabled title="Редактор нескольких сцен относится к следующему этапу">＋ Новая сцена</button></div>
       <div className="scene-settings-list">
-        <div><span className="scene-thumb">🗺️</span><span><strong>{scene.name}</strong><small>{scene.tokens.length} токена · активная сцена</small></span><button className="button">Открыть</button></div>
-        <div><span className="scene-thumb">🏰</span><span><strong>Замок</strong><small>Черновик · без токенов</small></span><button className="button">Настроить</button></div>
-        <div><span className="scene-thumb">🍺</span><span><strong>Таверна</strong><small>Черновик · без токенов</small></span><button className="button">Настроить</button></div>
+        <div><span className="scene-thumb">🗺️</span><span><strong>{scene.name}</strong><small>{scene.tokens.length} базовых токена · активная сцена</small></span><Link className="button" href="/campaign/demo/play">Открыть</Link></div>
+        <div><span className="scene-thumb">🏰</span><span><strong>Замок</strong><small>Концепт будущей сцены</small></span><button className="button" disabled>После v0.1</button></div>
+        <div><span className="scene-thumb">🍺</span><span><strong>Таверна</strong><small>Концепт будущей сцены</small></span><button className="button" disabled>После v0.1</button></div>
       </div>
     </div>
-    <div className="settings-card"><span className="eyebrow">ПЛАН</span><h2>Scene model</h2><p className="settings-help">В core уже есть Scene/Token. Walls, lighting, fog polygons и assets будут добавляться отдельными слоями, не меняя Actor/Inventory/Workshop.</p></div>
+    <div className="settings-card"><span className="eyebrow">ПЛАН</span><h2>Scene model</h2><p className="settings-help">В core уже есть Scene/Token и сохраняемые позиции токенов. Walls, lighting, fog polygons и asset storage будут добавляться отдельными слоями после v0.1.</p></div>
   </>;
 }
 
 function ImportSettings({ exportJson, importText, importMessage, onImportText, onImport, onReset }: { exportJson: string; importText: string; importMessage: string; onImportText: (value: string) => void; onImport: () => void; onReset: () => void }) {
   return <>
     <div className="settings-card">
-      <span className="eyebrow">ЭКСПОРТ</span><h2>Снимок локальной кампании</h2>
+      <span className="eyebrow">ЭКСПОРТ</span><h2>Полный снимок локальной кампании</h2>
       <textarea className="export-area" readOnly value={exportJson} />
       <button className="button" onClick={() => navigator.clipboard?.writeText(exportJson)}>Копировать JSON</button>
     </div>
