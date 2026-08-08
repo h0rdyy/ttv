@@ -39,6 +39,8 @@ export function DmDashboard() {
     mapGrid,
     mapFog,
     tokenPositions,
+    customActors,
+    customTokens,
     inventories,
     itemDefinitions,
     lastAction,
@@ -57,7 +59,9 @@ export function DmDashboard() {
 
   const [draggedInstance, setDraggedInstance] = useState<{ inventoryId: string; instanceId: string } | null>(null);
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
-  const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? actors[0];
+  const allActors = useMemo(() => [...actors, ...customActors], [customActors]);
+  const allTokens = useMemo(() => [...scene.tokens, ...customTokens], [customTokens]);
+  const selectedActor = allActors.find((actor) => actor.id === selectedActorId) ?? actors[0];
   const inventory = inventories.find((value) => value.ownerActorId === selectedActor.id);
   const preset = getCampaignPreset(presetId);
 
@@ -144,8 +148,8 @@ export function DmDashboard() {
             {['↖', '✋', '◇', '✎', '⌕', '◉'].map((icon) => <button className="map-tool" key={icon}>{icon}</button>)}
           </div>
 
-          {scene.tokens.map((token) => {
-            const actor = actors.find((value) => value.id === token.actorId);
+          {allTokens.map((token) => {
+            const actor = allActors.find((value) => value.id === token.actorId);
             if (!actor) return null;
             const hp = actor.systemData.hp;
             const hpPct = hp ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
@@ -385,7 +389,8 @@ function InventoryPanel({
 }
 
 function NpcPanel({ onOpenWorkshop }: { onOpenWorkshop: () => void }) {
-  const npc = actors.filter((actor) => actor.type !== 'player');
+  const customActors = useCampaignStore((state) => state.customActors);
+  const npc = [...customActors, ...actors.filter((actor) => actor.type !== 'player')];
   return (
     <>
       <div className="sidebar-section-head"><h3 className="sidebar-heading first">NPC И СУЩЕСТВА</h3><button className="text-button" onClick={onOpenWorkshop}>Мастерская</button></div>
