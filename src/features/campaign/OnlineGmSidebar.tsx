@@ -6,7 +6,16 @@ import { friendlyError } from '@/lib/friendlyError';
 
 export type GmSidebarTab = 'party' | 'combat' | 'inventory' | 'npc' | 'notes';
 
-type Actor = { id: string; type: string; name: string; subtitle: string; avatar: string; system_data: Record<string, any> };
+type Actor = {
+  id: string;
+  campaign_id: string;
+  owner_user_id: string | null;
+  type: string;
+  name: string;
+  subtitle: string;
+  avatar: string;
+  system_data: Record<string, any>;
+};
 type Inventory = { id: string; owner_actor_id: string };
 type Container = { id: string; inventory_id: string; name: string; type: string; capacity: number | null; sort_order: number };
 type ItemInstance = { id: string; definition_id: string; container_id: string; quantity: number; custom_name: string | null; equipped: boolean; state: Record<string, any> };
