@@ -47,7 +47,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
 
   const [{ data: notes }, { data: rollTables }] = gmAllowed
     ? await Promise.all([
-        supabase.from('journal_notes').select('id,title,body,pinned,created_at,updated_at').eq('campaign_id', campaignId).order('pinned', { ascending: false }).order('updated_at', { ascending: false }),
+        supabase.from('journal_notes').select('id,title,body,pinned,created_at,updated_at').eq('campaign_id', campaignId).eq('visibility', 'gm').order('pinned', { ascending: false }).order('updated_at', { ascending: false }),
         supabase.from('roll_tables').select('id,name,die,rows').eq('campaign_id', campaignId).order('created_at'),
       ])
     : [{ data: [] }, { data: [] }];
