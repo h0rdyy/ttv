@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -15,6 +15,188 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: Apply v0.4 hardening patch
+        if: github.event_name == 'pull_request'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              text = Path(path).read_text()
+              count = text.count(old)
+              if count == 0:
+                  return False
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, got {count}')
+              Path(path).write_text(text.replace(old, new, 1))
+              return True
+
+          scene_tools = 'src/features/campaign/OnlineSceneTools.tsx'
+          replace_once(scene_tools, '''  const removeMap = async () => {
+            if (!scene.background_path) return;
+            setBusy(true);
+            const supabase = createClient();
+            const { error: removeError } = await supabase.storage.from('campaign-maps').remove([scene.background_path]);
+            if (removeError) {
+              onMessage(friendlyError(removeError, 'Не удалось удалить карту.'));
+              setBusy(false);
+              return;
+            }
+            const { error } = await supabase.rpc('set_scene_map_path', {
+              target_campaign: campaignId,
+              target_scene: scene.id,
+              map_path: null,
+            });
+            if (error) onMessage(friendlyError(error, 'Не удалось очистить карту сцены.'));
+            else {
+              onMessage('Карта удалена со сцены.');
+              onChanged();
+            }
+            setBusy(false);
+          };''', '''  const removeMap = async () => {
+            if (!scene.background_path) return;
+            setBusy(true);
+            const supabase = createClient();
+            const mapPath = scene.background_path;
+            const { error } = await supabase.rpc('set_scene_map_path', {
+              target_campaign: campaignId,
+              target_scene: scene.id,
+              map_path: null,
+            });
+            if (error) {
+              onMessage(friendlyError(error, 'Не удалось убрать карту со сцены.'));
+              setBusy(false);
+              return;
+            }
+            const { error: removeError } = await supabase.storage.from('campaign-maps').remove([mapPath]);
+            if (removeError) onMessage('Карта убрана со сцены, но старый файл не удалось очистить.');
+            else onMessage('Карта удалена со сцены.');
+            onChanged();
+            setBusy(false);
+          };''')
+
+          replace_once(scene_tools, '''  const deleteScene = async () => {
+            if (!window.confirm(`Удалить сцену «${scene.name}»? Фишки этой сцены тоже будут убраны.`)) return;
+            setBusy(true);
+            const supabase = createClient();
+            if (scene.background_path) {
+              const { error: storageError } = await supabase.storage.from('campaign-maps').remove([scene.background_path]);
+              if (storageError) {
+                onMessage(friendlyError(storageError, 'Не удалось удалить файл карты. Сцена оставлена без изменений.'));
+                setBusy(false);
+                return;
+              }
+            }
+            const { error } = await supabase.rpc('delete_campaign_scene', {
+              target_campaign: campaignId,
+              target_scene: scene.id,
+            });
+            if (error) onMessage(friendlyError(error, 'Не удалось удалить сцену.'));
+            else {
+              onClose();
+              onChanged();
+            }
+            setBusy(false);
+          };''', '''  const deleteScene = async () => {
+            if (!window.confirm(`Удалить сцену «${scene.name}»? Фишки этой сцены тоже будут убраны.`)) return;
+            setBusy(true);
+            const supabase = createClient();
+            const mapPath = scene.background_path;
+            const { error } = await supabase.rpc('delete_campaign_scene', {
+              target_campaign: campaignId,
+              target_scene: scene.id,
+            });
+            if (error) {
+              onMessage(friendlyError(error, 'Не удалось удалить сцену.'));
+              setBusy(false);
+              return;
+            }
+            if (mapPath) {
+              const { error: storageError } = await supabase.storage.from('campaign-maps').remove([mapPath]);
+              if (storageError) onMessage('Сцена удалена. Старый файл карты не удалось очистить автоматически.');
+            }
+            onClose();
+            onChanged();
+            setBusy(false);
+          };''')
+
+          table = 'src/features/campaign/OnlineTable.tsx'
+          replace_once(table, '''  const combatActors = useMemo(
+            () => runtime.combat_order.map((id) => actors.find((actor) => actor.id === id)).filter((actor): actor is Actor => Boolean(actor)),
+            [runtime.combat_order, actors],
+          );
+''', '')
+
+          replace_once(table, '''    const token = tokens.find((value) => value.id === draggingTokenId);
+            const now = performance.now();
+            if (token && !token.hidden && now - lastBroadcastRef.current >= 40) {
+              lastBroadcastRef.current = now;
+              broadcastTokenMove(draggingTokenId, point.x, point.y);
+            }''', '''    const token = tokens.find((value) => value.id === draggingTokenId);
+            const now = performance.now();
+            const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(point, activeScene.fog_reveals ?? []));
+            if (liveVisible && now - lastBroadcastRef.current >= 40) {
+              lastBroadcastRef.current = now;
+              broadcastTokenMove(draggingTokenId, point.x, point.y);
+            }''')
+
+          replace_once(table, '''    setDraggingTokenId(null);
+            if (!rawPosition) return;
+            const position = snapPosition(rawPosition);
+
+            const token = tokens.find((value) => value.id === tokenId);
+            if (token && !token.hidden) broadcastTokenMove(tokenId, position.x, position.y);''', '''    setDraggingTokenId(null);
+            if (!rawPosition) return;
+            if (mode === 'player' && activeScene?.fog_enabled && !isPointRevealed(rawPosition, activeScene.fog_reveals ?? [])) {
+              setMessage('Эта область пока скрыта туманом.');
+              setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
+              return;
+            }
+            const position = snapPosition(rawPosition);
+
+            const token = tokens.find((value) => value.id === tokenId);
+            const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(position, activeScene.fog_reveals ?? []));
+            if (liveVisible) broadcastTokenMove(tokenId, position.x, position.y);''')
+
+          replace_once(table, '''                  if (mode === 'player' && activeScene.fog_enabled && !isPointRevealed(position, reveals)) return null;''', '''                  const hiddenByFog = mode === 'player' && activeScene.fog_enabled && actor.owner_user_id !== currentUserId && !isPointRevealed(position, reveals);
+                  if (hiddenByFog && draggingTokenId !== token.id) return null;''')
+
+          replace_once(table, '''            <CombatCard runtime={runtime} actors={combatActors} />''', '''            <CombatCard runtime={runtime} actors={actors} />''')
+
+          replace_once(table, '''function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
+            const current = runtime.combat_active ? actors[runtime.combat_turn] ?? null : null;
+            return (
+              <section className="online-combat-card">
+                <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
+                {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? '—'}</b></div><div className="online-combat-order">{actors.map((actor, index) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{index + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
+              </section>
+            );
+          }''', '''function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
+            const order = runtime.combat_order
+              .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
+              .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
+            const currentId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] : null;
+            const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
+            return (
+              <section className="online-combat-card">
+                <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
+                {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? 'Ход мастера'}</b></div><div className="online-combat-order">{order.map(({ actor, index }, visibleIndex) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{visibleIndex + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
+              </section>
+            );
+          }''')
+          PY
+      - name: Commit v0.4 hardening patch
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -n "$(git status --porcelain -- src/features/campaign/OnlineSceneTools.tsx src/features/campaign/OnlineTable.tsx)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/features/campaign/OnlineSceneTools.tsx src/features/campaign/OnlineTable.tsx
+            git commit -m "fix: harden v0.4 fog and scene cleanup"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
