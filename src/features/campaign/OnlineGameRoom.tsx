@@ -22,7 +22,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
     supabase.from('scenes').select('id,campaign_id,name,background_url,grid_enabled,fog_enabled,created_at').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('inventories').select('id,campaign_id,owner_actor_id').eq('campaign_id', campaignId),
-    supabase.from('item_definitions').select('id,name,description,category,rarity,icon,weight').eq('campaign_id', campaignId),
+    supabase.from('item_definitions').select('id,name,description,category,rarity,icon,weight,price,currency,source,properties,effects').eq('campaign_id', campaignId).order('created_at'),
   ]);
 
   const sceneRows = scenes ?? [];
@@ -45,6 +45,13 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
     ? await supabase.from('item_instances').select('id,definition_id,container_id,quantity,custom_name,equipped,state').in('container_id', containerIds)
     : { data: [] };
 
+  const [{ data: notes }, { data: rollTables }] = gmAllowed
+    ? await Promise.all([
+        supabase.from('journal_notes').select('id,title,body,pinned,created_at,updated_at').eq('campaign_id', campaignId).order('pinned', { ascending: false }).order('updated_at', { ascending: false }),
+        supabase.from('roll_tables').select('id,name,die,rows').eq('campaign_id', campaignId).order('created_at'),
+      ])
+    : [{ data: [] }, { data: [] }];
+
   const displayName =
     (typeof auth.user.user_metadata?.display_name === 'string' && auth.user.user_metadata.display_name.trim())
       ? auth.user.user_metadata.display_name.trim()
@@ -64,6 +71,8 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
       initialContainers={containerRows}
       initialItemInstances={instances ?? []}
       initialItemDefinitions={definitions ?? []}
+      initialNotes={notes ?? []}
+      initialRollTables={rollTables ?? []}
       initialRuntime={runtime ?? {
         campaign_id: campaignId,
         combat_active: false,
