@@ -7,9 +7,10 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect('/login');
 
-  const [{ data: campaign }, { data: membership }] = await Promise.all([
+  const [{ data: campaign }, { data: membership }, { data: runtime }] = await Promise.all([
     supabase.from('campaigns').select('id,name,description,owner_id,active_scene_id').eq('id', campaignId).maybeSingle(),
     supabase.from('campaign_members').select('role').eq('campaign_id', campaignId).eq('user_id', auth.user.id).maybeSingle(),
+    supabase.from('campaign_runtime').select('campaign_id,combat_active,combat_round,combat_turn,combat_order,updated_at').eq('campaign_id', campaignId).maybeSingle(),
   ]);
 
   if (!campaign || !membership) redirect('/campaigns/online');
@@ -44,19 +45,33 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
     ? await supabase.from('item_instances').select('id,definition_id,container_id,quantity,custom_name,equipped,state').in('container_id', containerIds)
     : { data: [] };
 
+  const displayName =
+    (typeof auth.user.user_metadata?.display_name === 'string' && auth.user.user_metadata.display_name.trim())
+      ? auth.user.user_metadata.display_name.trim()
+      : auth.user.email?.split('@')[0] || 'Игрок';
+
   return (
     <OnlineTable
       campaign={campaign}
       role={membership.role}
       mode={mode}
       currentUserId={auth.user.id}
+      displayName={displayName}
       initialScenes={sceneRows}
       initialActors={actors ?? []}
       initialTokens={tokens ?? []}
-      inventories={inventoryRows}
-      containers={containerRows}
-      itemInstances={instances ?? []}
-      itemDefinitions={definitions ?? []}
+      initialInventories={inventoryRows}
+      initialContainers={containerRows}
+      initialItemInstances={instances ?? []}
+      initialItemDefinitions={definitions ?? []}
+      initialRuntime={runtime ?? {
+        campaign_id: campaignId,
+        combat_active: false,
+        combat_round: 1,
+        combat_turn: 0,
+        combat_order: [],
+        updated_at: new Date(0).toISOString(),
+      }}
     />
   );
 }
