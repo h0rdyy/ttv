@@ -1,57 +1,31 @@
-'use client';
-
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { friendlyError } from '@/lib/friendlyError';
+import { login, register } from './actions';
 
-export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'login' | 'register'; nextPath?: string }) {
-  const router = useRouter();
-  const safeNext = nextPath.startsWith('/') ? nextPath : '/campaigns/online';
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [status, setStatus] = useState('');
-  const [busy, setBusy] = useState(false);
+const errorText: Record<string, string> = {
+  required: 'Заполните все поля.',
+  'invalid-credentials': 'Неверная почта или пароль.',
+  'already-registered': 'Аккаунт с этой почтой уже существует.',
+  'confirm-failed': 'Не удалось подтвердить почту. Попробуйте открыть письмо ещё раз.',
+  email: 'Проверьте адрес почты и попробуйте ещё раз.',
+  password: 'Проверьте пароль. Нужно минимум 8 символов.',
+  unknown: 'Не удалось выполнить вход. Попробуйте ещё раз.',
+};
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setStatus('');
-
-    try {
-      const supabase = createClient();
-      if (mode === 'register') {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { display_name: displayName },
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
-          },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          setStatus('Аккаунт создан. Проверьте почту и подтвердите адрес.');
-          return;
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      }
-
-      router.push(safeNext);
-      router.refresh();
-    } catch (error) {
-      setStatus(friendlyError(error, mode === 'login' ? 'Не удалось войти. Попробуйте ещё раз.' : 'Не удалось создать аккаунт. Попробуйте ещё раз.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
+export function AuthForm({
+  mode,
+  nextPath = '/campaigns/online',
+  error,
+  notice,
+}: {
+  mode: 'login' | 'register';
+  nextPath?: string;
+  error?: string;
+  notice?: string;
+}) {
+  const safeNext = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/campaigns/online';
   const registerHref = `/register?next=${encodeURIComponent(safeNext)}`;
   const loginHref = `/login?next=${encodeURIComponent(safeNext)}`;
+  const action = mode === 'login' ? login : register;
 
   return (
     <main className="auth-page">
@@ -60,13 +34,43 @@ export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'logi
         <span className="eyebrow">{mode === 'login' ? 'ВХОД' : 'НОВЫЙ АККАУНТ'}</span>
         <h1>{mode === 'login' ? 'С возвращением' : 'Создать профиль'}</h1>
         <p>{mode === 'login' ? 'Войдите, чтобы продолжить свои кампании.' : 'Один аккаунт для мастера и игрока.'}</p>
-        <form onSubmit={submit} className="auth-form">
-          {mode === 'register' && <label>Имя<input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Как вас будут видеть в кампании" /></label>}
-          <label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></label>
-          <label>Пароль<input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 8 символов" /></label>
-          <button className="button primary full" disabled={busy}>{busy ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}</button>
+
+        <form action={action} className="auth-form">
+          <input type="hidden" name="next" value={safeNext} />
+
+          {mode === 'register' && (
+            <label htmlFor="displayName">
+              Имя или ник
+              <input id="displayName" name="displayName" required autoComplete="nickname" placeholder="Например, Raven" />
+            </label>
+          )}
+
+          <label htmlFor="email">
+            Почта
+            <input id="email" name="email" required type="email" autoComplete="email" />
+          </label>
+
+          <label htmlFor="password">
+            Пароль
+            <input
+              id="password"
+              name="password"
+              required
+              minLength={8}
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              placeholder="Минимум 8 символов"
+            />
+          </label>
+
+          <button className="button primary full" type="submit">
+            {mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
+          </button>
         </form>
-        {status && <div className="auth-status">{status}</div>}
+
+        {error && <div className="auth-status">{errorText[error] ?? errorText.unknown}</div>}
+        {notice === 'check-email' && <div className="auth-status">Аккаунт создан. Откройте письмо и подтвердите почту.</div>}
+
         <div className="auth-switch">
           {mode === 'login' ? <>Нет аккаунта? <Link href={registerHref}>Регистрация</Link></> : <>Уже есть аккаунт? <Link href={loginHref}>Войти</Link></>}
         </div>
