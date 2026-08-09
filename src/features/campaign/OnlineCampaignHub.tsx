@@ -1,10 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
 
+type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type CampaignRow = {
   id: string;
   name: string;
@@ -14,6 +15,12 @@ type CampaignRow = {
   theme_id: string;
   owner_id: string;
   created_at: string;
+  role: Role;
+};
+
+const settingLabels: Record<string, string> = { 'medieval-fantasy': 'Средневековое фэнтези' };
+const roleLabels: Record<Role, string> = {
+  owner: 'Владелец', gm: 'Мастер', 'assistant-gm': 'Помощник мастера', player: 'Игрок', spectator: 'Наблюдатель',
 };
 
 export function OnlineCampaignHub() {
@@ -35,9 +42,17 @@ export function OnlineCampaignHub() {
     }
     setEmail(auth.user.email ?? null);
 
-    const { data, error } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false });
-    if (error) setMessage(error.message);
-    else setCampaigns((data ?? []) as CampaignRow[]);
+    const [{ data: campaignRows, error: campaignError }, { data: memberships, error: memberError }] = await Promise.all([
+      supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
+      supabase.from('campaign_members').select('campaign_id,role').eq('user_id', auth.user.id),
+    ]);
+
+    if (campaignError || memberError) {
+      setMessage(friendlyError(campaignError ?? memberError, 'Не удалось загрузить кампании.'));
+    } else {
+      const roles = new Map((memberships ?? []).map((membership) => [membership.campaign_id, membership.role as Role]));
+      setCampaigns((campaignRows ?? []).map((campaign) => ({ ...campaign, role: roles.get(campaign.id) ?? 'player' })) as CampaignRow[]);
+    }
     setLoading(false);
   };
 
@@ -56,7 +71,7 @@ export function OnlineCampaignHub() {
       campaign_setting_id: 'medieval-fantasy',
       campaign_theme_id: 'dark-fantasy',
     });
-    if (error) setMessage(error.message);
+    if (error) setMessage(friendlyError(error, 'Не удалось создать кампанию.'));
     else {
       setName('');
       setDescription('');
@@ -76,30 +91,32 @@ export function OnlineCampaignHub() {
     <main className="online-hub">
       <header className="online-hub-header">
         <div><div className="brand">✥ TTV</div><small>{email}</small></div>
-        <div className="online-hub-actions"><Link className="button" href="/campaigns">Локальное демо</Link><button className="button" onClick={signOut}>Выйти</button></div>
+        <button className="button" onClick={signOut}>Выйти</button>
       </header>
 
       <section className="online-hero">
-        <span className="eyebrow">SUPABASE ONLINE</span>
-        <h1>Твои кампании</h1>
-        <p>Эти кампании уже хранятся в PostgreSQL и фильтруются серверными RLS-политиками.</p>
+        <span className="eyebrow">МОИ КАМПАНИИ</span>
+        <h1>Куда отправимся сегодня?</h1>
+        <p>Продолжите существующую кампанию или создайте новый мир.</p>
       </section>
 
       <div className="online-layout">
         <section className="online-list">
-          <div className="hub-section-head"><div><span className="eyebrow">КАМПАНИИ</span><h2>Доступные тебе</h2></div></div>
-          {loading ? <div className="empty-card">Загрузка…</div> : campaigns.length === 0 ? <div className="empty-card">Пока нет серверных кампаний. Создай первую справа.</div> : (
+          <div className="hub-section-head"><div><span className="eyebrow">КАМПАНИИ</span><h2>Ваши приключения</h2></div></div>
+          {loading ? <div className="empty-card">Загрузка…</div> : campaigns.length === 0 ? <div className="empty-card">Кампаний пока нет. Создайте первую справа.</div> : (
             <div className="online-cards">
-              {campaigns.map((campaign) => (
-                <article className="online-card" key={campaign.id}>
-                  <div><span className="eyebrow">{campaign.setting_id}</span><h3>{campaign.name}</h3><p>{campaign.description || 'Без описания'}</p></div>
-                  <div className="online-card-meta"><span>{campaign.system_id}</span><span>{campaign.theme_id}</span></div>
-                  <div className="online-card-actions">
-                    <Link className="button" href={`/campaign/${campaign.id}/player`}>Игрок</Link>
-                    <Link className="button primary" href={`/campaign/${campaign.id}/play`}>Открыть как GM</Link>
-                  </div>
-                </article>
-              ))}
+              {campaigns.map((campaign) => {
+                const gmMode = ['owner', 'gm', 'assistant-gm'].includes(campaign.role);
+                return (
+                  <article className="online-card" key={campaign.id}>
+                    <div><span className="eyebrow">{roleLabels[campaign.role]}</span><h3>{campaign.name}</h3><p>{campaign.description || 'Без описания'}</p></div>
+                    <div className="online-card-meta"><span>{settingLabels[campaign.setting_id] ?? 'Авторский мир'}</span></div>
+                    <div className="online-card-actions">
+                      <button className="button primary" onClick={() => router.push(`/campaign/${campaign.id}/${gmMode ? 'play' : 'player'}`)}>Открыть кампанию</button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
@@ -109,10 +126,9 @@ export function OnlineCampaignHub() {
           <h2>Создать мир</h2>
           <form onSubmit={createCampaign} className="auth-form">
             <label>Название<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Например: Пепельная корона" /></label>
-            <label>Описание<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Коротко о кампании" /></label>
+            <label>Описание<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Пара слов о будущем приключении" /></label>
             <button className="button primary full" disabled={busy}>{busy ? 'Создаём…' : '＋ Создать кампанию'}</button>
           </form>
-          <small>Пока новая кампания использует generic-fantasy preset. Выбор системы и сеттинга подключим следующим шагом.</small>
           {message && <div className="auth-status">{message}</div>}
         </aside>
       </div>
