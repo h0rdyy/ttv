@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
 
 export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'login' | 'register'; nextPath?: string }) {
   const router = useRouter();
@@ -32,7 +33,7 @@ export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'logi
         });
         if (error) throw error;
         if (!data.session) {
-          setStatus('Аккаунт создан. Проверь почту и подтверди адрес. После подтверждения вернёшься к приглашению.');
+          setStatus('Аккаунт создан. Проверьте почту и подтвердите адрес.');
           return;
         }
       } else {
@@ -43,7 +44,7 @@ export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'logi
       router.push(safeNext);
       router.refresh();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Не удалось выполнить вход.');
+      setStatus(friendlyError(error, mode === 'login' ? 'Не удалось войти. Попробуйте ещё раз.' : 'Не удалось создать аккаунт. Попробуйте ещё раз.'));
     } finally {
       setBusy(false);
     }
@@ -57,10 +58,10 @@ export function AuthForm({ mode, nextPath = '/campaigns/online' }: { mode: 'logi
       <section className="auth-card">
         <Link href="/campaigns" className="brand">✥ TTV</Link>
         <span className="eyebrow">{mode === 'login' ? 'ВХОД' : 'НОВЫЙ АККАУНТ'}</span>
-        <h1>{mode === 'login' ? 'Вернуться к кампании' : 'Создать профиль'}</h1>
-        <p>{mode === 'login' ? 'Войди, чтобы открыть серверные кампании.' : 'Один аккаунт для ролей мастера и игрока.'}</p>
+        <h1>{mode === 'login' ? 'С возвращением' : 'Создать профиль'}</h1>
+        <p>{mode === 'login' ? 'Войдите, чтобы продолжить свои кампании.' : 'Один аккаунт для мастера и игрока.'}</p>
         <form onSubmit={submit} className="auth-form">
-          {mode === 'register' && <label>Имя<input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Как тебя показывать в кампании" /></label>}
+          {mode === 'register' && <label>Имя<input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Как вас будут видеть в кампании" /></label>}
           <label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></label>
           <label>Пароль<input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Минимум 8 символов" /></label>
           <button className="button primary full" disabled={busy}>{busy ? 'Подождите…' : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}</button>
