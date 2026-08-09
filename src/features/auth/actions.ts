@@ -14,6 +14,10 @@ function text(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function rawText(value: FormDataEntryValue | null) {
+  return typeof value === 'string' ? value : '';
+}
+
 function authUrl(mode: 'login' | 'register', next: string, key: 'error' | 'notice', value: string) {
   const params = new URLSearchParams({ next, [key]: value });
   return `/${mode}?${params.toString()}`;
@@ -39,7 +43,7 @@ async function requestOrigin() {
 
 export async function login(formData: FormData) {
   const email = text(formData.get('email')).toLowerCase();
-  const password = text(formData.get('password'));
+  const password = rawText(formData.get('password'));
   const next = safeNext(formData.get('next'));
 
   if (!email || !password) redirect(authUrl('login', next, 'error', 'required'));
@@ -55,7 +59,7 @@ export async function login(formData: FormData) {
 export async function register(formData: FormData) {
   const displayName = text(formData.get('displayName'));
   const email = text(formData.get('email')).toLowerCase();
-  const password = text(formData.get('password'));
+  const password = rawText(formData.get('password'));
   const next = safeNext(formData.get('next'));
 
   if (!displayName || !email || !password) redirect(authUrl('register', next, 'error', 'required'));
