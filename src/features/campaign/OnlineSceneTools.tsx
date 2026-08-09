@@ -147,22 +147,22 @@ export function OnlineSceneTools({
     if (!scene.background_path) return;
     setBusy(true);
     const supabase = createClient();
-    const { error: removeError } = await supabase.storage.from('campaign-maps').remove([scene.background_path]);
-    if (removeError) {
-      onMessage(friendlyError(removeError, 'Не удалось удалить карту.'));
-      setBusy(false);
-      return;
-    }
+    const mapPath = scene.background_path;
     const { error } = await supabase.rpc('set_scene_map_path', {
       target_campaign: campaignId,
       target_scene: scene.id,
       map_path: null,
     });
-    if (error) onMessage(friendlyError(error, 'Не удалось очистить карту сцены.'));
-    else {
-      onMessage('Карта удалена со сцены.');
-      onChanged();
+    if (error) {
+      onMessage(friendlyError(error, 'Не удалось убрать карту со сцены.'));
+      setBusy(false);
+      return;
     }
+
+    const { error: removeError } = await supabase.storage.from('campaign-maps').remove([mapPath]);
+    if (removeError) onMessage('Карта убрана со сцены, но старый файл не удалось очистить.');
+    else onMessage('Карта удалена со сцены.');
+    onChanged();
     setBusy(false);
   };
 
@@ -225,23 +225,23 @@ export function OnlineSceneTools({
     if (!window.confirm(`Удалить сцену «${scene.name}»? Фишки этой сцены тоже будут убраны.`)) return;
     setBusy(true);
     const supabase = createClient();
-    if (scene.background_path) {
-      const { error: storageError } = await supabase.storage.from('campaign-maps').remove([scene.background_path]);
-      if (storageError) {
-        onMessage(friendlyError(storageError, 'Не удалось удалить файл карты. Сцена оставлена без изменений.'));
-        setBusy(false);
-        return;
-      }
-    }
+    const mapPath = scene.background_path;
     const { error } = await supabase.rpc('delete_campaign_scene', {
       target_campaign: campaignId,
       target_scene: scene.id,
     });
-    if (error) onMessage(friendlyError(error, 'Не удалось удалить сцену.'));
-    else {
-      onClose();
-      onChanged();
+    if (error) {
+      onMessage(friendlyError(error, 'Не удалось удалить сцену.'));
+      setBusy(false);
+      return;
     }
+
+    if (mapPath) {
+      const { error: storageError } = await supabase.storage.from('campaign-maps').remove([mapPath]);
+      if (storageError) onMessage('Сцена удалена. Старый файл карты не удалось очистить автоматически.');
+    }
+    onClose();
+    onChanged();
     setBusy(false);
   };
 
