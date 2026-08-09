@@ -1,6 +1,6 @@
-import { OnlineCampaignRoom } from '@/features/campaign/OnlineCampaignRoom';
+import { OnlineGameRoom } from '@/features/campaign/OnlineGameRoom';
 
 export default async function CampaignPlayerPage({ params }: { params: Promise<{ campaignId: string }> }) {
   const { campaignId } = await params;
-  return <OnlineCampaignRoom campaignId={campaignId} mode="player" />;
+  return <OnlineGameRoom campaignId={campaignId} mode="player" />;
 }

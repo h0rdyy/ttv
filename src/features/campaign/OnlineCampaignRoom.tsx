@@ -33,14 +33,14 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
       <header className="online-hub-header">
         <div><div className="brand">✥ TTV</div><small>{campaign.name}</small></div>
         <div className="online-hub-actions">
-          {gmAllowed && <Link className={`button ${mode === 'gm' ? 'primary' : ''}`} href={`/campaign/${campaignId}/play`}>Мастер</Link>}
-          <Link className={`button ${mode === 'player' ? 'primary' : ''}`} href={`/campaign/${campaignId}/player`}>Игрок</Link>
-          <Link className="button" href="/campaigns/online">К кампаниям</Link>
+          <Link className="button" href={`/campaign/${campaignId}/play`}>Игровой стол</Link>
+          <Link className="button primary" href={`/campaign/${campaignId}/manage`}>Кампания</Link>
+          <Link className="button" href="/campaigns/online">К списку</Link>
         </div>
       </header>
 
       <section className="campaign-room-hero">
-        <span className="eyebrow">{mode === 'gm' ? 'КАМПАНИЯ' : 'ПРИКЛЮЧЕНИЕ'}</span>
+        <span className="eyebrow">УПРАВЛЕНИЕ КАМПАНИЕЙ</span>
         <h1>{campaign.name}</h1>
         <p>{campaign.description || 'Описание пока не добавлено.'}</p>
         <div className="friendly-tags">
@@ -49,29 +49,21 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
         </div>
       </section>
 
-      {mode === 'gm' ? (
-        <div className="campaign-manage-grid">
-          <div className="manage-stack">
-            <MembersPanel campaignId={campaignId} ownerId={campaign.owner_id} canManageRoles={isOwner} canAssignActors={gmAllowed} />
-            <InvitePanel campaignId={campaignId} />
-          </div>
-          <div className="manage-stack">
-            <section className="manage-card play-card">
-              <span className="eyebrow">ИГРОВОЙ СТОЛ</span>
-              <h3>Продолжить кампанию</h3>
-              <p className="muted">Персонажи, карта и инвентарь будут открываться здесь одной игровой комнатой.</p>
-              <button className="button primary" disabled>Открыть стол</button>
-            </section>
-            {isOwner && <DeleteCampaignPanel campaignId={campaignId} campaignName={campaign.name} />}
-          </div>
+      <div className="campaign-manage-grid">
+        <div className="manage-stack">
+          <MembersPanel campaignId={campaignId} ownerId={campaign.owner_id} canManageRoles={isOwner} canAssignActors={gmAllowed} />
+          <InvitePanel campaignId={campaignId} />
         </div>
-      ) : (
-        <section className="player-wait-card">
-          <h2>Вы в кампании</h2>
-          <p>Когда мастер подготовит персонажа и сцену, игровой стол откроется здесь.</p>
-          <Link className="button" href="/campaigns/online">Мои кампании</Link>
-        </section>
-      )}
+        <div className="manage-stack">
+          <section className="manage-card play-card">
+            <span className="eyebrow">ИГРОВОЙ СТОЛ</span>
+            <h3>Продолжить кампанию</h3>
+            <p className="muted">Откройте сцену, добавьте персонажей и начните игру.</p>
+            <Link className="button primary" href={`/campaign/${campaignId}/play`}>Открыть стол</Link>
+          </section>
+          {isOwner && <DeleteCampaignPanel campaignId={campaignId} campaignName={campaign.name} />}
+        </div>
+      </div>
     </main>
   );
 }
