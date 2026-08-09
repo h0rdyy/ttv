@@ -8,10 +8,25 @@ import { friendlyError } from '@/lib/friendlyError';
 import { useCampaignRealtime } from './useCampaignRealtime';
 import { OnlineGmWorkshop } from './OnlineGmWorkshop';
 import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
+import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
-type Scene = { id: string; campaign_id: string; name: string; background_url: string | null; grid_enabled: boolean; fog_enabled: boolean; created_at: string };
+type Scene = {
+  id: string;
+  campaign_id: string;
+  name: string;
+  background_url: string | null;
+  background_path: string | null;
+  grid_enabled: boolean;
+  fog_enabled: boolean;
+  grid_size: number;
+  grid_offset_x: number;
+  grid_offset_y: number;
+  grid_snap: boolean;
+  fog_reveals: FogReveal[];
+  created_at: string;
+};
 type Actor = { id: string; campaign_id: string; owner_user_id: string | null; type: string; name: string; subtitle: string; avatar: string; system_data: Record<string, any> };
 type Token = { id: string; scene_id: string; actor_id: string; x: number; y: number; size: number; rotation: number; enemy: boolean; hidden: boolean };
 type Inventory = { id: string; campaign_id: string; owner_actor_id: string };
@@ -34,6 +49,7 @@ type ItemDefinition = {
 type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
+type Camera = { zoom: number; x: number; y: number };
 
 type Props = {
   campaign: Campaign;
@@ -73,12 +89,21 @@ export function OnlineTable(props: Props) {
   });
   const [sidebarTab, setSidebarTab] = useState<GmSidebarTab>('party');
   const [workshopOpen, setWorkshopOpen] = useState(false);
+  const [sceneToolsOpen, setSceneToolsOpen] = useState(false);
+  const [fogDrawMode, setFogDrawMode] = useState(false);
+  const [fogDraft, setFogDraft] = useState<FogReveal | null>(null);
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [camera, setCamera] = useState<Camera>({ zoom: 1, x: 0, y: 0 });
+  const [panning, setPanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const refreshTimerRef = useRef<number | null>(null);
   const lastBroadcastRef = useRef(0);
+  const mapWorldRef = useRef<HTMLDivElement | null>(null);
+  const panRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const spaceHeldRef = useRef(false);
+  const fogStartRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => setCampaign(props.campaign), [props.campaign]);
   useEffect(() => setActors(props.initialActors), [props.initialActors]);
@@ -105,18 +130,32 @@ export function OnlineTable(props: Props) {
   }, []);
 
   useEffect(() => {
-    if (mode !== 'gm') return;
-    const onKey = (event: KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') spaceHeldRef.current = true;
+      if (mode !== 'gm') return;
       const editing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '');
       if (event.key === '/' && !editing) {
         event.preventDefault();
         setWorkshopOpen(true);
         requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[data-item-search]')?.focus());
       }
-      if (event.key === 'Escape') setWorkshopOpen(false);
+      if (event.key === 'Escape') {
+        setWorkshopOpen(false);
+        setSceneToolsOpen(false);
+        setFogDrawMode(false);
+        setFogDraft(null);
+        fogStartRef.current = null;
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') spaceHeldRef.current = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, [mode]);
 
   const onRemoteTokenMove = useCallback((move: { tokenId: string; x: number; y: number }) => {
@@ -146,6 +185,13 @@ export function OnlineTable(props: Props) {
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(role);
 
   useEffect(() => {
+    setCamera({ zoom: 1, x: 0, y: 0 });
+    setFogDraft(null);
+    fogStartRef.current = null;
+    setFogDrawMode(false);
+  }, [activeScene?.id]);
+
+  useEffect(() => {
     if (mode === 'player' && ownActor && selectedActorId !== ownActor.id) setSelectedActorId(ownActor.id);
     if (mode === 'gm' && selectedActorId && !actors.some((actor) => actor.id === selectedActorId)) {
       setSelectedActorId(actors.find((actor) => actor.type === 'player')?.id ?? actors[0]?.id ?? '');
@@ -156,19 +202,18 @@ export function OnlineTable(props: Props) {
   const selectedInventory = inventoryForActor(sidebarActor?.id);
   const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
   const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
-  const combatActors = useMemo(
-    () => runtime.combat_order.map((id) => actors.find((actor) => actor.id === id)).filter((actor): actor is Actor => Boolean(actor)),
-    [runtime.combat_order, actors],
-  );
 
   const createScene = async () => {
     const name = window.prompt('Название новой сцены', 'Новая сцена')?.trim();
     if (!name) return;
     setBusy(true); setMessage('');
     const supabase = createClient();
-    const { error } = await supabase.rpc('create_campaign_scene', { target_campaign: campaign.id, scene_name: name });
+    const { data, error } = await supabase.rpc('create_campaign_scene', { target_campaign: campaign.id, scene_name: name });
     if (error) setMessage(friendlyError(error, 'Не удалось создать сцену.'));
-    else scheduleRefresh();
+    else {
+      if (!campaign.active_scene_id && typeof data === 'string') setCampaign((current) => ({ ...current, active_scene_id: data }));
+      scheduleRefresh();
+    }
     setBusy(false);
   };
 
@@ -206,19 +251,66 @@ export function OnlineTable(props: Props) {
     setBusy(false);
   };
 
+  const patchScene = async (patch: { grid?: boolean; fog?: boolean }) => {
+    if (!activeScene || mode !== 'gm') return;
+    const supabase = createClient();
+    const { error } = await supabase.rpc('update_campaign_scene', {
+      target_campaign: campaign.id,
+      target_scene: activeScene.id,
+      scene_grid_enabled: patch.grid ?? null,
+      scene_fog_enabled: patch.fog ?? null,
+    });
+    if (error) {
+      setMessage(friendlyError(error, 'Не удалось изменить сцену.'));
+      return;
+    }
+    setScenes((current) => current.map((scene) => scene.id === activeScene.id ? {
+      ...scene,
+      grid_enabled: patch.grid ?? scene.grid_enabled,
+      fog_enabled: patch.fog ?? scene.fog_enabled,
+    } : scene));
+    scheduleRefresh();
+  };
+
+  const pointInWorld = (event: React.PointerEvent<HTMLElement>) => {
+    const rect = mapWorldRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return null;
+    return {
+      x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
+    };
+  };
+
   const moveDraggingToken = (event: React.PointerEvent<HTMLElement>) => {
     if (!draggingTokenId) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
-    setPositions((current) => ({ ...current, [draggingTokenId]: { x, y } }));
+    const point = pointInWorld(event);
+    if (!point) return;
+    setPositions((current) => ({ ...current, [draggingTokenId]: point }));
 
     const token = tokens.find((value) => value.id === draggingTokenId);
     const now = performance.now();
-    if (token && !token.hidden && now - lastBroadcastRef.current >= 40) {
+    const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(point, activeScene.fog_reveals ?? []));
+    if (liveVisible && now - lastBroadcastRef.current >= 40) {
       lastBroadcastRef.current = now;
-      broadcastTokenMove(draggingTokenId, x, y);
+      broadcastTokenMove(draggingTokenId, point.x, point.y);
     }
+  };
+
+  const snapPosition = (position: { x: number; y: number }) => {
+    if (!activeScene?.grid_enabled || !activeScene.grid_snap || !mapWorldRef.current) return position;
+    const rect = mapWorldRef.current.getBoundingClientRect();
+    const baseWidth = rect.width / camera.zoom;
+    const baseHeight = rect.height / camera.zoom;
+    if (!baseWidth || !baseHeight) return position;
+    const xPx = (position.x / 100) * baseWidth;
+    const yPx = (position.y / 100) * baseHeight;
+    const size = activeScene.grid_size || 64;
+    const snappedX = Math.round((xPx - activeScene.grid_offset_x) / size) * size + activeScene.grid_offset_x;
+    const snappedY = Math.round((yPx - activeScene.grid_offset_y) / size) * size + activeScene.grid_offset_y;
+    return {
+      x: Math.max(0, Math.min(100, (snappedX / baseWidth) * 100)),
+      y: Math.max(0, Math.min(100, (snappedY / baseHeight) * 100)),
+    };
   };
 
   const cancelTokenDrag = () => {
@@ -235,9 +327,21 @@ export function OnlineTable(props: Props) {
   const finishTokenDrag = async () => {
     if (!draggingTokenId) return;
     const tokenId = draggingTokenId;
-    const position = positions[tokenId];
+    const rawPosition = positions[tokenId];
     setDraggingTokenId(null);
-    if (!position) return;
+    if (!rawPosition) return;
+    const position = snapPosition(rawPosition);
+
+    if (mode === 'player' && activeScene?.fog_enabled && !isPointRevealed(position, activeScene.fog_reveals ?? [])) {
+      setMessage('Эта область пока скрыта туманом.');
+      setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
+      return;
+    }
+
+    const token = tokens.find((value) => value.id === tokenId);
+    const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(position, activeScene.fog_reveals ?? []));
+    if (liveVisible) broadcastTokenMove(tokenId, position.x, position.y);
+    setPositions((current) => ({ ...current, [tokenId]: position }));
 
     const supabase = createClient();
     const { error } = await supabase.rpc('move_scene_token', {
@@ -250,8 +354,82 @@ export function OnlineTable(props: Props) {
       setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
       return;
     }
-    setTokens((current) => current.map((token) => token.id === tokenId ? { ...token, ...position } : token));
+    setTokens((current) => current.map((value) => value.id === tokenId ? { ...value, ...position } : value));
     setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
+  };
+
+  const beginFogDraw = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (mode !== 'gm' || !fogDrawMode || !activeScene?.fog_enabled || event.button !== 0) return;
+    const point = pointInWorld(event);
+    if (!point) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    fogStartRef.current = point;
+    setFogDraft({ id: 'draft', x: point.x, y: point.y, width: 0, height: 0 });
+  };
+
+  const moveFogDraw = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = fogStartRef.current;
+    if (!start) return;
+    const point = pointInWorld(event);
+    if (!point) return;
+    setFogDraft({
+      id: 'draft',
+      x: Math.min(start.x, point.x),
+      y: Math.min(start.y, point.y),
+      width: Math.abs(point.x - start.x),
+      height: Math.abs(point.y - start.y),
+    });
+  };
+
+  const finishFogDraw = async () => {
+    const draft = fogDraft;
+    fogStartRef.current = null;
+    setFogDraft(null);
+    if (!draft || !activeScene || draft.width < 0.5 || draft.height < 0.5) return;
+    const reveal = { ...draft, id: crypto.randomUUID() };
+    const reveals = [...(activeScene.fog_reveals ?? []), reveal];
+    setScenes((current) => current.map((scene) => scene.id === activeScene.id ? { ...scene, fog_reveals: reveals } : scene));
+    const supabase = createClient();
+    const { error } = await supabase.rpc('set_scene_fog_reveals', {
+      target_campaign: campaign.id,
+      target_scene: activeScene.id,
+      reveals,
+    });
+    if (error) {
+      setMessage(friendlyError(error, 'Не удалось открыть область карты.'));
+      scheduleRefresh();
+    }
+  };
+
+  const beginPan = (event: React.PointerEvent<HTMLElement>) => {
+    if (fogDrawMode || draggingTokenId) return;
+    if (event.button !== 1 && !(event.button === 0 && spaceHeldRef.current)) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    setPanning(true);
+  };
+
+  const movePan = (event: React.PointerEvent<HTMLElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    panRef.current = { ...pan, x: event.clientX, y: event.clientY };
+    setCamera((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLElement>) => {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    setPanning(false);
+  };
+
+  const changeZoom = (nextZoom: number) => {
+    setCamera((current) => ({ ...current, zoom: Math.max(0.5, Math.min(3, nextZoom)) }));
   };
 
   const changeHp = async (actor: Actor, delta: number) => {
@@ -284,79 +462,142 @@ export function OnlineTable(props: Props) {
     ? onlineUsers.map((user) => `${user.name}${user.mode === 'gm' ? ' · мастер' : ''}`).join('\n')
     : 'Подключение к кампании';
 
+  const reveals = activeScene?.fog_reveals ?? [];
+  const zoomLabel = `${Math.round(camera.zoom * 100)}%`;
+
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
       <header className="online-table-topbar">
         <div className="online-table-brand">{mode === 'gm' ? '✥ ПАНЕЛЬ МАСТЕРА' : '✦ TTV'}</div>
         <div className="online-table-campaign"><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
+
+        <div className="map-zoom-controls">
+          <button className="button icon-button" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
+          <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
+          <button className="button icon-button" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
+        </div>
+
         {mode === 'gm' && (
           <>
             <div className="online-scene-controls">
               {scenes.length > 0 && <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy}>{scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}</select>}
               <button className="button" onClick={createScene} disabled={busy}>＋ Сцена</button>
             </div>
+            <div className="top-actions online-map-actions">
+              <button className={`button ${activeScene?.grid_enabled ? 'active' : ''}`} disabled={!activeScene} onClick={() => void patchScene({ grid: !activeScene?.grid_enabled })}>▦ Сетка</button>
+              <button className={`button ${activeScene?.fog_enabled ? 'active' : ''}`} disabled={!activeScene} onClick={() => void patchScene({ fog: !activeScene?.fog_enabled })}>♟ Туман</button>
+              <button className={`button ${sceneToolsOpen ? 'active' : ''}`} disabled={!activeScene} onClick={() => { setSceneToolsOpen((value) => !value); setWorkshopOpen(false); }}>▣ Сцена</button>
+            </div>
             <div className="top-actions online-gm-actions">
               <button className="button" onClick={() => { setSidebarTab('party'); void createPlayerActor(); }}>＋ Герой</button>
               <button className="button" onClick={() => setSidebarTab('party')}>♟ Игроки</button>
               <button className="button" onClick={() => setSidebarTab('npc')}>☠ NPC</button>
-              <button className="button" onClick={() => setSidebarTab('notes')}>▤ Заметки</button>
-              <button className={`button ${workshopOpen ? 'active' : ''}`} onClick={() => setWorkshopOpen((value) => !value)}>⚒ Мастерская</button>
+              <button className={`button ${workshopOpen ? 'active' : ''}`} onClick={() => { setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
             </div>
           </>
         )}
         <div className="online-table-spacer" />
         <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
         {gmAllowed && <Link className="button" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}>{mode === 'gm' ? '👁 Игрок' : 'Мастер'}</Link>}
-        {mode === 'gm' && <Link className="button" href={`/campaign/${campaign.id}/manage`}>⚙ Кампания</Link>}
+        {mode === 'gm' && <Link className="button" href={`/campaign/${campaign.id}/manage`}>⚙</Link>}
         <Link className="button" href="/campaigns/online">Выйти</Link>
       </header>
 
       <main className="online-table-workspace">
         <section
-          className={`map-stage online-map-stage ${activeScene?.grid_enabled === false ? 'grid-off' : ''} ${draggingTokenId ? 'token-dragging' : ''}`}
-          style={activeScene?.background_url ? { backgroundImage: `url(${activeScene.background_url})` } : undefined}
-          onPointerMove={moveDraggingToken}
-          onPointerUp={() => void finishTokenDrag()}
-          onPointerCancel={cancelTokenDrag}
+          className={`map-stage online-map-stage ${draggingTokenId ? 'token-dragging' : ''} ${panning ? 'map-panning' : ''} ${fogDrawMode ? 'fog-drawing' : ''}`}
+          onWheel={(event) => {
+            event.preventDefault();
+            changeZoom(camera.zoom * (event.deltaY < 0 ? 1.1 : 0.9));
+          }}
+          onPointerDown={beginPan}
+          onPointerMove={movePan}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
         >
           {!activeScene && mode === 'gm' ? (
             <div className="online-empty-map"><span>🗺</span><h2>Создайте первую сцену</h2><p>С неё начнётся игровой стол этой кампании.</p><button className="button primary" onClick={createScene}>＋ Создать сцену</button></div>
-          ) : (
+          ) : activeScene ? (
             <>
-              {!activeScene?.background_url && <><div className="map-river"/><div className="map-ruin"/><div className="map-location location-a">Неизведанные земли</div><div className="map-location location-b">Путь группы</div></>}
-              {activeScene?.fog_enabled && mode === 'player' && <div className="player-fog-hint" />}
-              {tokens.map((token) => {
-                const actor = actors.find((value) => value.id === token.actor_id);
-                if (!actor) return null;
-                const hp = actor.system_data?.hp;
-                const hpPct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
-                const position = positions[token.id] ?? { x: token.x, y: token.y };
-                const canMove = mode === 'gm' || actor.owner_user_id === currentUserId;
-                return (
-                  <button
-                    key={token.id}
-                    className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
-                    style={{ left: `${position.x}%`, top: `${position.y}%` }}
-                    onPointerDown={(event) => {
-                      setSelectedActorId(actor.id);
-                      if (!canMove) return;
-                      event.preventDefault();
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                      lastBroadcastRef.current = 0;
-                      setDraggingTokenId(token.id);
+              <div
+                ref={mapWorldRef}
+                className="online-map-world"
+                style={{
+                  transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
+                  backgroundImage: activeScene.background_url ? `url(${activeScene.background_url})` : undefined,
+                }}
+                onPointerDown={beginFogDraw}
+                onPointerMove={(event) => { moveDraggingToken(event); moveFogDraw(event); }}
+                onPointerUp={() => { void finishTokenDrag(); void finishFogDraw(); }}
+                onPointerCancel={() => { cancelTokenDrag(); fogStartRef.current = null; setFogDraft(null); }}
+              >
+                {!activeScene.background_url && <><div className="map-river"/><div className="map-ruin"/><div className="map-location location-a">Неизведанные земли</div><div className="map-location location-b">Путь группы</div></>}
+
+                {activeScene.grid_enabled && (
+                  <div
+                    className="online-grid-layer"
+                    style={{
+                      backgroundSize: `${activeScene.grid_size}px ${activeScene.grid_size}px`,
+                      backgroundPosition: `${activeScene.grid_offset_x}px ${activeScene.grid_offset_y}px`,
                     }}
-                    onClick={() => setSelectedActorId(actor.id)}
-                    title={canMove ? `${actor.name} — можно перемещать` : actor.name}
-                  >
-                    <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
-                    <span className="token-name">{actor.name}</span>
-                    <span className="token-hp"><i style={{ width: `${hpPct}%` }}/></span>
-                    {token.hidden && mode === 'gm' && <em className="hidden-token-mark">скрыт</em>}
-                  </button>
-                );
-              })}
-              {activeScene && <div className="scene-chip">СЦЕНА · {activeScene.name}</div>}
+                  />
+                )}
+
+                {tokens.map((token) => {
+                  const actor = actors.find((value) => value.id === token.actor_id);
+                  if (!actor) return null;
+                  const hp = actor.system_data?.hp;
+                  const hpPct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
+                  const position = positions[token.id] ?? { x: token.x, y: token.y };
+                  const hiddenByFog = mode === 'player' && activeScene.fog_enabled && actor.owner_user_id !== currentUserId && !isPointRevealed(position, reveals);
+                  if (hiddenByFog && draggingTokenId !== token.id) return null;
+                  const canMove = !fogDrawMode && (mode === 'gm' || actor.owner_user_id === currentUserId);
+                  return (
+                    <button
+                      key={token.id}
+                      className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
+                      style={{ left: `${position.x}%`, top: `${position.y}%`, transform: `translate(-50%,-50%) scale(${token.size || 1})` }}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        setSelectedActorId(actor.id);
+                        if (!canMove) return;
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        lastBroadcastRef.current = 0;
+                        setDraggingTokenId(token.id);
+                      }}
+                      onClick={() => setSelectedActorId(actor.id)}
+                      title={canMove ? `${actor.name} — можно перемещать` : actor.name}
+                    >
+                      <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+                      <span className="token-name">{actor.name}</span>
+                      <span className="token-hp"><i style={{ width: `${hpPct}%` }}/></span>
+                      {token.hidden && mode === 'gm' && <em className="hidden-token-mark">скрыт</em>}
+                    </button>
+                  );
+                })}
+
+                {activeScene.fog_enabled && <FogLayer reveals={reveals} draft={fogDraft} gm={mode === 'gm'} />}
+              </div>
+
+              <div className="map-view-hint">Колесо — масштаб · Space + drag / средняя кнопка — двигать карту</div>
+              <div className="scene-chip">СЦЕНА · {activeScene.name}</div>
+              {mode === 'gm' && fogDrawMode && <div className="fog-mode-chip">♟ Рисуйте область, которую увидят игроки</div>}
             </>
+          ) : null}
+
+          {mode === 'gm' && activeScene && sceneToolsOpen && (
+            <OnlineSceneTools
+              campaignId={campaign.id}
+              scene={activeScene}
+              actors={actors}
+              tokens={tokens}
+              fogDrawMode={fogDrawMode}
+              onFogDrawMode={setFogDrawMode}
+              onClose={() => { setSceneToolsOpen(false); setFogDrawMode(false); }}
+              onChanged={scheduleRefresh}
+              onMessage={setMessage}
+            />
           )}
 
           {mode === 'gm' && workshopOpen && (
@@ -392,7 +633,7 @@ export function OnlineTable(props: Props) {
             busy={busy}
             onHp={(actor, delta) => void changeHp(actor, delta)}
             onCombat={(action) => void combatAction(action)}
-            onOpenWorkshop={() => setWorkshopOpen(true)}
+            onOpenWorkshop={() => { setWorkshopOpen(true); setSceneToolsOpen(false); }}
             onChanged={scheduleRefresh}
             onMessage={setMessage}
           />
@@ -406,7 +647,7 @@ export function OnlineTable(props: Props) {
             ) : (
               <div className="online-player-unassigned"><span>🧙</span><h2>Персонаж ещё не назначен</h2><p>Мастер выберет вашего героя в настройках кампании.</p></div>
             )}
-            <CombatCard runtime={runtime} actors={combatActors} />
+            <CombatCard runtime={runtime} actors={actors} />
           </aside>
         )}
       </main>
@@ -414,6 +655,28 @@ export function OnlineTable(props: Props) {
       {message && <div className="auth-status online-table-message online-global-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
   );
+}
+
+function FogLayer({ reveals, draft, gm }: { reveals: FogReveal[]; draft: FogReveal | null; gm: boolean }) {
+  const maskId = gm ? 'ttv-fog-mask-gm' : 'ttv-fog-mask-player';
+  return (
+    <svg className={`online-fog-layer ${gm ? 'gm' : 'player'}`} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <mask id={maskId}>
+          <rect x="0" y="0" width="100" height="100" fill="white" />
+          {reveals.map((reveal) => <rect key={reveal.id} x={reveal.x} y={reveal.y} width={reveal.width} height={reveal.height} fill="black" />)}
+          {draft && <rect x={draft.x} y={draft.y} width={draft.width} height={draft.height} fill="black" />}
+        </mask>
+      </defs>
+      <rect x="0" y="0" width="100" height="100" className="fog-fill" mask={`url(#${maskId})`} />
+      {gm && reveals.map((reveal) => <rect key={`outline-${reveal.id}`} x={reveal.x} y={reveal.y} width={reveal.width} height={reveal.height} className="fog-reveal-outline" />)}
+      {gm && draft && <rect x={draft.x} y={draft.y} width={draft.width} height={draft.height} className="fog-draft-outline" />}
+    </svg>
+  );
+}
+
+function isPointRevealed(position: { x: number; y: number }, reveals: FogReveal[]) {
+  return reveals.some((reveal) => position.x >= reveal.x && position.x <= reveal.x + reveal.width && position.y >= reveal.y && position.y <= reveal.y + reveal.height);
 }
 
 function ActorCard({ actor }: { actor: Actor }) {
@@ -442,11 +705,15 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
 }
 
 function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
-  const current = runtime.combat_active ? actors[runtime.combat_turn] ?? null : null;
+  const order = runtime.combat_order
+    .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
+    .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
+  const currentId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] : null;
+  const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
   return (
     <section className="online-combat-card">
       <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
-      {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? '—'}</b></div><div className="online-combat-order">{actors.map((actor, index) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{index + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
+      {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? 'Ход мастера'}</b></div><div className="online-combat-order">{order.map(({ actor, index }, visibleIndex) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{visibleIndex + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
     </section>
   );
 }
