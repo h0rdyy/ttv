@@ -2,6 +2,15 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { InvitePanel } from './InvitePanel';
+import { MembersPanel } from './MembersPanel';
+import { DeleteCampaignPanel } from './DeleteCampaignPanel';
+
+const settingLabels: Record<string, string> = {
+  'medieval-fantasy': 'Средневековое фэнтези',
+};
+const themeLabels: Record<string, string> = {
+  'dark-fantasy': 'Тёмное фэнтези',
+};
 
 export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: string; mode: 'gm' | 'player' }) {
   const supabase = await createClient();
@@ -16,6 +25,7 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
   if (!campaign || !membership) redirect('/campaigns/online');
 
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(membership.role);
+  const isOwner = membership.role === 'owner';
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
 
   return (
@@ -28,20 +38,40 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
           <Link className="button" href="/campaigns/online">К кампаниям</Link>
         </div>
       </header>
-      <section className="online-room-card">
-        <span className="eyebrow">СЕРВЕРНАЯ КАМПАНИЯ · {membership.role}</span>
+
+      <section className="campaign-room-hero">
+        <span className="eyebrow">{mode === 'gm' ? 'КАМПАНИЯ' : 'ПРИКЛЮЧЕНИЕ'}</span>
         <h1>{campaign.name}</h1>
         <p>{campaign.description || 'Описание пока не добавлено.'}</p>
-        <div className="online-card-meta"><span>{campaign.system_id}</span><span>{campaign.setting_id}</span><span>{campaign.theme_id}</span></div>
-        <div className="room-status-grid">
-          <div><b>Auth</b><span>✓ реальный пользователь</span></div>
-          <div><b>PostgreSQL</b><span>✓ кампания на сервере</span></div>
-          <div><b>RLS</b><span>✓ роль проверена БД</span></div>
-          <div><b>Invites</b><span>{gmAllowed ? '✓ можно пригласить игрока' : '✓ вход по роли игрока'}</span></div>
+        <div className="friendly-tags">
+          <span>{settingLabels[campaign.setting_id] ?? 'Авторский мир'}</span>
+          <span>{themeLabels[campaign.theme_id] ?? 'Своя атмосфера'}</span>
         </div>
-        {gmAllowed && mode === 'gm' && <InvitePanel campaignId={campaignId} />}
-        <p className="room-note">Следующий блок подключит Actors / Scenes / Inventory этой серверной кампании к игровому столу. Локальный demo-state сюда намеренно не подмешивается.</p>
       </section>
+
+      {mode === 'gm' ? (
+        <div className="campaign-manage-grid">
+          <div className="manage-stack">
+            <MembersPanel campaignId={campaignId} ownerId={campaign.owner_id} canManageRoles={isOwner} canAssignActors={gmAllowed} />
+            <InvitePanel campaignId={campaignId} />
+          </div>
+          <div className="manage-stack">
+            <section className="manage-card play-card">
+              <span className="eyebrow">ИГРОВОЙ СТОЛ</span>
+              <h3>Продолжить кампанию</h3>
+              <p className="muted">Персонажи, карта и инвентарь будут открываться здесь одной игровой комнатой.</p>
+              <button className="button primary" disabled>Открыть стол</button>
+            </section>
+            {isOwner && <DeleteCampaignPanel campaignId={campaignId} campaignName={campaign.name} />}
+          </div>
+        </div>
+      ) : (
+        <section className="player-wait-card">
+          <h2>Вы в кампании</h2>
+          <p>Когда мастер подготовит персонажа и сцену, игровой стол откроется здесь.</p>
+          <Link className="button" href="/campaigns/online">Мои кампании</Link>
+        </section>
+      )}
     </main>
   );
 }
