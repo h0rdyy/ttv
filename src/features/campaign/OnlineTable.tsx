@@ -178,6 +178,17 @@ export function OnlineTable(props: Props) {
     }
   };
 
+  const cancelTokenDrag = () => {
+    if (!draggingTokenId) return;
+    const tokenId = draggingTokenId;
+    setDraggingTokenId(null);
+    setPositions((current) => {
+      const next = { ...current };
+      delete next[tokenId];
+      return next;
+    });
+  };
+
   const finishTokenDrag = async () => {
     if (!draggingTokenId) return;
     const tokenId = draggingTokenId;
@@ -273,7 +284,7 @@ export function OnlineTable(props: Props) {
           style={activeScene?.background_url ? { backgroundImage: `url(${activeScene.background_url})` } : undefined}
           onPointerMove={moveDraggingToken}
           onPointerUp={() => void finishTokenDrag()}
-          onPointerCancel={() => setDraggingTokenId(null)}
+          onPointerCancel={cancelTokenDrag}
         >
           {!activeScene && mode === 'gm' ? (
             <div className="online-empty-map"><span>🗺</span><h2>Создайте первую сцену</h2><p>С неё начнётся игровой стол этой кампании.</p><button className="button primary" onClick={createScene}>＋ Создать сцену</button></div>
@@ -297,6 +308,8 @@ export function OnlineTable(props: Props) {
                       setSelectedActorId(actor.id);
                       if (!canMove) return;
                       event.preventDefault();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      lastBroadcastRef.current = 0;
                       setDraggingTokenId(token.id);
                     }}
                     onClick={() => setSelectedActorId(actor.id)}
