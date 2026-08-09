@@ -202,10 +202,6 @@ export function OnlineTable(props: Props) {
   const selectedInventory = inventoryForActor(sidebarActor?.id);
   const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
   const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
-  const combatActors = useMemo(
-    () => runtime.combat_order.map((id) => actors.find((actor) => actor.id === id)).filter((actor): actor is Actor => Boolean(actor)),
-    [runtime.combat_order, actors],
-  );
 
   const createScene = async () => {
     const name = window.prompt('Название новой сцены', 'Новая сцена')?.trim();
@@ -293,7 +289,8 @@ export function OnlineTable(props: Props) {
 
     const token = tokens.find((value) => value.id === draggingTokenId);
     const now = performance.now();
-    if (token && !token.hidden && now - lastBroadcastRef.current >= 40) {
+    const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(point, activeScene.fog_reveals ?? []));
+    if (liveVisible && now - lastBroadcastRef.current >= 40) {
       lastBroadcastRef.current = now;
       broadcastTokenMove(draggingTokenId, point.x, point.y);
     }
@@ -335,8 +332,15 @@ export function OnlineTable(props: Props) {
     if (!rawPosition) return;
     const position = snapPosition(rawPosition);
 
+    if (mode === 'player' && activeScene?.fog_enabled && !isPointRevealed(position, activeScene.fog_reveals ?? [])) {
+      setMessage('Эта область пока скрыта туманом.');
+      setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
+      return;
+    }
+
     const token = tokens.find((value) => value.id === tokenId);
-    if (token && !token.hidden) broadcastTokenMove(tokenId, position.x, position.y);
+    const liveVisible = token && !token.hidden && (!activeScene?.fog_enabled || isPointRevealed(position, activeScene.fog_reveals ?? []));
+    if (liveVisible) broadcastTokenMove(tokenId, position.x, position.y);
     setPositions((current) => ({ ...current, [tokenId]: position }));
 
     const supabase = createClient();
@@ -545,7 +549,8 @@ export function OnlineTable(props: Props) {
                   const hp = actor.system_data?.hp;
                   const hpPct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
                   const position = positions[token.id] ?? { x: token.x, y: token.y };
-                  if (mode === 'player' && activeScene.fog_enabled && !isPointRevealed(position, reveals)) return null;
+                  const hiddenByFog = mode === 'player' && activeScene.fog_enabled && actor.owner_user_id !== currentUserId && !isPointRevealed(position, reveals);
+                  if (hiddenByFog && draggingTokenId !== token.id) return null;
                   const canMove = !fogDrawMode && (mode === 'gm' || actor.owner_user_id === currentUserId);
                   return (
                     <button
@@ -642,7 +647,7 @@ export function OnlineTable(props: Props) {
             ) : (
               <div className="online-player-unassigned"><span>🧙</span><h2>Персонаж ещё не назначен</h2><p>Мастер выберет вашего героя в настройках кампании.</p></div>
             )}
-            <CombatCard runtime={runtime} actors={combatActors} />
+            <CombatCard runtime={runtime} actors={actors} />
           </aside>
         )}
       </main>
@@ -700,11 +705,15 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
 }
 
 function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
-  const current = runtime.combat_active ? actors[runtime.combat_turn] ?? null : null;
+  const order = runtime.combat_order
+    .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
+    .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
+  const currentId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] : null;
+  const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
   return (
     <section className="online-combat-card">
       <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
-      {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? '—'}</b></div><div className="online-combat-order">{actors.map((actor, index) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{index + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
+      {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? 'Ход мастера'}</b></div><div className="online-combat-order">{order.map(({ actor, index }, visibleIndex) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{visibleIndex + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
     </section>
   );
 }
