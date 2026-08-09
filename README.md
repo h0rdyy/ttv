@@ -2,53 +2,83 @@
 
 TTV — универсальный VTT/GM-инструмент для кампаний с разными игровыми системами и сеттингами: от средневекового фэнтези и grimdark до sci-fi.
 
-Первая версия специально не привязана к D&D, Warhammer или другой конкретной системе. Core работает через общие сущности, а правила, сеттинг и визуальная тема подключаются отдельными слоями.
+Главный продуктовый принцип: **ДМ не должен изучать сложный VTT, чтобы начать играть.**
+
+```text
+регистрация → кампания → приглашение → персонаж → сцена → игра
+```
 
 ## Статус
 
-**v0.1 — verified local single-GM MVP.**
+**v0.3 — Realtime multiplayer.**
 
-Релизная PR-проверка успешно прошла:
+Проект уже умеет работать как настоящая online campaign с отдельными GM/Player View и общей серверной игровой комнатой.
 
-- `npm install`
-- `npm run typecheck`
-- `npm run build`
+CI проверяет каждый release-блок через:
 
-Release checklist: [`docs/RELEASE_V0_1.md`](docs/RELEASE_V0_1.md).
+```bash
+npm install
+npm run typecheck
+npm run build
+```
 
-## Что готово в v0.1
+Подробности текущего milestone: [`docs/V0_3_REALTIME.md`](docs/V0_3_REALTIME.md).
 
-- Next.js + React + TypeScript.
-- Zustand + `localStorage` persistence.
-- Campaign Hub `/campaigns`.
-- Demo campaign `/campaign/demo/play`.
-- Campaign settings `/campaign/demo/settings`.
-- Три campaign presets: средневековое фэнтези, grimdark и sci-fi.
-- Runtime theme tokens через CSS variables.
-- Универсальные сущности `Actor`, `ItemDefinition`, `ItemInstance`, `Inventory`, `Scene`, `RollTable`, `GameSystem`.
-- Карта с токенами.
-- Перетаскивание токенов с сохранением позиции.
-- Переключаемая сетка и базовый fog overlay.
-- Session sidebar: группа, бой, инвентарь, NPC, заметки.
-- Combat tracker с раундами и очередью хода.
-- Инвентарь с контейнерами, drag & drop и подсчётом веса.
-- Контекстный просмотр выбранного предмета.
-- Мастерская ДМа поверх карты.
-- Persistent библиотека предметов с поиском и фильтрами.
-- Создание, редактирование, дублирование и удаление предметов.
-- Структурированные custom properties и effects.
-- Быстрая выдача предметов персонажу.
-- Persistent создание/редактирование пользовательских NPC.
-- Добавление созданного NPC на карту.
-- Loot builder со случайным предметом и выдачей.
-- Persistent editable roll tables + история бросков.
-- Заметки ДМа.
-- Undo для операций с инвентарём.
-- Полный локальный snapshot import/export: предметы, инвентари, NPC, карта, таблицы, заметки, бой и campaign preset.
-- Permission model: Owner / GM / Assistant GM / Player / Spectator.
-- Реестры Game Systems и Setting Packs.
-- Горячие клавиши: `/` поиск, `N` новый предмет, `E` редактирование, `G` мастерская/выдача, `Esc` выход из билдера.
-- GitHub Actions: TypeScript typecheck + production Next.js build.
+## Что уже работает
+
+### Кампании и аккаунты
+
+- Supabase Auth;
+- регистрация и вход;
+- online Campaign Hub;
+- создание и удаление кампаний;
+- Owner / GM / Assistant GM / Player / Spectator;
+- одна многоразовая invite-ссылка на кампанию;
+- регенерация и отключение ссылки;
+- список участников;
+- смена ролей;
+- исключение игроков;
+- назначение персонажа конкретному игроку.
+
+### Игровой стол
+
+- отдельный GM View;
+- отдельный Player View;
+- несколько сцен;
+- активная сцена;
+- персонажи и NPC из PostgreSQL;
+- токены;
+- сохранение позиции токенов;
+- HP;
+- server-backed инвентари;
+- скрытые NPC и player-safe reads;
+- создание персонажа/NPC прямо со стола;
+- простая выдача предмета персонажу.
+
+### Realtime multiplayer
+
+- приватный realtime-канал на кампанию;
+- Presence: видно участников онлайн;
+- live movement токена во время перетаскивания;
+- финальная позиция сохраняется после отпускания;
+- HP обновляется у остальных участников без ручной перезагрузки;
+- смена сцены обновляет Player View;
+- изменения персонажей и инвентаря обновляют общую комнату;
+- общий combat runtime: старт боя, раунд, текущий ход, следующий ход, завершение боя.
+
+### Локальный GM prototype
+
+Старый demo-flow остаётся как отдельная песочница и содержит более широкий набор подготовленных GM-инструментов:
+
+- мастерская предметов/NPC/лут/таблицы;
+- локальный combat tracker;
+- заметки;
+- drag & drop inventory;
+- импорт/экспорт snapshot;
+- campaign presets;
+- theme switching.
+
+Постепенно эти возможности переносятся в online campaign вместо переписывания всего продукта одним большим релизом.
 
 ## Запуск
 
@@ -63,7 +93,11 @@ npm run dev
 http://localhost:3000
 ```
 
-Главная автоматически переводит на `/campaigns`.
+Online campaigns:
+
+```text
+http://localhost:3000/campaigns/online
+```
 
 Production-проверка:
 
@@ -72,6 +106,8 @@ npm run typecheck
 npm run build
 npm run start
 ```
+
+Для online-mode нужны публичные значения Supabase в `.env.local`. Шаблон находится в `.env.example`.
 
 ## Архитектурный принцип
 
@@ -83,7 +119,7 @@ Platform Core
   = Campaign
 ```
 
-Core не содержит D&D/Warhammer-специфичных полей. Он знает про:
+Core не должен содержать D&D/Warhammer-специфичные сущности. Базовый домен универсальный:
 
 ```text
 Actor
@@ -93,74 +129,80 @@ Scene
 Token
 Combat
 Journal
-RollTable
+Book
 Permission
 ```
 
-`Actor` используется для персонажа игрока, NPC, существа, транспорта, спутника и призыва. Специфичные игровые характеристики лежат в `systemData`.
+`Actor` используется для персонажа игрока, NPC, существа, транспорта, спутника и призыва. Специфичные игровые характеристики хранятся в `system_data`.
 
 Предметы разделены на:
 
-- `ItemDefinition` — шаблон предмета в библиотеке кампании;
-- `ItemInstance` — конкретный экземпляр в контейнере/инвентаре.
+- `ItemDefinition` — шаблон предмета кампании;
+- `ItemInstance` — конкретный экземпляр в инвентаре.
 
-Подробно: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Основная структура v0.1
+Realtime разделяет временное и постоянное состояние:
 
 ```text
-src/
-├── app/
-│   ├── campaigns/
-│   ├── campaign/demo/play/
-│   └── campaign/demo/settings/
-├── config/
-│   └── campaignPresets.ts
-├── core/
-│   ├── permissions.ts
-│   └── snapshot.ts
-├── data/
-│   └── demo.ts
-├── domain/
-│   └── types.ts
-├── features/
-│   ├── campaign/
-│   └── dm/
-│       └── workshop/
-│           ├── ItemWorkshop.tsx
-│           ├── NpcWorkshop.tsx
-│           ├── LootWorkshop.tsx
-│           └── TablesWorkshop.tsx
-├── settings/
-│   └── registry.ts
-├── store/
-│   ├── useCampaignStore.ts
-│   └── useRollTableStore.ts
-├── systems/
-│   └── registry.ts
-└── themes/
-    └── theme-registry.ts
+быстрое движение → Broadcast
+финальная позиция / HP / сцена / инвентарь / бой → PostgreSQL
 ```
 
-## Граница первой версии
+При этом realtime-сообщения не передают скрытые записи напрямую: клиент получает сигнал об изменении и перечитывает только те данные, которые ему разрешено видеть.
 
-v0.1 — намеренно **локальный single-GM продуктовый срез**. Он проверяет UX игрового стола и generic-домен до подключения серверного слоя.
+Подробно об архитектуре: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-После v0.1:
+## Roadmap
 
-- backend + PostgreSQL;
-- аккаунты и авторизация;
-- реальные приглашения и campaign members;
-- серверный permission enforcement;
-- realtime/WebSocket;
-- несколько сохраняемых сцен;
-- asset storage;
-- walls, lighting и полноценный fog-of-war;
-- server event log и расширенный undo;
-- compendium/import pipeline;
-- schema-driven Actor builder;
-- пользовательские Game Systems и Setting Packs.
+### v0.4 — Scenes / Maps
+
+- загрузка карт;
+- несколько полноценных сцен;
+- zoom / pan;
+- настройка grid;
+- расширенный Fog of War;
+- скрытые объекты;
+- подготовка Events/Triggers на карте.
+
+### v0.5 — Universal Character Sheets
+
+- schema-driven Actor Sheet;
+- пользовательские ресурсы и характеристики;
+- шаблоны игровых систем.
+
+### v0.6 — Combat / Dice / Effects
+
+- инициатива;
+- броски;
+- эффекты;
+- conditions;
+- более глубокая автоматизация боя.
+
+### v0.7 — Books / Lore / Codex
+
+- книги мира;
+- хроника кампании;
+- дерево страниц;
+- секретные записи;
+- связи с NPC, предметами и локациями.
+
+### v0.8+
+
+- расширенная мастерская;
+- Encounter Builder;
+- простые события/скрипты карты;
+- Session Timeline;
+- onboarding;
+- mobile polish;
+- production deploy.
+
+## Продуктовая цель
+
+TTV не должен выигрывать количеством настроек.
+
+Он должен выигрывать временем от регистрации до первой совместной игры.
+
+> Цель: ДМ и игроки оказываются на общей карте за несколько минут, а сложные возможности открываются только тогда, когда они реально нужны.
 
 ## Контент
 
-Демо использует только вымышленные generic-данные и не содержит официальных текстов, иллюстраций или правил конкретной коммерческой настольной системы.
+Проект использует вымышленные generic-данные и не должен включать официальный защищённый контент коммерческих настольных систем без соответствующей лицензии.
