@@ -19,13 +19,23 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
 
   const [{ data: scenes }, { data: actors }, { data: inventories }, { data: definitions }] = await Promise.all([
-    supabase.from('scenes').select('id,campaign_id,name,background_url,grid_enabled,fog_enabled,created_at').eq('campaign_id', campaignId).order('created_at'),
+    supabase
+      .from('scenes')
+      .select('id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at')
+      .eq('campaign_id', campaignId)
+      .order('created_at'),
     supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('inventories').select('id,campaign_id,owner_actor_id').eq('campaign_id', campaignId),
     supabase.from('item_definitions').select('id,name,description,category,rarity,icon,weight,price,currency,source,properties,effects').eq('campaign_id', campaignId).order('created_at'),
   ]);
 
-  const sceneRows = scenes ?? [];
+  const rawSceneRows = scenes ?? [];
+  const sceneRows = await Promise.all(rawSceneRows.map(async (scene) => {
+    if (!scene.background_path) return scene;
+    const { data } = await supabase.storage.from('campaign-maps').createSignedUrl(scene.background_path, 60 * 60 * 4);
+    return { ...scene, background_url: data?.signedUrl ?? scene.background_url };
+  }));
+
   const activeScene = sceneRows.find((scene) => scene.id === campaign.active_scene_id) ?? sceneRows[0] ?? null;
   const inventoryRows = inventories ?? [];
   const inventoryIds = inventoryRows.map((inventory) => inventory.id);
