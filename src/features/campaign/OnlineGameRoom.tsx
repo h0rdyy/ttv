@@ -30,11 +30,14 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   ]);
 
   const rawSceneRows = scenes ?? [];
-  const sceneRows = await Promise.all(rawSceneRows.map(async (scene) => {
+  const sceneRows = rawSceneRows.map((scene) => {
     if (!scene.background_path) return scene;
-    const { data } = await supabase.storage.from('campaign-maps').createSignedUrl(scene.background_path, 60 * 60 * 4);
-    return { ...scene, background_url: data?.signedUrl ?? scene.background_url };
-  }));
+    const version = encodeURIComponent(scene.background_path);
+    return {
+      ...scene,
+      background_url: `/api/campaign/${campaignId}/scene/${scene.id}/map?v=${version}`,
+    };
+  });
 
   const activeScene = sceneRows.find((scene) => scene.id === campaign.active_scene_id) ?? sceneRows[0] ?? null;
   const inventoryRows = inventories ?? [];
