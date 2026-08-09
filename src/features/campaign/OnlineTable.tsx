@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { useCampaignRealtime } from './useCampaignRealtime';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -15,27 +16,36 @@ type Inventory = { id: string; campaign_id: string; owner_actor_id: string };
 type Container = { id: string; inventory_id: string; name: string; type: string; capacity: number | null; sort_order: number };
 type ItemInstance = { id: string; definition_id: string; container_id: string; quantity: number; custom_name: string | null; equipped: boolean; state: Record<string, any> };
 type ItemDefinition = { id: string; name: string; description: string; category: string; rarity: string; icon: string; weight: number | null };
+type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 
 type Props = {
   campaign: Campaign;
   role: Role;
   mode: 'gm' | 'player';
   currentUserId: string;
+  displayName: string;
   initialScenes: Scene[];
   initialActors: Actor[];
   initialTokens: Token[];
-  inventories: Inventory[];
-  containers: Container[];
-  itemInstances: ItemInstance[];
-  itemDefinitions: ItemDefinition[];
+  initialInventories: Inventory[];
+  initialContainers: Container[];
+  initialItemInstances: ItemInstance[];
+  initialItemDefinitions: ItemDefinition[];
+  initialRuntime: Runtime;
 };
 
 export function OnlineTable(props: Props) {
-  const { campaign, role, mode, currentUserId, inventories, containers, itemInstances, itemDefinitions } = props;
+  const { role, mode, currentUserId, displayName } = props;
   const router = useRouter();
+  const [campaign, setCampaign] = useState(props.campaign);
   const [actors, setActors] = useState(props.initialActors);
   const [tokens, setTokens] = useState(props.initialTokens);
-  const [scenes] = useState(props.initialScenes);
+  const [scenes, setScenes] = useState(props.initialScenes);
+  const [inventories, setInventories] = useState(props.initialInventories);
+  const [containers, setContainers] = useState(props.initialContainers);
+  const [itemInstances, setItemInstances] = useState(props.initialItemInstances);
+  const [itemDefinitions, setItemDefinitions] = useState(props.initialItemDefinitions);
+  const [runtime, setRuntime] = useState(props.initialRuntime);
   const [selectedActorId, setSelectedActorId] = useState(() => {
     if (mode === 'player') return props.initialActors.find((actor) => actor.owner_user_id === currentUserId)?.id ?? '';
     return props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '';
@@ -44,8 +54,58 @@ export function OnlineTable(props: Props) {
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [actorName, setActorName] = useState('');
   const [actorKind, setActorKind] = useState<'player' | 'npc'>('player');
+  const [quickItemName, setQuickItemName] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const refreshTimerRef = useRef<number | null>(null);
+  const lastBroadcastRef = useRef(0);
+
+  useEffect(() => setCampaign(props.campaign), [props.campaign]);
+  useEffect(() => setActors(props.initialActors), [props.initialActors]);
+  useEffect(() => { setTokens(props.initialTokens); setPositions({}); }, [props.initialTokens]);
+  useEffect(() => setScenes(props.initialScenes), [props.initialScenes]);
+  useEffect(() => setInventories(props.initialInventories), [props.initialInventories]);
+  useEffect(() => setContainers(props.initialContainers), [props.initialContainers]);
+  useEffect(() => setItemInstances(props.initialItemInstances), [props.initialItemInstances]);
+  useEffect(() => setItemDefinitions(props.initialItemDefinitions), [props.initialItemDefinitions]);
+  useEffect(() => setRuntime(props.initialRuntime), [props.initialRuntime]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      router.refresh();
+    }, 90);
+  }, [router]);
+
+  useEffect(() => () => {
+    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
+  }, []);
+
+  const onRemoteTokenMove = useCallback((move: { tokenId: string; x: number; y: number }) => {
+    setTokens((currentTokens) => {
+      const token = currentTokens.find((value) => value.id === move.tokenId);
+      if (!token || token.hidden) return currentTokens;
+      setPositions((current) => ({
+        ...current,
+        [move.tokenId]: {
+          x: Math.max(0, Math.min(100, move.x)),
+          y: Math.max(0, Math.min(100, move.y)),
+        },
+      }));
+      return currentTokens;
+    });
+  }, []);
+
+  const onStateChanged = useCallback(() => scheduleRefresh(), [scheduleRefresh]);
+  const { status: liveStatus, onlineUsers, broadcastTokenMove } = useCampaignRealtime({
+    campaignId: campaign.id,
+    currentUserId,
+    displayName,
+    mode,
+    onStateChanged,
+    onRemoteTokenMove,
+  });
 
   const activeScene = scenes.find((scene) => scene.id === campaign.active_scene_id) ?? scenes[0] ?? null;
   const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? null;
@@ -53,11 +113,21 @@ export function OnlineTable(props: Props) {
   const sidebarActor = mode === 'player' ? ownActor : selectedActor;
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(role);
 
+  useEffect(() => {
+    if (mode === 'player' && ownActor && selectedActorId !== ownActor.id) setSelectedActorId(ownActor.id);
+    if (mode === 'gm' && selectedActorId && !actors.some((actor) => actor.id === selectedActorId)) {
+      setSelectedActorId(actors[0]?.id ?? '');
+    }
+  }, [actors, mode, ownActor, selectedActorId]);
+
   const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
   const selectedInventory = inventoryForActor(sidebarActor?.id);
   const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
-
   const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
+  const combatActors = useMemo(
+    () => runtime.combat_order.map((id) => actors.find((actor) => actor.id === id)).filter((actor): actor is Actor => Boolean(actor)),
+    [runtime.combat_order, actors],
+  );
 
   const createScene = async () => {
     const name = window.prompt('Название новой сцены', 'Новая сцена')?.trim();
@@ -66,7 +136,7 @@ export function OnlineTable(props: Props) {
     const supabase = createClient();
     const { error } = await supabase.rpc('create_campaign_scene', { target_campaign: campaign.id, scene_name: name });
     if (error) setMessage(friendlyError(error, 'Не удалось создать сцену.'));
-    else router.refresh();
+    else scheduleRefresh();
     setBusy(false);
   };
 
@@ -75,7 +145,10 @@ export function OnlineTable(props: Props) {
     const supabase = createClient();
     const { error } = await supabase.rpc('set_active_scene', { target_campaign: campaign.id, target_scene: sceneId });
     if (error) setMessage(friendlyError(error, 'Не удалось открыть сцену.'));
-    else router.refresh();
+    else {
+      setCampaign((current) => ({ ...current, active_scene_id: sceneId }));
+      scheduleRefresh();
+    }
     setBusy(false);
   };
 
@@ -91,7 +164,7 @@ export function OnlineTable(props: Props) {
       target_scene: activeScene?.id ?? null,
     });
     if (error) setMessage(friendlyError(error, 'Не удалось создать персонажа.'));
-    else { setActorName(''); router.refresh(); }
+    else { setActorName(''); scheduleRefresh(); }
     setBusy(false);
   };
 
@@ -101,6 +174,13 @@ export function OnlineTable(props: Props) {
     const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
     setPositions((current) => ({ ...current, [draggingTokenId]: { x, y } }));
+
+    const token = tokens.find((value) => value.id === draggingTokenId);
+    const now = performance.now();
+    if (token && !token.hidden && now - lastBroadcastRef.current >= 40) {
+      lastBroadcastRef.current = now;
+      broadcastTokenMove(draggingTokenId, x, y);
+    }
   };
 
   const finishTokenDrag = async () => {
@@ -111,29 +191,68 @@ export function OnlineTable(props: Props) {
     if (!position) return;
 
     const supabase = createClient();
-    const { error } = await supabase.from('scene_tokens').update({ x: position.x, y: position.y }).eq('id', tokenId);
+    const { error } = await supabase.rpc('move_scene_token', {
+      target_token: tokenId,
+      new_x: position.x,
+      new_y: position.y,
+    });
     if (error) {
       setMessage(friendlyError(error, 'Не удалось сохранить положение фишки.'));
       setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
       return;
     }
     setTokens((current) => current.map((token) => token.id === tokenId ? { ...token, ...position } : token));
+    setPositions((current) => { const next = { ...current }; delete next[tokenId]; return next; });
   };
 
   const changeHp = async (actor: Actor, delta: number) => {
-    const hp = actor.system_data?.hp;
-    if (!hp || typeof hp.current !== 'number' || typeof hp.max !== 'number') return;
-    const nextCurrent = Math.max(0, Math.min(hp.max, hp.current + delta));
-    const systemData = { ...actor.system_data, hp: { ...hp, current: nextCurrent } };
     const supabase = createClient();
-    const { error } = await supabase.from('actors').update({ system_data: systemData }).eq('id', actor.id);
-    if (error) setMessage(friendlyError(error, 'Не удалось изменить здоровье.'));
-    else setActors((current) => current.map((value) => value.id === actor.id ? { ...value, system_data: systemData } : value));
+    const { data, error } = await supabase.rpc('adjust_actor_hp', { target_actor: actor.id, hp_delta: delta });
+    if (error) {
+      setMessage(friendlyError(error, 'Не удалось изменить здоровье.'));
+      return;
+    }
+    if (data && typeof data === 'object') {
+      setActors((current) => current.map((value) => value.id === actor.id ? { ...value, system_data: data as Record<string, any> } : value));
+    }
+  };
+
+  const giveItem = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedActor || !quickItemName.trim()) return;
+    setBusy(true); setMessage('');
+    const supabase = createClient();
+    const { error } = await supabase.rpc('give_simple_item', {
+      target_campaign: campaign.id,
+      target_actor: selectedActor.id,
+      item_name: quickItemName.trim(),
+    });
+    if (error) setMessage(friendlyError(error, 'Не удалось выдать предмет.'));
+    else {
+      setQuickItemName('');
+      setMessage(`Предмет выдан: ${selectedActor.name}`);
+      scheduleRefresh();
+    }
+    setBusy(false);
+  };
+
+  const combatAction = async (action: 'start' | 'next' | 'stop') => {
+    setBusy(true); setMessage('');
+    const supabase = createClient();
+    const rpc = action === 'start' ? 'start_campaign_combat' : action === 'next' ? 'next_campaign_combat_turn' : 'stop_campaign_combat';
+    const { error } = await supabase.rpc(rpc, { target_campaign: campaign.id });
+    if (error) setMessage(friendlyError(error, action === 'start' ? 'Не удалось начать бой.' : 'Не удалось изменить ход боя.'));
+    else scheduleRefresh();
+    setBusy(false);
   };
 
   if (!activeScene && mode === 'player') {
     return <EmptyPlayerState campaignName={campaign.name} text="Мастер ещё не открыл игровую сцену." />;
   }
+
+  const onlineTitle = onlineUsers.length
+    ? onlineUsers.map((user) => `${user.name}${user.mode === 'gm' ? ' · мастер' : ''}`).join('\n')
+    : 'Подключение к кампании';
 
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : ''}`}>
@@ -147,6 +266,7 @@ export function OnlineTable(props: Props) {
           </div>
         )}
         <div className="online-table-spacer" />
+        <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
         {gmAllowed && <Link className="button" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}>{mode === 'gm' ? '👁 Игрок' : 'Мастер'}</Link>}
         {mode === 'gm' && <Link className="button" href={`/campaign/${campaign.id}/manage`}>⚙ Кампания</Link>}
         <Link className="button" href="/campaigns/online">Выйти</Link>
@@ -216,6 +336,7 @@ export function OnlineTable(props: Props) {
 
               {selectedActor && <ActorCard actor={selectedActor} editable onHp={changeHp} />}
               <InventoryCard actor={selectedActor} containers={selectedContainers} instances={itemInstances} itemById={itemById} />
+              {selectedActor && <QuickGive actorName={selectedActor.name} itemName={quickItemName} busy={busy} onItemName={setQuickItemName} onSubmit={giveItem} />}
             </>
           ) : sidebarActor ? (
             <>
@@ -225,6 +346,17 @@ export function OnlineTable(props: Props) {
           ) : (
             <div className="online-player-unassigned"><span>🧙</span><h2>Персонаж ещё не назначен</h2><p>Мастер выберет вашего героя в настройках кампании.</p></div>
           )}
+
+          <CombatCard
+            runtime={runtime}
+            actors={combatActors}
+            editable={mode === 'gm'}
+            busy={busy}
+            onStart={() => void combatAction('start')}
+            onNext={() => void combatAction('next')}
+            onStop={() => void combatAction('stop')}
+          />
+
           {message && <div className="auth-status online-table-message">{message}</div>}
         </aside>
       </main>
@@ -253,6 +385,34 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
         const rows = instances.filter((instance) => instance.container_id === container.id);
         return <div className="online-container" key={container.id}><header><b>{container.name}</b><span>{rows.length}</span></header>{rows.length === 0 ? <small>Пусто</small> : rows.map((instance) => { const item=itemById.get(instance.definition_id); return item ? <div className="online-item" key={instance.id}><span>{item.icon}</span><span><b>{instance.custom_name || item.name}</b><small>{item.category}</small></span><em>×{instance.quantity}</em></div> : null; })}</div>;
       })}
+    </section>
+  );
+}
+
+function QuickGive({ actorName, itemName, busy, onItemName, onSubmit }: { actorName: string; itemName: string; busy: boolean; onItemName: (value: string) => void; onSubmit: (event: FormEvent) => void }) {
+  return (
+    <form className="online-quick-give" onSubmit={onSubmit}>
+      <strong>Выдать предмет</strong>
+      <small>{actorName}</small>
+      <div><input value={itemName} onChange={(event) => onItemName(event.target.value)} placeholder="Например: Ключ от башни" /><button className="button" disabled={busy || !itemName.trim()}>Выдать</button></div>
+    </form>
+  );
+}
+
+function CombatCard({ runtime, actors, editable, busy, onStart, onNext, onStop }: { runtime: Runtime; actors: Actor[]; editable: boolean; busy: boolean; onStart: () => void; onNext: () => void; onStop: () => void }) {
+  const current = runtime.combat_active ? actors[runtime.combat_turn] ?? null : null;
+  return (
+    <section className="online-combat-card">
+      <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
+      {!runtime.combat_active ? (
+        <>{editable ? <button className="button primary full" disabled={busy} onClick={onStart}>⚔ Начать бой</button> : <div className="online-small-empty">Сейчас боя нет.</div>}</>
+      ) : (
+        <>
+          <div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? '—'}</b></div>
+          <div className="online-combat-order">{actors.map((actor, index) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{index + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div>
+          {editable && <div className="online-combat-actions"><button className="button primary" disabled={busy} onClick={onNext}>Следующий ход →</button><button className="button" disabled={busy} onClick={onStop}>Закончить</button></div>}
+        </>
+      )}
     </section>
   );
 }
