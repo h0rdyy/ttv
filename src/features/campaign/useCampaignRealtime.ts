@@ -35,12 +35,14 @@ export function useCampaignRealtime({
   onRemoteTokenMove,
 }: Options) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscribedRef = useRef(false);
   const [status, setStatus] = useState<'connecting' | 'online' | 'offline'>('connecting');
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
     let disposed = false;
+    subscribedRef.current = false;
     const channel = supabase.channel(`campaign:${campaignId}`, {
       config: {
         private: true,
@@ -89,6 +91,7 @@ export function useCampaignRealtime({
         channel.subscribe(async (nextStatus) => {
           if (disposed) return;
           if (nextStatus === 'SUBSCRIBED') {
+            subscribedRef.current = true;
             setStatus('online');
             await channel.track({
               user_id: currentUserId,
@@ -97,16 +100,21 @@ export function useCampaignRealtime({
               online_at: new Date().toISOString(),
             });
           } else if (nextStatus === 'CHANNEL_ERROR' || nextStatus === 'TIMED_OUT' || nextStatus === 'CLOSED') {
+            subscribedRef.current = false;
             setStatus('offline');
           }
         });
       } catch {
-        if (!disposed) setStatus('offline');
+        if (!disposed) {
+          subscribedRef.current = false;
+          setStatus('offline');
+        }
       }
     })();
 
     return () => {
       disposed = true;
+      subscribedRef.current = false;
       channelRef.current = null;
       void supabase.removeChannel(channel);
     };
@@ -114,12 +122,15 @@ export function useCampaignRealtime({
 
   const broadcastTokenMove = useCallback((tokenId: string, x: number, y: number) => {
     const channel = channelRef.current;
-    if (!channel) return;
+    if (!channel || !subscribedRef.current) return;
+
     void channel.send({
       type: 'broadcast',
       event: 'token_move',
       payload: { tokenId, x, y, senderUserId: currentUserId },
-    });
+    }).then((result) => {
+      if (result !== 'ok') setStatus('offline');
+    }).catch(() => setStatus('offline'));
   }, [currentUserId]);
 
   return { status, onlineUsers, broadcastTokenMove };

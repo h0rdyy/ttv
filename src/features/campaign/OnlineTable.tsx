@@ -83,18 +83,13 @@ export function OnlineTable(props: Props) {
   }, []);
 
   const onRemoteTokenMove = useCallback((move: { tokenId: string; x: number; y: number }) => {
-    setTokens((currentTokens) => {
-      const token = currentTokens.find((value) => value.id === move.tokenId);
-      if (!token || token.hidden) return currentTokens;
-      setPositions((current) => ({
-        ...current,
-        [move.tokenId]: {
-          x: Math.max(0, Math.min(100, move.x)),
-          y: Math.max(0, Math.min(100, move.y)),
-        },
-      }));
-      return currentTokens;
-    });
+    setPositions((current) => ({
+      ...current,
+      [move.tokenId]: {
+        x: Math.max(0, Math.min(100, move.x)),
+        y: Math.max(0, Math.min(100, move.y)),
+      },
+    }));
   }, []);
 
   const onStateChanged = useCallback(() => scheduleRefresh(), [scheduleRefresh]);
