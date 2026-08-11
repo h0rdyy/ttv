@@ -7,6 +7,7 @@ import './player-switch.css';
 import './auth.css';
 import './online-table.css';
 import './scene-v04.css';
+import './sheet-v05.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
