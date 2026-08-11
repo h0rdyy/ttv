@@ -4,11 +4,13 @@ import { login, register } from './actions';
 const errorText: Record<string, string> = {
   required: 'Заполните все поля.',
   'invalid-credentials': 'Неверная почта или пароль.',
+  'email-not-confirmed': 'Сначала подтвердите почту по ссылке из письма, затем войдите.',
   'already-registered': 'Аккаунт с этой почтой уже существует.',
   'confirm-failed': 'Не удалось подтвердить почту. Попробуйте открыть письмо ещё раз.',
+  'email-rate-limit': 'Письмо уже отправлялось недавно. Подождите немного и попробуйте ещё раз.',
   email: 'Проверьте адрес почты и попробуйте ещё раз.',
-  password: 'Проверьте пароль. Нужно минимум 8 символов.',
-  unknown: 'Не удалось выполнить вход. Попробуйте ещё раз.',
+  password: 'Пароль не подходит требованиям. Используйте минимум 8 символов.',
+  unknown: 'Не удалось выполнить действие. Попробуйте ещё раз.',
 };
 
 export function AuthForm({
@@ -69,7 +71,7 @@ export function AuthForm({
         </form>
 
         {error && <div className="auth-status">{errorText[error] ?? errorText.unknown}</div>}
-        {notice === 'check-email' && <div className="auth-status">Аккаунт создан. Откройте письмо и подтвердите почту.</div>}
+        {notice === 'check-email' && <div className="auth-status">Аккаунт создан. Мы отправили письмо подтверждения. Откройте его, подтвердите почту и затем войдите.</div>}
 
         <div className="auth-switch">
           {mode === 'login' ? <>Нет аккаунта? <Link href={registerHref}>Регистрация</Link></> : <>Уже есть аккаунт? <Link href={loginHref}>Войти</Link></>}
