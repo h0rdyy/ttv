@@ -74,7 +74,7 @@ export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged,
           <div className="actor-sheet-empty">
             <span>◇</span>
             <h3>Шаблон листа не назначен</h3>
-            <p>Мастер может создать универсальный шаблон в Мастерской → Листы и назначить его этому персонажу.</p>
+            <p>Мастер может создать шаблон кнопкой «Листы» и назначить его этому персонажу.</p>
           </div>
         ) : fieldCount === 0 ? (
           <div className="actor-sheet-empty">
