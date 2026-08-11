@@ -23,12 +23,34 @@ function authUrl(mode: 'login' | 'register', next: string, key: 'error' | 'notic
   return `/${mode}?${params.toString()}`;
 }
 
-function errorCode(message: string) {
-  const lower = message.toLowerCase();
+type AuthLikeError = { message: string; code?: string };
+
+function errorCode(error: AuthLikeError) {
+  switch (error.code) {
+    case 'invalid_credentials':
+      return 'invalid-credentials';
+    case 'email_not_confirmed':
+      return 'email-not-confirmed';
+    case 'email_exists':
+    case 'user_already_exists':
+      return 'already-registered';
+    case 'email_address_invalid':
+      return 'email';
+    case 'weak_password':
+      return 'password';
+    case 'over_email_send_rate_limit':
+      return 'email-rate-limit';
+    default:
+      break;
+  }
+
+  // Fallback for older/legacy Auth responses that may not expose a stable code.
+  const lower = error.message.toLowerCase();
+  if (lower.includes('email not confirmed')) return 'email-not-confirmed';
   if (lower.includes('invalid login credentials')) return 'invalid-credentials';
   if (lower.includes('already registered') || lower.includes('user already registered')) return 'already-registered';
+  if (lower.includes('weak password')) return 'password';
   if (lower.includes('email')) return 'email';
-  if (lower.includes('password')) return 'password';
   return 'unknown';
 }
 
@@ -50,7 +72,7 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(authUrl('login', next, 'error', errorCode(error.message)));
+  if (error) redirect(authUrl('login', next, 'error', errorCode(error)));
 
   revalidatePath('/', 'layout');
   redirect(next);
@@ -76,7 +98,7 @@ export async function register(formData: FormData) {
     },
   });
 
-  if (error) redirect(authUrl('register', next, 'error', errorCode(error.message)));
+  if (error) redirect(authUrl('register', next, 'error', errorCode(error)));
 
   if (!data.session) {
     redirect(authUrl('register', next, 'notice', 'check-email'));
