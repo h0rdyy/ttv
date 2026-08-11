@@ -18,15 +18,16 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(membership.role);
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
 
-  const [{ data: scenes }, { data: actors }, { data: inventories }, { data: definitions }] = await Promise.all([
+  const [{ data: scenes }, { data: actors }, { data: inventories }, { data: definitions }, { data: sheetTemplates }] = await Promise.all([
     supabase
       .from('scenes')
       .select('id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at')
       .eq('campaign_id', campaignId)
       .order('created_at'),
-    supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data').eq('campaign_id', campaignId).order('created_at'),
+    supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data,sheet_template_id').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('inventories').select('id,campaign_id,owner_actor_id').eq('campaign_id', campaignId),
     supabase.from('item_definitions').select('id,name,description,category,rarity,icon,weight,price,currency,source,properties,effects').eq('campaign_id', campaignId).order('created_at'),
+    supabase.from('actor_sheet_templates').select('id,campaign_id,name,schema,is_default,created_at,updated_at').eq('campaign_id', campaignId).order('created_at'),
   ]);
 
   const rawSceneRows = scenes ?? [];
@@ -84,6 +85,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
       initialContainers={containerRows}
       initialItemInstances={instances ?? []}
       initialItemDefinitions={definitions ?? []}
+      initialSheetTemplates={sheetTemplates ?? []}
       initialNotes={notes ?? []}
       initialRollTables={rollTables ?? []}
       initialRuntime={runtime ?? {
