@@ -25,6 +25,12 @@ function authUrl(mode: 'login' | 'register', next: string, key: 'error' | 'notic
 
 type AuthLikeError = { message: string; code?: string };
 
+function isRecentConfirmationCooldown(error: AuthLikeError) {
+  if (error.code !== 'over_email_send_rate_limit') return false;
+  const lower = error.message.toLowerCase();
+  return lower.includes('for security purposes') || lower.includes('only request this after');
+}
+
 function errorCode(error: AuthLikeError) {
   switch (error.code) {
     case 'invalid_credentials':
@@ -98,7 +104,15 @@ export async function register(formData: FormData) {
     },
   });
 
-  if (error) redirect(authUrl('register', next, 'error', errorCode(error)));
+  if (error) {
+    // Supabase applies a short per-address cooldown after sending confirmation mail.
+    // If a duplicate form submission lands immediately after the successful request,
+    // keep the user on the successful "check your email" path instead of showing 429.
+    if (isRecentConfirmationCooldown(error)) {
+      redirect(authUrl('register', next, 'notice', 'check-email'));
+    }
+    redirect(authUrl('register', next, 'error', errorCode(error)));
+  }
 
   if (!data.session) {
     redirect(authUrl('register', next, 'notice', 'check-email'));
