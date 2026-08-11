@@ -86,6 +86,16 @@ export function OnlineTableV05(props: Props) {
     setSelectedActorId(props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '');
   }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, sheetActorId]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setSheetActorId(null);
+      setManagerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const selectedActor = props.initialActors.find((actor) => actor.id === selectedActorId) ?? null;
   const sheetActor = props.initialActors.find((actor) => actor.id === sheetActorId) ?? null;
   const template = sheetActor ? initialSheetTemplates.find((value) => value.id === sheetActor.sheet_template_id) ?? null : null;
