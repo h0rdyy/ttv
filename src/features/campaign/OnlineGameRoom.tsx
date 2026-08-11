@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { OnlineTable } from './OnlineTable';
+import { OnlineTableV05 } from './OnlineTableV05';
 
 export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string; mode: 'gm' | 'player' }) {
   const supabase = await createClient();
@@ -72,7 +72,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
       : auth.user.email?.split('@')[0] || 'Игрок';
 
   return (
-    <OnlineTable
+    <OnlineTableV05
       campaign={campaign}
       role={membership.role}
       mode={mode}
