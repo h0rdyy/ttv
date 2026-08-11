@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { login, register } from './actions';
+import { AuthSubmitButton } from './AuthSubmitButton';
 
 const errorText: Record<string, string> = {
   required: 'Заполните все поля.',
@@ -7,7 +8,7 @@ const errorText: Record<string, string> = {
   'email-not-confirmed': 'Сначала подтвердите почту по ссылке из письма, затем войдите.',
   'already-registered': 'Аккаунт с этой почтой уже существует.',
   'confirm-failed': 'Не удалось подтвердить почту. Попробуйте открыть письмо ещё раз.',
-  'email-rate-limit': 'Письмо уже отправлялось недавно. Подождите немного и попробуйте ещё раз.',
+  'email-rate-limit': 'Слишком много писем за короткое время. Подождите немного и попробуйте ещё раз.',
   email: 'Проверьте адрес почты и попробуйте ещё раз.',
   password: 'Пароль не подходит требованиям. Используйте минимум 8 символов.',
   unknown: 'Не удалось выполнить действие. Попробуйте ещё раз.',
@@ -65,13 +66,11 @@ export function AuthForm({
             />
           </label>
 
-          <button className="button primary full" type="submit">
-            {mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-          </button>
+          <AuthSubmitButton mode={mode} />
         </form>
 
         {error && <div className="auth-status">{errorText[error] ?? errorText.unknown}</div>}
-        {notice === 'check-email' && <div className="auth-status">Аккаунт создан. Мы отправили письмо подтверждения. Откройте его, подтвердите почту и затем войдите.</div>}
+        {notice === 'check-email' && <div className="auth-status">Письмо подтверждения отправлено. Проверьте почту, подтвердите адрес и затем войдите.</div>}
 
         <div className="auth-switch">
           {mode === 'login' ? <>Нет аккаунта? <Link href={registerHref}>Регистрация</Link></> : <>Уже есть аккаунт? <Link href={loginHref}>Войти</Link></>}
