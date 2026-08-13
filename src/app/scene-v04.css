@@ -1,7 +1,7 @@
 .online-map-stage{position:relative;overflow:hidden;background:#171811;touch-action:none}
 .online-map-stage.map-panning,.online-map-stage.map-panning *{cursor:grabbing!important}
 .online-map-stage.fog-drawing .online-map-world{cursor:crosshair}
-.online-map-world{position:absolute;inset:0;overflow:hidden;transform-origin:50% 50%;will-change:transform;touch-action:none;background:radial-gradient(circle at 24% 32%,rgba(53,82,45,.42),transparent 25%),radial-gradient(circle at 70% 28%,rgba(100,81,43,.25),transparent 22%),linear-gradient(135deg,#4a4930 0%,#6d6041 38%,#574830 68%,#2d3327 100%);background-size:cover;background-position:center;background-repeat:no-repeat}
+.online-map-world{position:absolute;overflow:hidden;transform-origin:50% 50%;will-change:transform;touch-action:none;background:radial-gradient(circle at 24% 32%,rgba(53,82,45,.42),transparent 25%),radial-gradient(circle at 70% 28%,rgba(100,81,43,.25),transparent 22%),linear-gradient(135deg,#4a4930 0%,#6d6041 38%,#574830 68%,#2d3327 100%);background-size:100% 100%;background-position:center;background-repeat:no-repeat;box-shadow:0 0 0 1px rgba(210,184,135,.14),0 18px 55px rgba(0,0,0,.38)}
 .online-grid-layer{position:absolute;inset:0;z-index:2;pointer-events:none;background-image:linear-gradient(rgba(214,190,145,.18) 1px,transparent 1px),linear-gradient(90deg,rgba(214,190,145,.18) 1px,transparent 1px)}
 .online-map-world .map-river,.online-map-world .map-ruin,.online-map-world .map-location{z-index:1}
 .online-map-world .token{z-index:6}
