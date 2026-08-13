@@ -89,16 +89,32 @@
   flex: 0 0 auto;
 }
 
-@media (max-width: 1250px) {
+@media (max-width: 1500px) {
   .online-table-topbar {
     height: auto;
     min-height: 58px;
     flex-wrap: wrap;
+    align-content: center;
+    column-gap: 8px;
+    row-gap: 6px;
+    padding-inline: 10px;
     padding-block: 7px;
   }
 
+  .online-table-topbar .button {
+    padding-inline: 9px;
+    white-space: nowrap;
+  }
+
   .online-table-topbar .top-actions {
-    flex-wrap: wrap;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  .online-scene-controls,
+  .map-zoom-controls,
+  .online-presence {
+    flex: 0 0 auto;
   }
 
   .online-table-spacer {

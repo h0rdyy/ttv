@@ -1,4 +1,4 @@
-.player-shell { height: 100vh; display: grid; grid-template-rows: 52px minmax(0, 1fr); background: var(--bg); color: var(--text); }
+.player-shell { height: 100vh; display: grid; grid-template-rows: 52px minmax(0, 1fr); overflow: hidden; background: var(--bg); color: var(--text); }
 .player-topbar { display: flex; align-items: center; gap: 10px; padding: 0 12px; border-bottom: 1px solid var(--line-soft); background: color-mix(in srgb, var(--panel) 95%, #000 5%); box-shadow: 0 8px 30px rgba(0,0,0,.28); z-index: 20; }
 .player-brand { font: 700 15px Georgia,serif; color: var(--gold-2); letter-spacing: .09em; }
 .player-campaign { display: grid; line-height: 1.1; }
