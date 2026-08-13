@@ -92,7 +92,10 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
                   </div>
                 ))}
               </div>
-              <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span><b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
+              <div className="dice-roll-total">
+                <span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span>
+                <div>{lastRoll && !rolling && <button type="button" onClick={() => setLastRoll(null)} title="Убрать кубы с лотка">Убрать кубы</button>}<b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
+              </div>
             </div>
           </div>
 
