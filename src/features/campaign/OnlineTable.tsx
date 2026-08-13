@@ -9,6 +9,7 @@ import { useCampaignRealtime } from './useCampaignRealtime';
 import { OnlineGmWorkshop } from './OnlineGmWorkshop';
 import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
 import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
+import { DiceTray } from './DiceTray';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -651,6 +652,8 @@ export function OnlineTable(props: Props) {
           </aside>
         )}
       </main>
+
+      <DiceTray displayName={displayName} mode={mode} />
 
       {message && <div className="auth-status online-table-message online-global-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
