@@ -169,7 +169,7 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
 
   return (
     <form className="builder-view sheet-builder" onSubmit={submit}>
-      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Добавленные мастером поля появятся в классическом листе и будут доступны игроку для заполнения.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
+      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Мастер может добавлять и удалять поля. После сохранения изменения появятся у всех игроков.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
       <div className="builder-scroll">
         {value.schema.sections.map((section, sectionIndex) => (
           <section className="builder-section sheet-builder-section" key={section.id}>
@@ -186,7 +186,7 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
                     <input value={field.label} readOnly={builtIn} onChange={(event) => patchField(section.id, field.id, { label: event.target.value })} placeholder="Название характеристики" />
                     <select value={field.type} disabled={builtIn} onChange={(event) => patchField(section.id, field.id, { type: event.target.value as SheetFieldType })}>{fieldTypes.map(([type, label]) => <option key={type} value={type}>{label}</option>)}</select>
                     <input value={field.hint ?? ''} readOnly={builtIn} onChange={(event) => patchField(section.id, field.id, { hint: event.target.value })} placeholder="Подсказка, необязательно" />
-                    {builtIn ? <span className="sheet-field-lock" title="Базовое поле">◆</span> : <button type="button" className="close-button tiny" onClick={() => removeField(section.id, field.id)}>×</button>}
+                    <button type="button" className="close-button tiny" onClick={() => removeField(section.id, field.id)} aria-label={`Удалить поле «${field.label}»`} title="Удалить характеристику">×</button>
                   </div>
                 );
               })}
