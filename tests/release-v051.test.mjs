@@ -178,3 +178,21 @@ test('ordinary pages can scroll while tabletop workspaces stay viewport locked',
   assert.match(tableCss, /\.online-table-shell\s*\{[^}]*overflow:\s*hidden/);
   assert.match(room, /<main className="online-room">/);
 });
+
+test('tabletop topbar groups secondary actions without duplicating sidebar tabs', async () => {
+  const [table, sidebar, tableCss] = await Promise.all([
+    readFile(new URL('../src/features/campaign/OnlineTable.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/online-table.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(table, /aria-haspopup="menu"/);
+  assert.match(table, /role="menu" aria-label="Действия сцены"/);
+  assert.match(table, /role="menu" aria-label="Меню игрового стола"/);
+  assert.doesNotMatch(table, />\s*♟ Игроки\s*</);
+  assert.doesNotMatch(table, /setSidebarTab\('npc'\)/);
+  assert.match(sidebar, /onCreateHero/);
+  assert.match(sidebar, />＋ Герой</);
+  assert.match(sidebar, /\['npc', 'NPC'\]/);
+  assert.match(tableCss, /\.online-menu-popover\s*\{/);
+});

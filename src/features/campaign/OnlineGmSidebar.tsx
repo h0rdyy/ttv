@@ -37,6 +37,7 @@ type Props = {
   runtime: Runtime;
   notes: Note[];
   busy: boolean;
+  onCreateHero: () => void;
   onHp: (actor: Actor, delta: number) => void;
   onCombat: (action: 'start' | 'next' | 'stop') => void;
   onOpenWorkshop: () => void;
@@ -71,7 +72,7 @@ export function OnlineGmSidebar(props: Props) {
   );
 }
 
-function PartyPanel({ campaignId, actors, selectedActorId, onSelectActor, onHp, onChanged, onMessage }: Props) {
+function PartyPanel({ campaignId, actors, selectedActorId, onSelectActor, busy, onCreateHero, onHp, onChanged, onMessage }: Props) {
   const party = actors.filter((actor) => actor.type === 'player');
   const selected = actors.find((actor) => actor.id === selectedActorId) ?? party[0] ?? null;
   const [deleting, setDeleting] = useState(false);
@@ -92,7 +93,10 @@ function PartyPanel({ campaignId, actors, selectedActorId, onSelectActor, onHp, 
 
   return (
     <>
-      <h3 className="sidebar-heading first">ГРУППА</h3>
+      <div className="sidebar-heading-row">
+        <h3 className="sidebar-heading first">ГРУППА</h3>
+        <button className="button" disabled={busy} onClick={onCreateHero}>＋ Герой</button>
+      </div>
       {party.map((actor) => {
         const hp = actor.system_data?.hp;
         const pct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
