@@ -51,6 +51,7 @@ type Runtime = { campaign_id: string; combat_active: boolean; combat_round: numb
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
 type Camera = { zoom: number; x: number; y: number };
+type Size = { width: number; height: number };
 
 type Props = {
   campaign: Campaign;
@@ -96,12 +97,15 @@ export function OnlineTable(props: Props) {
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [camera, setCamera] = useState<Camera>({ zoom: 1, x: 0, y: 0 });
+  const [mapNaturalSize, setMapNaturalSize] = useState<Size | null>(null);
+  const [mapStageSize, setMapStageSize] = useState<Size | null>(null);
   const [panning, setPanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const refreshTimerRef = useRef<number | null>(null);
   const lastBroadcastRef = useRef(0);
   const mapWorldRef = useRef<HTMLDivElement | null>(null);
+  const mapStageRef = useRef<HTMLElement | null>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const spaceHeldRef = useRef(false);
   const fogStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -191,6 +195,34 @@ export function OnlineTable(props: Props) {
     fogStartRef.current = null;
     setFogDrawMode(false);
   }, [activeScene?.id]);
+
+  useEffect(() => {
+    const stage = mapStageRef.current;
+    if (!stage) return;
+    const updateSize = () => setMapStageSize({ width: stage.clientWidth, height: stage.clientHeight });
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const url = activeScene?.background_url;
+    if (!url) {
+      setMapNaturalSize(null);
+      return;
+    }
+    let disposed = false;
+    const image = new Image();
+    image.onload = () => {
+      if (!disposed && image.naturalWidth > 0 && image.naturalHeight > 0) {
+        setMapNaturalSize({ width: image.naturalWidth, height: image.naturalHeight });
+      }
+    };
+    image.onerror = () => { if (!disposed) setMapNaturalSize(null); };
+    image.src = url;
+    return () => { disposed = true; };
+  }, [activeScene?.background_url]);
 
   useEffect(() => {
     if (mode === 'player' && ownActor && selectedActorId !== ownActor.id) setSelectedActorId(ownActor.id);
@@ -465,6 +497,12 @@ export function OnlineTable(props: Props) {
 
   const reveals = activeScene?.fog_reveals ?? [];
   const zoomLabel = `${Math.round(camera.zoom * 100)}%`;
+  const fittedMapSize = mapNaturalSize && mapStageSize
+    ? (() => {
+        const scale = Math.min(mapStageSize.width / mapNaturalSize.width, mapStageSize.height / mapNaturalSize.height);
+        return { width: mapNaturalSize.width * scale, height: mapNaturalSize.height * scale };
+      })()
+    : null;
 
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
@@ -506,6 +544,7 @@ export function OnlineTable(props: Props) {
 
       <main className="online-table-workspace">
         <section
+          ref={mapStageRef}
           className={`map-stage online-map-stage ${draggingTokenId ? 'token-dragging' : ''} ${panning ? 'map-panning' : ''} ${fogDrawMode ? 'fog-drawing' : ''}`}
           onWheel={(event) => {
             event.preventDefault();
@@ -524,7 +563,13 @@ export function OnlineTable(props: Props) {
                 ref={mapWorldRef}
                 className="online-map-world"
                 style={{
-                  transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
+                  ...(fittedMapSize ? {
+                    width: `${fittedMapSize.width}px`,
+                    height: `${fittedMapSize.height}px`,
+                    left: '50%',
+                    top: '50%',
+                  } : { inset: 0 }),
+                  transform: `${fittedMapSize ? 'translate(-50%, -50%) ' : ''}translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
                   backgroundImage: activeScene.background_url ? `url(${activeScene.background_url})` : undefined,
                 }}
                 onPointerDown={beginFogDraw}
