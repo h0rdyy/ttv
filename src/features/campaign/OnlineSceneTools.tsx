@@ -316,9 +316,11 @@ export function OnlineSceneTools({
                   <span className="scene-token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
                   <span><strong>{actor.name}</strong><small>{token.hidden ? 'Скрыт от игроков' : 'Виден игрокам'}</small></span>
                   <button className={`button icon-button ${token.hidden ? 'active' : ''}`} title={token.hidden ? 'Показать' : 'Скрыть'} onClick={() => void updateToken(token, { hidden: !token.hidden })}>{token.hidden ? '◉' : '◌'}</button>
-                  <select className="control token-size-select" value={token.size} onChange={(event) => void updateToken(token, { size: Number(event.target.value) })} title="Размер фишки">
-                    <option value={0.5}>½</option><option value={0.75}>¾</option><option value={1}>1×</option><option value={1.5}>1½</option><option value={2}>2×</option><option value={3}>3×</option>
-                  </select>
+                  <div className="token-size-stepper" title="Размер фишки">
+                    <button type="button" disabled={token.size <= 0.25} onClick={() => void updateToken(token, { size: Math.max(0.25, token.size - 0.25) })}>−</button>
+                    <span>{Math.round(token.size * 100)}%</span>
+                    <button type="button" disabled={token.size >= 4} onClick={() => void updateToken(token, { size: Math.min(4, token.size + 0.25) })}>+</button>
+                  </div>
                   <button className="button danger icon-button" title="Убрать со сцены" onClick={() => void removeToken(token)}>×</button>
                 </div>
               );
