@@ -70,36 +70,36 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть">×</button>
           </header>
 
-          <div className="dice-picker">
-            {DICE.map((sides) => (
-              <button key={sides} type="button" className={`die-button die-d${sides}`} onClick={() => setPool((current) => [...current, sides])}>
-                <span>{sides === 100 ? '%' : sides}</span><small>d{sides}</small>
-              </button>
-            ))}
-          </div>
+          <div className="dice-tray-board">
+            <aside className="dice-picker" aria-label="Добавить куб">
+              {DICE.map((sides) => {
+                const count = pool.filter((value) => value === sides).length;
+                return <button key={sides} type="button" className={`die-button die-d${sides}`} onClick={() => setPool((current) => [...current, sides])}><span>{sides === 100 ? '%' : sides}</span>{count > 0 && <em>{count}</em>}</button>;
+              })}
+            </aside>
 
-          <div className="dice-pool">
-            <span>Выбрано</span>
-            <div>{pool.length ? pool.map((sides, index) => <button type="button" key={`${sides}-${index}`} onClick={() => setPool((current) => current.filter((_, itemIndex) => itemIndex !== index))}>d{sides}</button>) : <small>Нажмите на куб выше</small>}</div>
-          </div>
-
-          {lastRoll && (
             <div className={`dice-roll-surface ${rolling ? 'rolling' : 'settled'}`} aria-live="polite">
               <div className="dice-roll-felt">
-                {lastRoll.values.map((value, index) => (
+                {!lastRoll && <div className="dice-empty-felt"><span>⚄</span><strong>Соберите бросок</strong><small>Выберите кубы слева</small></div>}
+                {lastRoll?.values.map((value, index) => (
                   <div
                     key={`${lastRoll.id}-${index}`}
-                    className={`rolled-die rolled-d${lastRoll.sides[index]} ${value === lastRoll.sides[index] ? 'max' : ''} ${value === 1 ? 'one' : ''}`}
+                    className={`rolled-die rolled-d${lastRoll.sides[index]} ${!rolling && value === lastRoll.sides[index] ? 'max' : ''} ${!rolling && value === 1 ? 'one' : ''}`}
                     style={{ '--die-index': index } as React.CSSProperties}
                   >
                     <small>d{lastRoll.sides[index]}</small>
-                    <strong>{rolling ? '?' : value}</strong>
+                    <strong>{rolling ? '·' : value}</strong>
                   </div>
                 ))}
               </div>
-              <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll.formula}</span><b>{rolling ? '—' : lastRoll.total}</b></div>
+              <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span><b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
             </div>
-          )}
+          </div>
+
+          <div className="dice-pool">
+            <span>Набор</span>
+            <div>{pool.length ? pool.map((sides, index) => <button type="button" key={`${sides}-${index}`} onClick={() => setPool((current) => current.filter((_, itemIndex) => itemIndex !== index))}>d{sides}<i>×</i></button>) : <small>Пока пусто</small>}</div>
+          </div>
 
           <div className="dice-controls">
             <div className="dice-modifier">
