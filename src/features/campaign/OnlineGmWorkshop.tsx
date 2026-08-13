@@ -70,7 +70,7 @@ export function OnlineGmWorkshop(props: Props) {
   const [tab, setTab] = useState<WorkshopTab>('items');
 
   return (
-    <section className="workshop-panel online-workshop-panel">
+    <section className="workshop-panel online-workshop-panel" data-wheel-isolation="true">
       <header className="workshop-header">
         <div className="workshop-title">МАСТЕРСКАЯ ДМа</div>
         <nav className="workshop-tabs">

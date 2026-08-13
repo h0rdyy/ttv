@@ -19,4 +19,231 @@
 .dice-roll-surface.settled .rolled-die{cursor:pointer;transition:transform .13s,filter .13s,opacity .13s}.dice-roll-surface.settled .rolled-die:hover{transform:rotate(var(--landing-rotation)) translateY(-4px) scale(1.05);filter:brightness(1.18)}
 .dice-tray{width:min(470px,calc(100vw - 36px))}.dice-tray-board{display:grid;grid-template-columns:55px minmax(0,1fr);min-height:190px;border-bottom:1px solid var(--line-soft)}.dice-tray-board .dice-picker{display:grid;grid-template-columns:1fr;align-content:center;gap:5px;padding:9px 7px;border-right:1px solid rgba(255,255,255,.065);background:rgba(5,4,3,.48)}.dice-tray-board .die-button{position:relative;width:40px;height:22px;aspect-ratio:auto;border:1px solid transparent;border-radius:6px;background:transparent;color:#a58d69;display:grid;place-items:center;cursor:pointer;transition:background .12s,color .12s,transform .12s}.dice-tray-board .die-button:hover{transform:translateX(2px);border-color:#725632;background:#281d11;color:#f0d4a0}.dice-tray-board .die-button>span{font:700 12px Georgia,serif}.dice-tray-board .die-button>em{position:absolute;right:-2px;top:-4px;min-width:15px;height:15px;display:grid;place-items:center;border-radius:8px;background:#bd8845;color:#160f08;font-size:8px;font-style:normal;font-weight:800}.dice-tray-board .die-d20{background:#2a1d10;color:#d9b875}.dice-tray-board .die-d100>span{font-size:15px}.dice-tray-board .dice-roll-surface{margin:0;border:0;border-radius:0;min-width:0}.dice-tray-board .dice-roll-felt{min-height:150px;gap:12px;padding:16px;background:radial-gradient(circle at 50% 38%,rgba(74,91,60,.42),rgba(17,25,18,.84) 68%),repeating-linear-gradient(35deg,rgba(255,255,255,.012) 0 1px,transparent 1px 4px)}.dice-empty-felt{display:grid;justify-items:center;gap:2px;color:#6e7866}.dice-empty-felt>span{font-size:28px;opacity:.45}.dice-empty-felt strong{font:14px Georgia,serif;color:#7f8977}.dice-empty-felt small{font-size:9px;color:#586052}.dice-tray>.dice-pool{margin:9px 14px 0;padding:0;border:0;background:transparent;display:grid;grid-template-columns:42px minmax(0,1fr);align-items:start;gap:7px}.dice-tray>.dice-pool>span{padding-top:6px;margin:0}.dice-tray>.dice-pool button{display:flex;align-items:center;gap:5px;border-radius:6px;padding:4px 6px}.dice-tray>.dice-pool button i{color:#79674e;font-style:normal}.dice-tray>.dice-pool button:hover{border-color:#9a5d50;color:#d99e91;text-decoration:none}
 @media(max-width:900px){.online-table-topbar{gap:7px}.online-table-brand{display:none}.online-table-workspace{grid-template-columns:minmax(0,1fr) 310px}.online-scene-controls select{min-width:110px}.online-table-topbar>.button{padding:0 8px}.online-presence{padding:0 7px}}
-@media(max-width:680px){.online-table-shell{height:auto;min-height:100vh;overflow:auto}.online-table-topbar{position:sticky;top:0}.online-table-campaign small,.online-scene-controls,.online-presence{display:none}.online-table-workspace{height:auto;min-height:calc(100vh - 58px);grid-template-columns:1fr;grid-template-rows:58vh auto}.online-table-sidebar{height:auto;border-left:0;border-top:1px solid var(--line-soft)}.online-map-stage{min-height:58vh}.dice-tray-anchor{left:10px;bottom:10px}.dice-tray{width:calc(100vw - 20px);max-height:calc(100vh - 74px);overflow:auto}.dice-picker{grid-template-columns:repeat(4,1fr)}.die-button{aspect-ratio:auto;min-height:48px}.dice-controls{grid-template-columns:1fr}.dice-history article{grid-template-columns:minmax(0,1fr) auto}.dice-values{display:none}}
+@media(max-width:680px){.online-table-shell{height:auto;min-height:100vh;overflow:auto}.online-table-topbar{position:sticky;top:0}.online-table-campaign small,.online-presence{display:none}.online-table-workspace{height:auto;min-height:calc(100vh - 58px);grid-template-columns:1fr;grid-template-rows:58vh auto}.online-table-sidebar{height:auto;border-left:0;border-top:1px solid var(--line-soft)}.online-map-stage{min-height:58vh}.dice-tray-anchor{left:10px;bottom:10px}.dice-tray{width:calc(100vw - 20px);max-height:calc(100vh - 74px);overflow:auto}.dice-picker{grid-template-columns:repeat(4,1fr)}.die-button{aspect-ratio:auto;min-height:48px}.dice-controls{grid-template-columns:1fr}.dice-history article{grid-template-columns:minmax(0,1fr) auto}.dice-values{display:none}}
+
+/* The table owns the desktop viewport; every long panel owns its own scroll. */
+.online-table-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+.online-table-topbar {
+  min-width: 0;
+}
+
+.online-table-workspace {
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.online-table-sidebar,
+.online-table-workspace > .session-sidebar {
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.online-table-workspace > .session-sidebar {
+  position: relative;
+  inset: auto;
+  box-shadow: none;
+}
+
+.online-table-sidebar,
+.online-table-workspace > .session-sidebar .sidebar-body,
+.dice-tray {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.dice-tray {
+  max-height: calc(100vh - 96px);
+  max-height: calc(100dvh - 96px);
+  overflow: auto;
+}
+
+.online-map-stage > .online-workshop-panel {
+  top: 12px;
+  bottom: 12px;
+  height: auto;
+  min-height: 0;
+}
+
+.online-workshop-panel .workshop-header,
+.online-workshop-panel .workshop-tabs {
+  min-width: 0;
+}
+
+.online-workshop-panel .workshop-tabs {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.online-workshop-panel .workshop-tabs button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1250px) {
+  .online-table-topbar {
+    height: auto;
+    min-height: 58px;
+    flex-wrap: wrap;
+    padding-block: 7px;
+  }
+
+  .online-table-topbar .top-actions {
+    flex-wrap: wrap;
+  }
+
+  .online-table-spacer {
+    flex: 1 1 12px;
+  }
+}
+
+@media (max-width: 800px) {
+  .online-table-shell {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .online-table-topbar {
+    position: sticky;
+    top: 0;
+    height: auto;
+    min-height: 58px;
+    padding: 7px 10px;
+  }
+
+  .online-table-campaign {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .online-table-campaign strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .online-table-campaign small,
+  .online-presence {
+    display: none;
+  }
+
+  .online-table-spacer {
+    display: none;
+  }
+
+  .online-scene-controls {
+    display: flex;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .online-scene-controls select {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .online-map-actions,
+  .online-gm-actions {
+    flex: 1 1 auto;
+  }
+
+  .online-table-workspace {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 72px;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: clamp(320px, 58dvh, 650px) auto;
+  }
+
+  .online-map-stage {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .online-table-sidebar,
+  .online-table-workspace > .session-sidebar {
+    position: relative;
+    inset: auto;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+    box-shadow: none;
+    overscroll-behavior: auto;
+  }
+
+  .online-table-workspace > .session-sidebar {
+    grid-template-rows: auto auto;
+  }
+
+  .online-table-workspace > .session-sidebar .sidebar-body {
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .dice-tray-anchor {
+    left: 10px;
+    bottom: 10px;
+    max-width: calc(100vw - 20px);
+  }
+
+  .dice-tray {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 82px);
+    max-height: calc(100dvh - 82px);
+  }
+}
+
+@media (max-width: 520px) {
+  .online-workshop-panel .workshop-title {
+    display: none;
+  }
+
+  .online-workshop-panel .workshop-header {
+    gap: 4px;
+    padding-left: 4px;
+  }
+
+  .online-workshop-panel .workshop-tabs button {
+    min-width: 72px;
+    padding-inline: 9px;
+  }
+}
+
+@media (max-height: 480px) and (min-width: 801px) {
+  body {
+    overflow: auto;
+  }
+
+  .online-table-shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .online-table-topbar {
+    position: sticky;
+    top: 0;
+  }
+
+  .online-table-workspace {
+    height: clamp(320px, calc(100dvh - 58px), 650px);
+    min-height: 320px;
+  }
+}

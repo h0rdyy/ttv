@@ -261,7 +261,7 @@ export function OnlineSceneTools({
 
   return (
     <>
-      <section className="scene-tools-panel">
+      <section className="scene-tools-panel" data-wheel-isolation="true">
       <header className="scene-tools-head">
         <div><span className="eyebrow">СЦЕНА</span><h2>{scene.name}</h2></div>
         <button className="close-button" onClick={onClose}>×</button>

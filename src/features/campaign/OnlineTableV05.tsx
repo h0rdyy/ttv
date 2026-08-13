@@ -121,7 +121,7 @@ export function OnlineTableV05(props: Props) {
       </div>
 
       {managerOpen && props.mode === 'gm' && (
-        <section className="workshop-panel online-workshop-panel v05-sheet-workshop-overlay">
+        <section className="workshop-panel online-workshop-panel v05-sheet-workshop-overlay" data-wheel-isolation="true">
           <header className="workshop-header">
             <div className="workshop-title">ЛИСТЫ ПЕРСОНАЖЕЙ</div>
             <div className="workshop-shortcuts">Классический лист · поля мастера</div>

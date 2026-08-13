@@ -125,3 +125,38 @@ test('v0.5.1 release files contain production wiring and no release markers', as
   assert.match(sources[5], /campaign-gm:/);
   assert.doesNotMatch(sources[5], /create\s+table/i);
 });
+
+test('responsive table keeps controls reachable and isolates nested wheel scrolling', async () => {
+  const componentPaths = [
+    'src/features/campaign/OnlineGmWorkshop.tsx',
+    'src/features/campaign/OnlineSceneTools.tsx',
+    'src/features/campaign/MapCropDialog.tsx',
+    'src/features/campaign/DiceTray.tsx',
+    'src/features/campaign/OnlineTableV05.tsx',
+    'src/features/campaign/OnlineActorSheet.tsx',
+  ];
+  const [table, ...isolatedPanels] = await Promise.all([
+    readFile(new URL('../src/features/campaign/OnlineTable.tsx', import.meta.url), 'utf8'),
+    ...componentPaths.map((path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8')),
+  ]);
+  const [tableCss, sceneCss, sheetCss, workshopCss] = await Promise.all([
+    readFile(new URL('../src/app/online-table.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/scene-v04.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/sheet-v05.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/mvp.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(table, /closest\('\[data-wheel-isolation="true"\]'\)/);
+  isolatedPanels.forEach((source, index) => {
+    assert.match(source, /data-wheel-isolation="true"/, `${componentPaths[index]} must isolate its wheel events`);
+  });
+  assert.match(tableCss, /height:\s*100dvh/);
+  assert.match(tableCss, /grid-template-rows:\s*clamp\(320px,\s*58dvh,\s*650px\)\s+auto/);
+  assert.match(tableCss, /padding-bottom:\s*72px/);
+  assert.match(tableCss, /@media\s*\(max-height:\s*480px\)[\s\S]*?\.online-table-shell\s*\{[\s\S]*?overflow:\s*visible/);
+  assert.match(tableCss, /overscroll-behavior:\s*contain/);
+  assert.match(sceneCss, /max-height:\s*calc\(100dvh\s*-\s*48px\)/);
+  assert.doesNotMatch(sceneCss, /online-map-actions[^{}]*button:not\(\.active\)[^{]*\{[^}]*display:\s*none/);
+  assert.match(sheetCss, /height:\s*min\(920px,\s*calc\(100dvh\s*-\s*32px\)\)/);
+  assert.match(workshopCss, /\.module-list-scroll,[\s\S]*overscroll-behavior:\s*contain/);
+});
