@@ -153,10 +153,28 @@ test('responsive table keeps controls reachable and isolates nested wheel scroll
   assert.match(tableCss, /height:\s*100dvh/);
   assert.match(tableCss, /grid-template-rows:\s*clamp\(320px,\s*58dvh,\s*650px\)\s+auto/);
   assert.match(tableCss, /padding-bottom:\s*72px/);
+  assert.match(tableCss, /@media\s*\(max-width:\s*1500px\)[\s\S]*?\.online-table-topbar\s*\{[^}]*flex-wrap:\s*wrap/);
+  assert.match(tableCss, /\.online-table-topbar \.button\s*\{[^}]*white-space:\s*nowrap/);
   assert.match(tableCss, /@media\s*\(max-height:\s*480px\)[\s\S]*?\.online-table-shell\s*\{[\s\S]*?overflow:\s*visible/);
   assert.match(tableCss, /overscroll-behavior:\s*contain/);
   assert.match(sceneCss, /max-height:\s*calc\(100dvh\s*-\s*48px\)/);
   assert.doesNotMatch(sceneCss, /online-map-actions[^{}]*button:not\(\.active\)[^{]*\{[^}]*display:\s*none/);
+  assert.doesNotMatch(sceneCss, /online-gm-actions[^{}]*button:nth-child[^{}]*\{[^}]*display:\s*none/);
   assert.match(sheetCss, /height:\s*min\(920px,\s*calc\(100dvh\s*-\s*32px\)\)/);
   assert.match(workshopCss, /\.module-list-scroll,[\s\S]*overscroll-behavior:\s*contain/);
+});
+
+test('ordinary pages can scroll while tabletop workspaces stay viewport locked', async () => {
+  const [globalCss, playerCss, tableCss, room] = await Promise.all([
+    readFile(new URL('../src/app/globals.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/player.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/online-table.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineCampaignRoom.tsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(globalCss, /body\s*\{[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto/);
+  assert.match(globalCss, /\.app-shell\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(playerCss, /\.player-shell\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(tableCss, /\.online-table-shell\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(room, /<main className="online-room">/);
 });
