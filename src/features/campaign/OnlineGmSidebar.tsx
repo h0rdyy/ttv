@@ -71,9 +71,24 @@ export function OnlineGmSidebar(props: Props) {
   );
 }
 
-function PartyPanel({ actors, selectedActorId, onSelectActor, onHp }: Props) {
+function PartyPanel({ campaignId, actors, selectedActorId, onSelectActor, onHp, onChanged, onMessage }: Props) {
   const party = actors.filter((actor) => actor.type === 'player');
   const selected = actors.find((actor) => actor.id === selectedActorId) ?? party[0] ?? null;
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteHero = async () => {
+    if (!selected || !window.confirm(`Удалить героя «${selected.name}» из кампании? Вместе с ним удалятся его фишки, лист и инвентарь. Игрок останется участником кампании.`)) return;
+    setDeleting(true);
+    const supabase = createClient();
+    const { error } = await supabase.rpc('delete_campaign_actor', { target_campaign: campaignId, target_actor: selected.id });
+    if (error) onMessage(friendlyError(error, 'Не удалось удалить героя.'));
+    else {
+      onSelectActor('');
+      onMessage(`Герой «${selected.name}» удалён.`);
+      onChanged();
+    }
+    setDeleting(false);
+  };
 
   return (
     <>
@@ -97,6 +112,7 @@ function PartyPanel({ actors, selectedActorId, onSelectActor, onHp }: Props) {
         <section className="online-actor-card">
           <div className="online-actor-title"><span>{selected.avatar || '👤'}</span><div><h2>{selected.name}</h2><p>{selected.subtitle}</p></div></div>
           <div className="online-hp-box"><span>Здоровье</span><b>{selected.system_data.hp.current} / {selected.system_data.hp.max}</b><div><button onClick={() => onHp(selected, -1)}>−</button><button onClick={() => onHp(selected, 1)}>＋</button></div></div>
+          <button className="button danger full party-delete-hero" disabled={deleting} onClick={() => void deleteHero()}>{deleting ? 'Удаление…' : 'Удалить героя'}</button>
         </section>
       )}
     </>
