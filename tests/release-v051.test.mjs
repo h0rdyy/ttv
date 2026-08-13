@@ -196,3 +196,20 @@ test('tabletop topbar groups secondary actions without duplicating sidebar tabs'
   assert.match(sidebar, /\['npc', 'NPC'\]/);
   assert.match(tableCss, /\.online-menu-popover\s*\{/);
 });
+
+test('dice tray exposes quantity steppers and keeps secondary controls compact', async () => {
+  const [tray, tableCss] = await Promise.all([
+    readFile(new URL('../src/features/campaign/DiceTray.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/online-table.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(tray, /useState\(false\).*historyOpen|\[historyOpen, setHistoryOpen\] = useState\(false\)/);
+  assert.match(tray, /aria-label={`Количество d\$\{sides\}`}/);
+  assert.match(tray, /role="group" aria-label="Видимость броска"/);
+  assert.match(tray, />Сбросить<\/button>/);
+  assert.doesNotMatch(tray, /className="dice-pool"/);
+  assert.doesNotMatch(tray, /<select value=\{visibility\}/);
+  assert.doesNotMatch(tray, /setHistoryOpen\(true\)/);
+  assert.match(tableCss, /\.dice-picker\s*\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(tableCss, /\.dice-visibility button\[aria-pressed="true"\]/);
+});

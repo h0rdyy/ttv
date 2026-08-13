@@ -26,7 +26,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
   const [pool, setPool] = useState<number[]>([]);
   const [modifier, setModifier] = useState(0);
   const [visibility, setVisibility] = useState<DiceVisibility>('public');
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [rollingSides, setRollingSides] = useState<number[]>([]);
   const [lastRoll, setLastRoll] = useState<DiceRoll | null>(null);
@@ -44,6 +44,20 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
       }
       return [...current, sides];
     });
+  };
+
+  const removeDie = (sides: number) => {
+    setPool((current) => {
+      const index = current.lastIndexOf(sides);
+      if (index === -1) return current;
+      return current.filter((_, itemIndex) => itemIndex !== index);
+    });
+  };
+
+  const resetBuilder = () => {
+    if (rolling) return;
+    setPool([]);
+    setModifier(0);
   };
 
   const removeSettledDie = (index: number) => {
@@ -84,7 +98,6 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
       }
 
       setLastRoll(result);
-      setHistoryOpen(true);
       onRoll(result);
     } catch (error) {
       onMessage(friendlyError(error, 'Не удалось выполнить бросок. Проверьте соединение и попробуйте ещё раз.'));
@@ -100,21 +113,36 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
       {open && (
         <section className="dice-tray" data-wheel-isolation="true" aria-label="Лоток с кубами">
           <header className="dice-tray-head">
-            <div><span>ЛОТОК КУБОВ</span><strong>{formula}</strong></div>
+            <div><span>ЛОТОК КУБОВ</span><strong>Соберите бросок</strong></div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть">×</button>
           </header>
 
-          <div className="dice-tray-board">
-            <aside className="dice-picker" aria-label="Добавить куб">
+          <section className="dice-builder" aria-label="Набор кубов">
+            <header>
+              <div><span>Набор</span><strong>{pool.length ? formula : 'Выберите кубы'}</strong></div>
+              {pool.length > 0 && <button type="button" onClick={resetBuilder} disabled={rolling}>Сбросить</button>}
+            </header>
+            <div className="dice-picker">
               {DICE_SIDES.map((sides) => {
                 const count = pool.filter((value) => value === sides).length;
-                return <button key={sides} type="button" className={`die-button die-d${sides}`} onClick={() => addDie(sides)}><span>{sides === 100 ? '%' : sides}</span>{count > 0 && <em>{count}</em>}</button>;
+                return (
+                  <div key={sides} className={`dice-choice die-d${sides} ${count > 0 ? 'selected' : ''}`}>
+                    <strong>d{sides}</strong>
+                    <div className="dice-quantity" aria-label={`Количество d${sides}`}>
+                      <button type="button" disabled={count === 0 || rolling} onClick={() => removeDie(sides)} aria-label={`Убрать один d${sides}`}>−</button>
+                      <span aria-live="polite">{count}</span>
+                      <button type="button" disabled={pool.length >= 20 || rolling} onClick={() => addDie(sides)} aria-label={`Добавить один d${sides}`}>+</button>
+                    </div>
+                  </div>
+                );
               })}
-            </aside>
+            </div>
+          </section>
 
+          <div className="dice-tray-board">
             <div className={`dice-roll-surface ${rolling ? 'rolling' : 'settled'}`} aria-live="polite">
               <div className="dice-roll-felt">
-                {!shownSides.length && <div className="dice-empty-felt"><span>⚄</span><strong>Соберите бросок</strong><small>Выберите кубы слева</small></div>}
+                {!shownSides.length && <div className="dice-empty-felt"><span>⚄</span><strong>Результат появится здесь</strong><small>Добавьте кубы выше и нажмите «Бросить»</small></div>}
                 {shownSides.map((sides, index) => {
                   const value = shownValues[index];
                   return (
@@ -135,34 +163,31 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
             </div>
           </div>
 
-          <div className="dice-pool">
-            <span>Набор</span>
-            <div>{pool.length ? pool.map((sides, index) => <button type="button" key={`${sides}-${index}`} onClick={() => setPool((current) => current.filter((_, itemIndex) => itemIndex !== index))}>d{sides}<i>×</i></button>) : <small>Пока пусто</small>}</div>
-          </div>
-
           <div className="dice-controls">
             <div className="dice-modifier">
               <span>Модификатор</span>
               <div><button type="button" disabled={modifier <= -100} onClick={() => setModifier((value) => Math.max(-100, value - 1))}>−</button><b>{modifier > 0 ? `+${modifier}` : modifier}</b><button type="button" disabled={modifier >= 100} onClick={() => setModifier((value) => Math.min(100, value + 1))}>+</button></div>
             </div>
-            <label>
-              Кто увидит
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as DiceVisibility)}>
-                <option value="public">Все игроки</option>
-                <option value="gm">{mode === 'gm' ? 'Только мастера' : 'Только мастер'}</option>
-              </select>
-            </label>
+            <div className="dice-visibility">
+              <span>Кто увидит</span>
+              <div role="group" aria-label="Видимость броска">
+                <button type="button" aria-pressed={visibility === 'public'} onClick={() => setVisibility('public')}>Всем</button>
+                <button type="button" aria-pressed={visibility === 'gm'} onClick={() => setVisibility('gm')}>{mode === 'gm' ? 'Мастерам' : 'Мастеру'}</button>
+              </div>
+            </div>
           </div>
 
           <div className="dice-actions">
-            <button type="button" className="button" onClick={() => { setPool([]); setModifier(0); }}>Очистить</button>
-            <button type="button" className="button primary dice-roll-button" disabled={!pool.length || rolling} onClick={() => void roll()}>{rolling ? 'Бросаем…' : 'Бросить'}</button>
+            <button type="button" className="button primary dice-roll-button" disabled={!pool.length || rolling} onClick={() => void roll()}>
+              <span>{rolling ? 'Кубы летят…' : 'Бросить'}</span>
+              <small>{pool.length ? formula : 'Сначала выберите кубы'}</small>
+            </button>
           </div>
 
           <div className="dice-history">
             <header>
               <button type="button" className="dice-history-toggle" onClick={() => setHistoryOpen((value) => !value)}><span>{historyOpen ? '⌄' : '›'}</span> Последние броски {history.length > 0 && <em>{history.length}</em>}</button>
-              <div><small>Realtime · не сохраняется</small>{history.length > 0 && <button type="button" onClick={onClearHistory}>Очистить</button>}</div>
+              <div><small>Только эта сессия</small>{history.length > 0 && <button type="button" onClick={onClearHistory}>Очистить историю</button>}</div>
             </header>
             {historyOpen && (history.length === 0 ? <p>Здесь появятся результаты бросков.</p> : history.map((item) => (
               <article key={item.id}>
