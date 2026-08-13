@@ -166,6 +166,13 @@
   gap: 8px;
 }
 
+.sheet-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
 .sheet-section-title-row > input,
 .sheet-field-builder-row input,
 .sheet-field-builder-row select {

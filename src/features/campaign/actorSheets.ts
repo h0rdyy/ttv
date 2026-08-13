@@ -216,6 +216,23 @@ export function normalizeSheetSchema(value: unknown): ActorSheetSchema {
   };
 }
 
+export function removeSheetSection(schema: ActorSheetSchema, sectionId: string): ActorSheetSchema {
+  return {
+    ...schema,
+    sections: schema.sections.filter((section) => section.id !== sectionId),
+  };
+}
+
+export function removeSheetField(schema: ActorSheetSchema, sectionId: string, fieldId: string): ActorSheetSchema {
+  return {
+    ...schema,
+    sections: schema.sections.map((section) => section.id === sectionId ? {
+      ...section,
+      fields: section.fields.filter((field) => field.id !== fieldId),
+    } : section),
+  };
+}
+
 function field(key: string, label: string, type: SheetFieldType, hint = ''): SheetField {
   return { id: `classic-${key}`, key, label, type, hint };
 }

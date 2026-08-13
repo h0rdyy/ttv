@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { type DiceRoll, parseDiceRoll } from './dice';
 
 type PresenceUser = {
   userId: string;
@@ -24,6 +25,7 @@ type Options = {
   mode: 'gm' | 'player';
   onStateChanged: (scope?: string) => void;
   onRemoteTokenMove: (payload: TokenMovePayload) => void;
+  onDiceRoll: (roll: DiceRoll) => void;
 };
 
 export function useCampaignRealtime({
@@ -33,6 +35,7 @@ export function useCampaignRealtime({
   mode,
   onStateChanged,
   onRemoteTokenMove,
+  onDiceRoll,
 }: Options) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribedRef = useRef(false);
@@ -50,7 +53,18 @@ export function useCampaignRealtime({
         broadcast: { self: false },
       },
     });
+    const gmChannel = mode === 'gm' ? supabase.channel(`campaign-gm:${campaignId}`, {
+      config: {
+        private: true,
+        broadcast: { self: false },
+      },
+    }) : null;
     channelRef.current = channel;
+
+    const receiveDiceRoll = (payload: unknown) => {
+      const roll = parseDiceRoll(payload);
+      if (roll) onDiceRoll(roll);
+    };
 
     channel
       .on('broadcast', { event: 'state_changed' }, ({ payload }) => {
@@ -68,6 +82,7 @@ export function useCampaignRealtime({
           onRemoteTokenMove(move as TokenMovePayload);
         }
       })
+      .on('broadcast', { event: 'dice_roll' }, ({ payload }) => receiveDiceRoll(payload))
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         const unique = new Map<string, PresenceUser>();
@@ -83,6 +98,8 @@ export function useCampaignRealtime({
         });
         setOnlineUsers([...unique.values()]);
       });
+
+    gmChannel?.on('broadcast', { event: 'dice_roll' }, ({ payload }) => receiveDiceRoll(payload));
 
     void (async () => {
       try {
@@ -104,6 +121,12 @@ export function useCampaignRealtime({
             setStatus('offline');
           }
         });
+        gmChannel?.subscribe((nextStatus) => {
+          if (disposed) return;
+          if (nextStatus === 'CHANNEL_ERROR' || nextStatus === 'TIMED_OUT' || nextStatus === 'CLOSED') {
+            setStatus('offline');
+          }
+        });
       } catch {
         if (!disposed) {
           subscribedRef.current = false;
@@ -117,8 +140,9 @@ export function useCampaignRealtime({
       subscribedRef.current = false;
       channelRef.current = null;
       void supabase.removeChannel(channel);
+      if (gmChannel) void supabase.removeChannel(gmChannel);
     };
-  }, [campaignId, currentUserId, displayName, mode, onRemoteTokenMove, onStateChanged]);
+  }, [campaignId, currentUserId, displayName, mode, onDiceRoll, onRemoteTokenMove, onStateChanged]);
 
   const broadcastTokenMove = useCallback((tokenId: string, x: number, y: number) => {
     const channel = channelRef.current;

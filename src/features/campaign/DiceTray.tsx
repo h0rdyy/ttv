@@ -1,85 +1,98 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
+import {
+  buildDiceFormula,
+  DICE_SIDES,
+  type DiceRoll,
+  type DiceVisibility,
+  parseDiceRoll,
+  removeDieFromRoll,
+} from './dice';
 
-const DICE = [4, 6, 8, 10, 12, 20, 100] as const;
-
-type Roll = {
-  id: number;
-  formula: string;
-  values: number[];
-  sides: number[];
-  modifier: number;
-  total: number;
-  visibility: 'public' | 'gm';
+type Props = {
+  campaignId: string;
+  mode: 'gm' | 'player';
+  history: DiceRoll[];
+  onRoll: (roll: DiceRoll) => void;
+  onClearHistory: () => void;
+  onMessage: (message: string) => void;
 };
 
-function secureDie(sides: number) {
-  const value = new Uint32Array(1);
-  crypto.getRandomValues(value);
-  return (value[0] % sides) + 1;
-}
-
-function buildFormula(sidesList: number[], modifier: number) {
-  if (!sidesList.length) return 'Выберите кубы';
-  const counts = new Map<number, number>();
-  sidesList.forEach((sides) => counts.set(sides, (counts.get(sides) ?? 0) + 1));
-  const dice = [...counts.entries()].map(([sides, count]) => `${count}d${sides}`).join(' + ');
-  if (!modifier) return dice;
-  return `${dice} ${modifier > 0 ? '+' : '−'} ${Math.abs(modifier)}`;
-}
-
-export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm' | 'player' }) {
+export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, onMessage }: Props) {
   const [open, setOpen] = useState(false);
   const [pool, setPool] = useState<number[]>([]);
   const [modifier, setModifier] = useState(0);
-  const [visibility, setVisibility] = useState<'public' | 'gm'>('public');
-  const [history, setHistory] = useState<Roll[]>([]);
+  const [visibility, setVisibility] = useState<DiceVisibility>('public');
   const [historyOpen, setHistoryOpen] = useState(true);
   const [rolling, setRolling] = useState(false);
-  const [lastRoll, setLastRoll] = useState<Roll | null>(null);
+  const [rollingSides, setRollingSides] = useState<number[]>([]);
+  const [lastRoll, setLastRoll] = useState<DiceRoll | null>(null);
+  const rollingRef = useRef(false);
 
-  const formula = useMemo(() => {
-    return buildFormula(pool, modifier);
-  }, [modifier, pool]);
+  const formula = useMemo(() => buildDiceFormula(pool, modifier), [modifier, pool]);
+  const shownSides = rolling ? rollingSides : lastRoll?.sides ?? [];
+  const shownValues = rolling ? rollingSides.map(() => 0) : lastRoll?.values ?? [];
 
-  const removeSettledDie = (index: number) => {
-    if (rolling) return;
-    setLastRoll((current) => {
-      if (!current) return null;
-      const values = current.values.filter((_, valueIndex) => valueIndex !== index);
-      const sides = current.sides.filter((_, sideIndex) => sideIndex !== index);
-      if (!values.length) return null;
-      return {
-        ...current,
-        values,
-        sides,
-        formula: buildFormula(sides, current.modifier),
-        total: values.reduce((sum, value) => sum + value, 0) + current.modifier,
-      };
+  const addDie = (sides: number) => {
+    setPool((current) => {
+      if (current.length >= 20) {
+        onMessage('В один бросок можно добавить до 20 кубов.');
+        return current;
+      }
+      return [...current, sides];
     });
   };
 
-  const roll = () => {
-    if (!pool.length || rolling) return;
-    const values = pool.map(secureDie);
-    const total = values.reduce((sum, value) => sum + value, 0) + modifier;
-    const nextRoll = {
-      id: Date.now(),
-      formula,
-      values,
-      sides: [...pool],
-      modifier,
-      total,
-      visibility,
-    };
-    setLastRoll(nextRoll);
+  const removeSettledDie = (index: number) => {
+    if (rolling) return;
+    setLastRoll((current) => current ? removeDieFromRoll(current, index) : null);
+  };
+
+  const roll = async () => {
+    if (!pool.length || rollingRef.current) return;
+    const requestedSides = [...pool];
+    const requestedModifier = modifier;
+    const requestedVisibility = visibility;
+    const startedAt = performance.now();
+
+    rollingRef.current = true;
     setRolling(true);
-    window.setTimeout(() => {
-      setRolling(false);
+    setRollingSides(requestedSides);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc('broadcast_dice_roll', {
+        target_campaign: campaignId,
+        roll_sides: requestedSides,
+        roll_modifier: requestedModifier,
+        roll_visibility: requestedVisibility,
+      });
+      const animationLeft = Math.max(0, 720 - (performance.now() - startedAt));
+      if (animationLeft > 0) await new Promise((resolve) => window.setTimeout(resolve, animationLeft));
+
+      if (error) {
+        onMessage(friendlyError(error.message, 'Не удалось выполнить бросок. Проверьте соединение и попробуйте ещё раз.'));
+        return;
+      }
+      const result = parseDiceRoll(data);
+      if (!result) {
+        onMessage('Сервер вернул некорректный результат броска. Попробуйте ещё раз.');
+        return;
+      }
+
+      setLastRoll(result);
       setHistoryOpen(true);
-      setHistory((current) => [nextRoll, ...current].slice(0, 5));
-    }, 720);
+      onRoll(result);
+    } catch (error) {
+      onMessage(friendlyError(error, 'Не удалось выполнить бросок. Проверьте соединение и попробуйте ещё раз.'));
+    } finally {
+      rollingRef.current = false;
+      setRolling(false);
+      setRollingSides([]);
+    }
   };
 
   return (
@@ -93,27 +106,30 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
 
           <div className="dice-tray-board">
             <aside className="dice-picker" aria-label="Добавить куб">
-              {DICE.map((sides) => {
+              {DICE_SIDES.map((sides) => {
                 const count = pool.filter((value) => value === sides).length;
-                return <button key={sides} type="button" className={`die-button die-d${sides}`} onClick={() => setPool((current) => [...current, sides])}><span>{sides === 100 ? '%' : sides}</span>{count > 0 && <em>{count}</em>}</button>;
+                return <button key={sides} type="button" className={`die-button die-d${sides}`} onClick={() => addDie(sides)}><span>{sides === 100 ? '%' : sides}</span>{count > 0 && <em>{count}</em>}</button>;
               })}
             </aside>
 
             <div className={`dice-roll-surface ${rolling ? 'rolling' : 'settled'}`} aria-live="polite">
               <div className="dice-roll-felt">
-                {!lastRoll && <div className="dice-empty-felt"><span>⚄</span><strong>Соберите бросок</strong><small>Выберите кубы слева</small></div>}
-                {lastRoll?.values.map((value, index) => (
-                  <div
-                    key={`${lastRoll.id}-${index}`}
-                    className={`rolled-die rolled-d${lastRoll.sides[index]} ${!rolling && value === lastRoll.sides[index] ? 'max' : ''} ${!rolling && value === 1 ? 'one' : ''}`}
-                    style={{ '--die-index': index } as React.CSSProperties}
-                    onClick={() => removeSettledDie(index)}
-                    title={rolling ? undefined : 'Нажмите, чтобы убрать куб'}
-                  >
-                    <small>d{lastRoll.sides[index]}</small>
-                    <strong>{rolling ? '·' : value}</strong>
-                  </div>
-                ))}
+                {!shownSides.length && <div className="dice-empty-felt"><span>⚄</span><strong>Соберите бросок</strong><small>Выберите кубы слева</small></div>}
+                {shownSides.map((sides, index) => {
+                  const value = shownValues[index];
+                  return (
+                    <div
+                      key={`${rolling ? 'rolling' : lastRoll?.id}-${index}`}
+                      className={`rolled-die rolled-d${sides} ${!rolling && value === sides ? 'max' : ''} ${!rolling && value === 1 ? 'one' : ''}`}
+                      style={{ '--die-index': index } as React.CSSProperties}
+                      onClick={() => removeSettledDie(index)}
+                      title={rolling ? undefined : 'Нажмите, чтобы убрать куб'}
+                    >
+                      <small>d{sides}</small>
+                      <strong>{rolling ? '·' : value}</strong>
+                    </div>
+                  );
+                })}
               </div>
               <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span><b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
             </div>
@@ -127,30 +143,30 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
           <div className="dice-controls">
             <div className="dice-modifier">
               <span>Модификатор</span>
-              <div><button type="button" onClick={() => setModifier((value) => value - 1)}>−</button><b>{modifier > 0 ? `+${modifier}` : modifier}</b><button type="button" onClick={() => setModifier((value) => value + 1)}>+</button></div>
+              <div><button type="button" disabled={modifier <= -100} onClick={() => setModifier((value) => Math.max(-100, value - 1))}>−</button><b>{modifier > 0 ? `+${modifier}` : modifier}</b><button type="button" disabled={modifier >= 100} onClick={() => setModifier((value) => Math.min(100, value + 1))}>+</button></div>
             </div>
             <label>
               Кто увидит
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as 'public' | 'gm')}>
+              <select value={visibility} onChange={(event) => setVisibility(event.target.value as DiceVisibility)}>
                 <option value="public">Все игроки</option>
-                <option value="gm">{mode === 'gm' ? 'Только я' : 'Только мастер'}</option>
+                <option value="gm">{mode === 'gm' ? 'Только мастера' : 'Только мастер'}</option>
               </select>
             </label>
           </div>
 
           <div className="dice-actions">
             <button type="button" className="button" onClick={() => { setPool([]); setModifier(0); }}>Очистить</button>
-            <button type="button" className="button primary dice-roll-button" disabled={!pool.length || rolling} onClick={roll}>{rolling ? 'Бросаем…' : 'Бросить'}</button>
+            <button type="button" className="button primary dice-roll-button" disabled={!pool.length || rolling} onClick={() => void roll()}>{rolling ? 'Бросаем…' : 'Бросить'}</button>
           </div>
 
           <div className="dice-history">
             <header>
               <button type="button" className="dice-history-toggle" onClick={() => setHistoryOpen((value) => !value)}><span>{historyOpen ? '⌄' : '›'}</span> Последние броски {history.length > 0 && <em>{history.length}</em>}</button>
-              <div><small>Прототип · локально</small>{history.length > 0 && <button type="button" onClick={() => setHistory([])}>Очистить</button>}</div>
+              <div><small>Realtime · не сохраняется</small>{history.length > 0 && <button type="button" onClick={onClearHistory}>Очистить</button>}</div>
             </header>
             {historyOpen && (history.length === 0 ? <p>Здесь появятся результаты бросков.</p> : history.map((item) => (
               <article key={item.id}>
-                <div><strong>{displayName}</strong><small>{item.visibility === 'public' ? 'Всем' : mode === 'gm' ? 'Скрытый' : 'Мастеру'} · {item.formula}</small></div>
+                <div><strong>{item.displayName}</strong><small>{item.visibility === 'public' ? 'Всем' : 'Мастеру'} · {item.formula}</small></div>
                 <span className="dice-values">{item.values.join(' · ')}{item.modifier ? ` ${item.modifier > 0 ? '+' : '−'} ${Math.abs(item.modifier)}` : ''}</span>
                 <b>{item.total}</b>
               </article>

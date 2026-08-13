@@ -9,6 +9,8 @@ import {
   classicFantasySheetSchema,
   fieldKeyFromLabel,
   normalizeSheetSchema,
+  removeSheetField,
+  removeSheetSection,
   type SheetFieldType,
 } from './actorSheets';
 type Props = {
@@ -76,7 +78,7 @@ export function OnlineSheetWorkshop(props: Props) {
               <div><h2>Классический лист</h2><p>Один общий вид для всех героев кампании · игроки заполняют значения</p></div>
               <button className="button primary" onClick={() => setDraft(fromTemplate(template))}>✎ Настроить поля</button>
             </div>
-            <div className="classic-workshop-note"><strong>Как это работает</strong><span>Базовые характеристики уже встроены. Мастер может добавлять свои поля в нужные разделы, а игрок — заполнять их в своём листе.</span></div>
+            <div className="classic-workshop-note"><strong>Как это работает</strong><span>Базовые характеристики уже встроены. Мастер может добавлять и удалять разделы и поля, а игрок — заполнять их в своём листе.</span></div>
             <TemplatePreview template={template} />
           </>
         ) : (
@@ -110,7 +112,7 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
   };
 
   const removeSection = (sectionId: string) => {
-    setValue((current) => ({ ...current, schema: { ...current.schema, sections: current.schema.sections.filter((section) => section.id !== sectionId) } }));
+    setValue((current) => ({ ...current, schema: removeSheetSection(current.schema, sectionId) }));
   };
 
   const patchSection = (sectionId: string, title: string) => {
@@ -158,25 +160,22 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
   };
 
   const removeField = (sectionId: string, fieldId: string) => {
-    setValue((current) => ({
-      ...current,
-      schema: {
-        ...current.schema,
-        sections: current.schema.sections.map((section) => section.id === sectionId ? { ...section, fields: section.fields.filter((field) => field.id !== fieldId) } : section),
-      },
-    }));
+    setValue((current) => ({ ...current, schema: removeSheetField(current.schema, sectionId, fieldId) }));
   };
 
   return (
     <form className="builder-view sheet-builder" onSubmit={submit}>
-      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Мастер может добавлять и удалять поля. После сохранения изменения появятся у всех игроков.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
+      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Мастер может добавлять и удалять целые разделы и отдельные поля. После сохранения изменения появятся у всех игроков.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
       <div className="builder-scroll">
         {value.schema.sections.map((section, sectionIndex) => (
           <section className="builder-section sheet-builder-section" key={section.id}>
             <div className="sheet-section-title-row">
               <span className="eyebrow">РАЗДЕЛ {sectionIndex + 1}</span>
               <input value={section.title} readOnly={section.slot !== 'custom'} onChange={(event) => patchSection(section.id, event.target.value)} aria-label={`Название раздела ${sectionIndex + 1}`} />
-              {section.slot === 'custom' ? <button type="button" className="button danger" onClick={() => removeSection(section.id)}>Удалить раздел</button> : <span className="sheet-built-in-label">БАЗОВЫЙ</span>}
+              <div className="sheet-section-actions">
+                {section.slot !== 'custom' && <span className="sheet-built-in-label">БАЗОВЫЙ</span>}
+                <button type="button" className="button danger" onClick={() => removeSection(section.id)} aria-label={`Удалить раздел «${section.title}»`}>Удалить раздел</button>
+              </div>
             </div>
             <div className="sheet-field-builder-list">
               {section.fields.map((field) => {

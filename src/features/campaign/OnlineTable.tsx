@@ -10,6 +10,7 @@ import { OnlineGmWorkshop } from './OnlineGmWorkshop';
 import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
 import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
 import { DiceTray } from './DiceTray';
+import { type DiceRoll, mergeDiceRollHistory } from './dice';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -85,6 +86,7 @@ export function OnlineTable(props: Props) {
   const [notes, setNotes] = useState(props.initialNotes);
   const [rollTables, setRollTables] = useState(props.initialRollTables);
   const [runtime, setRuntime] = useState(props.initialRuntime);
+  const [diceHistory, setDiceHistory] = useState<DiceRoll[]>([]);
   const [selectedActorId, setSelectedActorId] = useState(() => {
     if (mode === 'player') return props.initialActors.find((actor) => actor.owner_user_id === currentUserId)?.id ?? '';
     return props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '';
@@ -121,6 +123,7 @@ export function OnlineTable(props: Props) {
   useEffect(() => setNotes(props.initialNotes), [props.initialNotes]);
   useEffect(() => setRollTables(props.initialRollTables), [props.initialRollTables]);
   useEffect(() => setRuntime(props.initialRuntime), [props.initialRuntime]);
+  useEffect(() => setDiceHistory([]), [props.campaign.id]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
@@ -174,6 +177,9 @@ export function OnlineTable(props: Props) {
   }, []);
 
   const onStateChanged = useCallback(() => scheduleRefresh(), [scheduleRefresh]);
+  const onDiceRoll = useCallback((roll: DiceRoll) => {
+    setDiceHistory((current) => mergeDiceRollHistory(current, roll));
+  }, []);
   const { status: liveStatus, onlineUsers, broadcastTokenMove } = useCampaignRealtime({
     campaignId: campaign.id,
     currentUserId,
@@ -181,6 +187,7 @@ export function OnlineTable(props: Props) {
     mode,
     onStateChanged,
     onRemoteTokenMove,
+    onDiceRoll,
   });
 
   const activeScene = scenes.find((scene) => scene.id === campaign.active_scene_id) ?? scenes[0] ?? null;
@@ -705,7 +712,14 @@ export function OnlineTable(props: Props) {
         )}
       </main>
 
-      <DiceTray displayName={displayName} mode={mode} />
+      <DiceTray
+        campaignId={campaign.id}
+        mode={mode}
+        history={diceHistory}
+        onRoll={onDiceRoll}
+        onClearHistory={() => setDiceHistory([])}
+        onMessage={setMessage}
+      />
 
       {message && <div className="auth-status online-table-message online-global-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
