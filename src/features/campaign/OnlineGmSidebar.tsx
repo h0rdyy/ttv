@@ -108,10 +108,10 @@ function PartyPanel({ campaignId, actors, selectedActorId, onSelectActor, onHp, 
         );
       })}
       {!party.length && <div className="online-small-empty">Персонажей игроков пока нет.</div>}
-      {selected && selected.system_data?.hp && (
+      {selected && (
         <section className="online-actor-card">
           <div className="online-actor-title"><span>{selected.avatar || '👤'}</span><div><h2>{selected.name}</h2><p>{selected.subtitle}</p></div></div>
-          <div className="online-hp-box"><span>Здоровье</span><b>{selected.system_data.hp.current} / {selected.system_data.hp.max}</b><div><button onClick={() => onHp(selected, -1)}>−</button><button onClick={() => onHp(selected, 1)}>＋</button></div></div>
+          {selected.system_data?.hp && <div className="online-hp-box"><span>Здоровье</span><b>{selected.system_data.hp.current} / {selected.system_data.hp.max}</b><div><button onClick={() => onHp(selected, -1)}>−</button><button onClick={() => onHp(selected, 1)}>＋</button></div></div>}
           <button className="button danger full party-delete-hero" disabled={deleting} onClick={() => void deleteHero()}>{deleting ? 'Удаление…' : 'Удалить героя'}</button>
         </section>
       )}

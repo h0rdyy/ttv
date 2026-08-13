@@ -602,7 +602,14 @@ export function OnlineTable(props: Props) {
                     <button
                       key={token.id}
                       className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
-                      style={{ left: `${position.x}%`, top: `${position.y}%`, transform: `translate(-50%,-50%) scale(${token.size || 1})` }}
+                      style={{
+                        left: `${position.x}%`,
+                        top: `${position.y}%`,
+                        transform: 'translate(-50%,-50%)',
+                        '--token-avatar-size': `${Math.max(12, Math.round(46 * (token.size || 1)))}px`,
+                        '--token-avatar-font-size': `${Math.max(9, Math.round(20 * (token.size || 1)))}px`,
+                        '--token-border-size': `${Math.max(1, Math.round(3 * Math.min(token.size || 1, 1)))}px`,
+                      } as React.CSSProperties}
                       onPointerDown={(event) => {
                         event.stopPropagation();
                         setSelectedActorId(actor.id);

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { MapCropDialog } from './MapCropDialog';
 
 type Scene = {
   id: string;
@@ -56,6 +57,7 @@ export function OnlineSceneTools({
   const [snap, setSnap] = useState(scene.grid_snap);
   const [actorToPlace, setActorToPlace] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -141,6 +143,18 @@ export function OnlineSceneTools({
     onMessage('Карта загружена.');
     onChanged();
     setBusy(false);
+  };
+
+  const selectMap = (file: File) => {
+    if (!MAP_TYPES.includes(file.type)) {
+      onMessage('Поддерживаются PNG, JPG и WebP.');
+      return;
+    }
+    if (file.size > MAX_MAP_BYTES) {
+      onMessage('Карта слишком большая. Максимум 6 МБ.');
+      return;
+    }
+    setCropFile(file);
   };
 
   const removeMap = async () => {
@@ -246,7 +260,8 @@ export function OnlineSceneTools({
   };
 
   return (
-    <section className="scene-tools-panel">
+    <>
+      <section className="scene-tools-panel">
       <header className="scene-tools-head">
         <div><span className="eyebrow">СЦЕНА</span><h2>{scene.name}</h2></div>
         <button className="close-button" onClick={onClose}>×</button>
@@ -273,7 +288,7 @@ export function OnlineSceneTools({
             accept="image/png,image/jpeg,image/webp"
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) void uploadMap(file);
+              if (file) selectMap(file);
               event.currentTarget.value = '';
             }}
           />
@@ -334,6 +349,8 @@ export function OnlineSceneTools({
           <button className="button danger full" disabled={busy} onClick={() => void deleteScene()}>Удалить сцену</button>
         </section>
       </div>
-    </section>
+      </section>
+      {cropFile && <MapCropDialog file={cropFile} maxBytes={MAX_MAP_BYTES} onCancel={() => setCropFile(null)} onError={onMessage} onConfirm={(file) => { setCropFile(null); void uploadMap(file); }} />}
+    </>
   );
 }

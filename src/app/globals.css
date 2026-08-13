@@ -47,12 +47,12 @@ button { -webkit-tap-highlight-color: transparent; }
 .map-tools { position: absolute; left: 12px; top: 18px; z-index: 4; display: grid; gap: 3px; padding: 4px; background: rgba(10,8,6,.9); border: 1px solid var(--line); border-radius: 7px; }
 .map-tool { width: 34px; height: 34px; border: 0; border-radius: 5px; background: transparent; color: #cbaa6e; cursor: pointer; }
 .map-tool:hover { background: #241b11; }
-.token { position: absolute; z-index: 5; transform: translate(-50%,-50%); width: 72px; padding: 0; border: 0; background: transparent; color: #f1dfbe; cursor: pointer; display: grid; justify-items: center; }
-.token-avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: #1b1813; border: 3px solid #588e49; box-shadow: 0 0 0 2px rgba(0,0,0,.6), 0 5px 14px rgba(0,0,0,.5); font-weight: 800; }
+.token { --token-avatar-size: 46px; --token-avatar-font-size: 20px; --token-border-size: 3px; position: absolute; z-index: 5; transform: translate(-50%,-50%); width: calc(var(--token-avatar-size) + 26px); padding: 0; border: 0; background: transparent; color: #f1dfbe; cursor: pointer; display: grid; justify-items: center; }
+.token-avatar { width: var(--token-avatar-size); height: var(--token-avatar-size); border-radius: 50%; display: grid; place-items: center; background: #1b1813; border: var(--token-border-size) solid #588e49; box-shadow: 0 0 0 2px rgba(0,0,0,.6), 0 5px 14px rgba(0,0,0,.5); font-size: var(--token-avatar-font-size); line-height: 1; font-weight: 800; text-rendering: geometricPrecision; }
 .token.enemy .token-avatar { border-color: #b84d3c; }
 .token.selected .token-avatar { box-shadow: 0 0 0 3px rgba(224,189,122,.7), 0 5px 18px rgba(0,0,0,.6); }
 .token-name { margin-top: 3px; font-family: Georgia,serif; font-size: 12px; text-shadow: 0 2px 3px #000; }
-.token-hp { width: 44px; height: 4px; background: #282219; border-radius: 20px; overflow: hidden; margin-top: 3px; }
+.token-hp { width: min(44px,var(--token-avatar-size)); height: 4px; background: #282219; border-radius: 20px; overflow: hidden; margin-top: 3px; }
 .token-hp i { display: block; height: 100%; background: var(--green); }
 
 .session-sidebar { min-height: 0; position: relative; display: grid; grid-template-rows: 48px minmax(0,1fr) auto; border-left: 1px solid var(--line); background: linear-gradient(180deg,#0e0c09,#090806); z-index: 15; }
