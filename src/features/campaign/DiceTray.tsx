@@ -20,6 +20,15 @@ function secureDie(sides: number) {
   return (value[0] % sides) + 1;
 }
 
+function buildFormula(sidesList: number[], modifier: number) {
+  if (!sidesList.length) return 'Выберите кубы';
+  const counts = new Map<number, number>();
+  sidesList.forEach((sides) => counts.set(sides, (counts.get(sides) ?? 0) + 1));
+  const dice = [...counts.entries()].map(([sides, count]) => `${count}d${sides}`).join(' + ');
+  if (!modifier) return dice;
+  return `${dice} ${modifier > 0 ? '+' : '−'} ${Math.abs(modifier)}`;
+}
+
 export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm' | 'player' }) {
   const [open, setOpen] = useState(false);
   const [pool, setPool] = useState<number[]>([]);
@@ -31,13 +40,25 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
   const [lastRoll, setLastRoll] = useState<Roll | null>(null);
 
   const formula = useMemo(() => {
-    if (!pool.length) return 'Выберите кубы';
-    const counts = new Map<number, number>();
-    pool.forEach((sides) => counts.set(sides, (counts.get(sides) ?? 0) + 1));
-    const dice = [...counts.entries()].map(([sides, count]) => `${count}d${sides}`).join(' + ');
-    if (!modifier) return dice;
-    return `${dice} ${modifier > 0 ? '+' : '−'} ${Math.abs(modifier)}`;
+    return buildFormula(pool, modifier);
   }, [modifier, pool]);
+
+  const removeSettledDie = (index: number) => {
+    if (rolling) return;
+    setLastRoll((current) => {
+      if (!current) return null;
+      const values = current.values.filter((_, valueIndex) => valueIndex !== index);
+      const sides = current.sides.filter((_, sideIndex) => sideIndex !== index);
+      if (!values.length) return null;
+      return {
+        ...current,
+        values,
+        sides,
+        formula: buildFormula(sides, current.modifier),
+        total: values.reduce((sum, value) => sum + value, 0) + current.modifier,
+      };
+    });
+  };
 
   const roll = () => {
     if (!pool.length || rolling) return;
@@ -86,16 +107,15 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
                     key={`${lastRoll.id}-${index}`}
                     className={`rolled-die rolled-d${lastRoll.sides[index]} ${!rolling && value === lastRoll.sides[index] ? 'max' : ''} ${!rolling && value === 1 ? 'one' : ''}`}
                     style={{ '--die-index': index } as React.CSSProperties}
+                    onClick={() => removeSettledDie(index)}
+                    title={rolling ? undefined : 'Нажмите, чтобы убрать куб'}
                   >
                     <small>d{lastRoll.sides[index]}</small>
                     <strong>{rolling ? '·' : value}</strong>
                   </div>
                 ))}
               </div>
-              <div className="dice-roll-total">
-                <span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span>
-                <div>{lastRoll && !rolling && <button type="button" onClick={() => setLastRoll(null)} title="Убрать кубы с лотка">Убрать кубы</button>}<b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
-              </div>
+              <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll ? lastRoll.formula : 'Результат броска'}</span><b>{rolling || !lastRoll ? '—' : lastRoll.total}</b></div>
             </div>
           </div>
 
