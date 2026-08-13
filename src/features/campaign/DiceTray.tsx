@@ -8,6 +8,7 @@ type Roll = {
   id: number;
   formula: string;
   values: number[];
+  sides: number[];
   modifier: number;
   total: number;
   visibility: 'public' | 'gm';
@@ -25,6 +26,9 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
   const [modifier, setModifier] = useState(0);
   const [visibility, setVisibility] = useState<'public' | 'gm'>('public');
   const [history, setHistory] = useState<Roll[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [rolling, setRolling] = useState(false);
+  const [lastRoll, setLastRoll] = useState<Roll | null>(null);
 
   const formula = useMemo(() => {
     if (!pool.length) return 'Выберите кубы';
@@ -36,17 +40,25 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
   }, [modifier, pool]);
 
   const roll = () => {
-    if (!pool.length) return;
+    if (!pool.length || rolling) return;
     const values = pool.map(secureDie);
     const total = values.reduce((sum, value) => sum + value, 0) + modifier;
-    setHistory((current) => [{
+    const nextRoll = {
       id: Date.now(),
       formula,
       values,
+      sides: [...pool],
       modifier,
       total,
       visibility,
-    }, ...current].slice(0, 5));
+    };
+    setLastRoll(nextRoll);
+    setRolling(true);
+    window.setTimeout(() => {
+      setRolling(false);
+      setHistoryOpen(true);
+      setHistory((current) => [nextRoll, ...current].slice(0, 5));
+    }, 720);
   };
 
   return (
@@ -71,6 +83,24 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
             <div>{pool.length ? pool.map((sides, index) => <button type="button" key={`${sides}-${index}`} onClick={() => setPool((current) => current.filter((_, itemIndex) => itemIndex !== index))}>d{sides}</button>) : <small>Нажмите на куб выше</small>}</div>
           </div>
 
+          {lastRoll && (
+            <div className={`dice-roll-surface ${rolling ? 'rolling' : 'settled'}`} aria-live="polite">
+              <div className="dice-roll-felt">
+                {lastRoll.values.map((value, index) => (
+                  <div
+                    key={`${lastRoll.id}-${index}`}
+                    className={`rolled-die rolled-d${lastRoll.sides[index]} ${value === lastRoll.sides[index] ? 'max' : ''} ${value === 1 ? 'one' : ''}`}
+                    style={{ '--die-index': index } as React.CSSProperties}
+                  >
+                    <small>d{lastRoll.sides[index]}</small>
+                    <strong>{rolling ? '?' : value}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="dice-roll-total"><span>{rolling ? 'Кубы летят…' : lastRoll.formula}</span><b>{rolling ? '—' : lastRoll.total}</b></div>
+            </div>
+          )}
+
           <div className="dice-controls">
             <div className="dice-modifier">
               <span>Модификатор</span>
@@ -87,18 +117,21 @@ export function DiceTray({ displayName, mode }: { displayName: string; mode: 'gm
 
           <div className="dice-actions">
             <button type="button" className="button" onClick={() => { setPool([]); setModifier(0); }}>Очистить</button>
-            <button type="button" className="button primary dice-roll-button" disabled={!pool.length} onClick={roll}>Бросить</button>
+            <button type="button" className="button primary dice-roll-button" disabled={!pool.length || rolling} onClick={roll}>{rolling ? 'Бросаем…' : 'Бросить'}</button>
           </div>
 
           <div className="dice-history">
-            <header><span>Последние броски</span><small>Прототип · локально</small></header>
-            {history.length === 0 ? <p>Здесь появятся результаты бросков.</p> : history.map((item) => (
+            <header>
+              <button type="button" className="dice-history-toggle" onClick={() => setHistoryOpen((value) => !value)}><span>{historyOpen ? '⌄' : '›'}</span> Последние броски {history.length > 0 && <em>{history.length}</em>}</button>
+              <div><small>Прототип · локально</small>{history.length > 0 && <button type="button" onClick={() => setHistory([])}>Очистить</button>}</div>
+            </header>
+            {historyOpen && (history.length === 0 ? <p>Здесь появятся результаты бросков.</p> : history.map((item) => (
               <article key={item.id}>
                 <div><strong>{displayName}</strong><small>{item.visibility === 'public' ? 'Всем' : mode === 'gm' ? 'Скрытый' : 'Мастеру'} · {item.formula}</small></div>
                 <span className="dice-values">{item.values.join(' · ')}{item.modifier ? ` ${item.modifier > 0 ? '+' : '−'} ${Math.abs(item.modifier)}` : ''}</span>
                 <b>{item.total}</b>
               </article>
-            ))}
+            )))}
           </div>
         </section>
       )}
