@@ -1,53 +1,42 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 import {
   type ActorSheetSchema,
   type ActorSheetTemplate,
+  classicFantasySheetSchema,
   fieldKeyFromLabel,
   normalizeSheetSchema,
   type SheetFieldType,
 } from './actorSheets';
-import type { SheetActor } from './OnlineActorSheet';
-
 type Props = {
   campaignId: string;
-  actors: SheetActor[];
   templates: ActorSheetTemplate[];
-  selectedActorId: string;
-  onSelectActor: (id: string) => void;
   onChanged: () => void;
   onMessage: (message: string) => void;
 };
 
 type Draft = {
   id: string | null;
-  name: string;
-  isDefault: boolean;
   schema: ActorSheetSchema;
 };
 
 const fieldTypes: [SheetFieldType, string][] = [
   ['text', 'Текст'],
+  ['textarea', 'Большое текстовое поле'],
   ['number', 'Число'],
   ['checkbox', 'Флажок'],
   ['resource', 'Ресурс текущее / максимум'],
+  ['ability', 'Характеристика с модификатором'],
+  ['skill', 'Навык с владением и бонусом'],
 ];
 
 export function OnlineSheetWorkshop(props: Props) {
-  const [selectedId, setSelectedId] = useState(props.templates[0]?.id ?? '');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (selectedId && props.templates.some((template) => template.id === selectedId)) return;
-    setSelectedId(props.templates[0]?.id ?? '');
-  }, [props.templates, selectedId]);
-
-  const selected = props.templates.find((template) => template.id === selectedId) ?? props.templates[0] ?? null;
-  const actor = props.actors.find((value) => value.id === props.selectedActorId) ?? props.actors[0] ?? null;
+  const template = props.templates.find((value) => value.is_default) ?? props.templates[0] ?? null;
 
   const save = async (next: Draft) => {
     const keys = next.schema.sections.flatMap((section) => section.fields.map((field) => field.key));
@@ -61,48 +50,14 @@ export function OnlineSheetWorkshop(props: Props) {
     const { data, error } = await supabase.rpc('save_actor_sheet_template', {
       target_campaign: props.campaignId,
       target_template: next.id,
-      template_name: next.name.trim(),
+      template_name: 'Классический лист',
       template_schema: next.schema,
-      make_default: next.isDefault,
+      make_default: true,
     });
     if (error) props.onMessage(friendlyError(error, 'Не удалось сохранить шаблон листа.'));
     else {
-      if (typeof data === 'string') setSelectedId(data);
       setDraft(null);
-      props.onMessage('Шаблон листа сохранён.');
-      props.onChanged();
-    }
-    setBusy(false);
-  };
-
-  const remove = async () => {
-    if (!selected || !window.confirm(`Удалить шаблон «${selected.name}»? Персонажи останутся, но лист будет отвязан.`)) return;
-    setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('delete_actor_sheet_template', {
-      target_campaign: props.campaignId,
-      target_template: selected.id,
-    });
-    if (error) props.onMessage(friendlyError(error, 'Не удалось удалить шаблон листа.'));
-    else {
-      setSelectedId('');
-      props.onChanged();
-    }
-    setBusy(false);
-  };
-
-  const assign = async (templateId: string) => {
-    if (!actor) return;
-    setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('assign_actor_sheet_template', {
-      target_campaign: props.campaignId,
-      target_actor: actor.id,
-      target_template: templateId || null,
-    });
-    if (error) props.onMessage(friendlyError(error, 'Не удалось назначить лист персонажу.'));
-    else {
-      props.onMessage(templateId ? 'Шаблон назначен персонажу.' : 'Шаблон снят с персонажа.');
+      props.onMessage(typeof data === 'string' ? 'Классический лист сохранён.' : 'Лист сохранён.');
       props.onChanged();
     }
     setBusy(false);
@@ -113,54 +68,20 @@ export function OnlineSheetWorkshop(props: Props) {
   }
 
   return (
-    <div className="module-split sheet-workshop-module">
-      <section className="module-list">
-        <div className="library-meta-row">
-          <strong>Шаблоны листов</strong>
-          <button className="button" onClick={() => setDraft(newDraft(props.templates.length === 0))}>＋ Создать</button>
-        </div>
-        <div className="module-list-scroll">
-          {props.templates.map((template) => {
-            const schema = normalizeSheetSchema(template.schema);
-            const fieldCount = schema.sections.reduce((sum, section) => sum + section.fields.length, 0);
-            return (
-              <button key={template.id} className={`module-row ${selected?.id === template.id ? 'selected' : ''}`} onClick={() => setSelectedId(template.id)}>
-                <span className="module-avatar">◇</span>
-                <span><strong>{template.name}</strong><small>{schema.sections.length} разделов · {fieldCount} полей</small></span>
-                {template.is_default && <b>ОСНОВНОЙ</b>}
-              </button>
-            );
-          })}
-          {!props.templates.length && <div className="online-small-empty">Создайте первый шаблон: например лист для героев или NPC.</div>}
-        </div>
-      </section>
-
+    <div className="sheet-workshop-module sheet-workshop-single">
       <section className="module-detail sheet-template-detail">
-        {selected ? (
+        {template ? (
           <>
             <div className="inspector-header">
-              <div><h2>{selected.name}</h2><p>{selected.is_default ? 'Назначается новым персонажам автоматически' : 'Шаблон кампании'}</p></div>
-              <button className="button primary" onClick={() => setDraft(fromTemplate(selected))}>✎ Редактировать</button>
+              <div><h2>Классический лист</h2><p>Один общий вид для всех героев кампании · игроки заполняют значения</p></div>
+              <button className="button primary" onClick={() => setDraft(fromTemplate(template))}>✎ Настроить поля</button>
             </div>
-            <TemplatePreview template={selected} />
-            <div className="module-actions"><button className="button danger" disabled={busy} onClick={() => void remove()}>Удалить шаблон</button></div>
+            <div className="classic-workshop-note"><strong>Как это работает</strong><span>Базовые характеристики уже встроены. Мастер может добавлять свои поля в нужные разделы, а игрок — заполнять их в своём листе.</span></div>
+            <TemplatePreview template={template} />
           </>
         ) : (
-          <div className="placeholder-panel"><h2>Конструктор листов</h2><p>Соберите характеристики под любую систему без изменения кода TTV.</p><button className="button primary" onClick={() => setDraft(newDraft(true))}>Создать первый шаблон</button></div>
+          <div className="placeholder-panel"><h2>Классический лист готов</h2><p>Создайте его один раз для этой кампании. После сохранения он автоматически станет листом по умолчанию для героев.</p><button className="button primary" onClick={() => setDraft(newDraft())}>Создать классический лист</button></div>
         )}
-
-        <section className="builder-section compact-section sheet-assignment-box">
-          <h3>ЛИСТ ПЕРСОНАЖА</h3>
-          <select className="control full" value={actor?.id ?? ''} onChange={(event) => props.onSelectActor(event.target.value)}>
-            {props.actors.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
-          </select>
-          {actor ? (
-            <select className="control full" value={actor.sheet_template_id ?? ''} disabled={busy} onChange={(event) => void assign(event.target.value)}>
-              <option value="">Без шаблона</option>
-              {props.templates.map((template) => <option key={template.id} value={template.id}>{template.name}{template.is_default ? ' · основной' : ''}</option>)}
-            </select>
-          ) : <p className="muted">В кампании пока нет персонажей.</p>}
-        </section>
       </section>
     </div>
   );
@@ -171,7 +92,6 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!value.name.trim()) return;
     if (value.schema.sections.length > 20) {
       onMessage('В одном листе можно создать до 20 разделов.');
       return;
@@ -184,7 +104,7 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
       ...current,
       schema: {
         ...current.schema,
-        sections: [...current.schema.sections, { id: crypto.randomUUID(), title: 'Новый раздел', fields: [] }],
+        sections: [...current.schema.sections, { id: crypto.randomUUID(), title: 'Новый раздел', slot: 'custom', fields: [] }],
       },
     }));
   };
@@ -249,32 +169,27 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
 
   return (
     <form className="builder-view sheet-builder" onSubmit={submit}>
-      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Разделы и характеристики будут одинаковыми для всех персонажей с этим шаблоном.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
+      <header className="builder-head"><div><h2>КОНСТРУКТОР ЛИСТА</h2><p>Добавленные мастером поля появятся в классическом листе и будут доступны игроку для заполнения.</p></div><button type="button" className="button" onClick={onCancel}>← Назад</button></header>
       <div className="builder-scroll">
-        <section className="builder-section">
-          <h3>ОСНОВНОЕ</h3>
-          <div className="builder-grid">
-            <label className="builder-field"><span>Название шаблона</span><input required value={value.name} onChange={(event) => setValue((current) => ({ ...current, name: event.target.value }))} /></label>
-            <label className="sheet-default-toggle"><input type="checkbox" checked={value.isDefault} onChange={(event) => setValue((current) => ({ ...current, isDefault: event.target.checked }))} /> Назначать новым персонажам</label>
-          </div>
-        </section>
-
         {value.schema.sections.map((section, sectionIndex) => (
           <section className="builder-section sheet-builder-section" key={section.id}>
             <div className="sheet-section-title-row">
               <span className="eyebrow">РАЗДЕЛ {sectionIndex + 1}</span>
-              <input value={section.title} onChange={(event) => patchSection(section.id, event.target.value)} aria-label={`Название раздела ${sectionIndex + 1}`} />
-              <button type="button" className="button danger" onClick={() => removeSection(section.id)}>Удалить раздел</button>
+              <input value={section.title} readOnly={section.slot !== 'custom'} onChange={(event) => patchSection(section.id, event.target.value)} aria-label={`Название раздела ${sectionIndex + 1}`} />
+              {section.slot === 'custom' ? <button type="button" className="button danger" onClick={() => removeSection(section.id)}>Удалить раздел</button> : <span className="sheet-built-in-label">БАЗОВЫЙ</span>}
             </div>
             <div className="sheet-field-builder-list">
-              {section.fields.map((field) => (
-                <div className="sheet-field-builder-row" key={field.id}>
-                  <input value={field.label} onChange={(event) => patchField(section.id, field.id, { label: event.target.value })} placeholder="Название характеристики" />
-                  <select value={field.type} onChange={(event) => patchField(section.id, field.id, { type: event.target.value as SheetFieldType })}>{fieldTypes.map(([type, label]) => <option key={type} value={type}>{label}</option>)}</select>
-                  <input value={field.hint ?? ''} onChange={(event) => patchField(section.id, field.id, { hint: event.target.value })} placeholder="Подсказка, необязательно" />
-                  <button type="button" className="close-button tiny" onClick={() => removeField(section.id, field.id)}>×</button>
-                </div>
-              ))}
+              {section.fields.map((field) => {
+                const builtIn = field.id.startsWith('classic-');
+                return (
+                  <div className={`sheet-field-builder-row ${builtIn ? 'built-in' : ''}`} key={field.id}>
+                    <input value={field.label} readOnly={builtIn} onChange={(event) => patchField(section.id, field.id, { label: event.target.value })} placeholder="Название характеристики" />
+                    <select value={field.type} disabled={builtIn} onChange={(event) => patchField(section.id, field.id, { type: event.target.value as SheetFieldType })}>{fieldTypes.map(([type, label]) => <option key={type} value={type}>{label}</option>)}</select>
+                    <input value={field.hint ?? ''} readOnly={builtIn} onChange={(event) => patchField(section.id, field.id, { hint: event.target.value })} placeholder="Подсказка, необязательно" />
+                    {builtIn ? <span className="sheet-field-lock" title="Базовое поле">◆</span> : <button type="button" className="close-button tiny" onClick={() => removeField(section.id, field.id)}>×</button>}
+                  </div>
+                );
+              })}
               {!section.fields.length && <div className="empty-drop">В этом разделе пока нет характеристик.</div>}
             </div>
             <button type="button" className="button" onClick={() => addField(section.id)}>＋ Добавить характеристику</button>
@@ -283,7 +198,7 @@ function SheetTemplateBuilder({ draft, busy, onCancel, onSave, onMessage }: { dr
 
         <button type="button" className="button sheet-add-section" onClick={addSection}>＋ Добавить раздел</button>
       </div>
-      <footer className="builder-actions"><button type="button" className="button" onClick={onCancel}>Отмена</button><button className="button primary" disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить шаблон'}</button></footer>
+      <footer className="builder-actions"><button type="button" className="button" onClick={onCancel}>Отмена</button><button className="button primary" disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить лист'}</button></footer>
     </form>
   );
 }
@@ -298,17 +213,15 @@ function TemplatePreview({ template }: { template: ActorSheetTemplate }) {
   );
 }
 
-function newDraft(isDefault: boolean): Draft {
+function newDraft(): Draft {
   return {
     id: null,
-    name: 'Новый лист',
-    isDefault,
-    schema: { version: 1, sections: [{ id: crypto.randomUUID(), title: 'Основное', fields: [] }] },
+    schema: classicFantasySheetSchema(),
   };
 }
 
 function fromTemplate(template: ActorSheetTemplate): Draft {
-  return { id: template.id, name: template.name, isDefault: template.is_default, schema: normalizeSheetSchema(template.schema) };
+  return { id: template.id, schema: normalizeSheetSchema(template.schema) };
 }
 
 function cloneDraft(value: Draft): Draft {

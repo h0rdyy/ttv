@@ -124,16 +124,13 @@ export function OnlineTableV05(props: Props) {
         <section className="workshop-panel online-workshop-panel v05-sheet-workshop-overlay">
           <header className="workshop-header">
             <div className="workshop-title">ЛИСТЫ ПЕРСОНАЖЕЙ</div>
-            <div className="workshop-shortcuts">Шаблоны кампании · универсальные характеристики</div>
+            <div className="workshop-shortcuts">Классический лист · поля мастера</div>
             <button className="close-button" onClick={() => setManagerOpen(false)}>×</button>
           </header>
           <div className="workshop-module-body">
             <OnlineSheetWorkshop
               campaignId={props.campaign.id}
-              actors={props.initialActors}
               templates={initialSheetTemplates}
-              selectedActorId={selectedActorId}
-              onSelectActor={setSelectedActorId}
               onChanged={refresh}
               onMessage={setMessage}
             />
