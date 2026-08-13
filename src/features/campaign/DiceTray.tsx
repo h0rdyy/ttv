@@ -98,7 +98,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
   return (
     <div className={`dice-tray-anchor ${open ? 'open' : ''}`}>
       {open && (
-        <section className="dice-tray" aria-label="Лоток с кубами">
+        <section className="dice-tray" data-wheel-isolation="true" aria-label="Лоток с кубами">
           <header className="dice-tray-head">
             <div><span>ЛОТОК КУБОВ</span><strong>{formula}</strong></div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть">×</button>

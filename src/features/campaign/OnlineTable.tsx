@@ -554,6 +554,8 @@ export function OnlineTable(props: Props) {
           ref={mapStageRef}
           className={`map-stage online-map-stage ${draggingTokenId ? 'token-dragging' : ''} ${panning ? 'map-panning' : ''} ${fogDrawMode ? 'fog-drawing' : ''}`}
           onWheel={(event) => {
+            const target = event.target;
+            if (target instanceof Element && target.closest('[data-wheel-isolation="true"]')) return;
             event.preventDefault();
             changeZoom(camera.zoom * (event.deltaY < 0 ? 1.1 : 0.9));
           }}

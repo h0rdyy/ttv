@@ -167,3 +167,66 @@
   .architecture-strip > div { border-left: 0; border-top: 1px solid var(--line-soft); }
   .architecture-strip > div:first-child { border-top: 0; }
 }
+
+/* Keep nested tools independent from the map and from each other. */
+.sidebar-body,
+.module-list-scroll,
+.module-detail,
+.builder-scroll,
+.loot-builder,
+.module-split,
+.loot-layout {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.sidebar-body,
+.module-list-scroll,
+.module-detail,
+.builder-scroll,
+.loot-builder {
+  touch-action: pan-y;
+}
+
+.workshop-module-body,
+.module-split,
+.module-list,
+.module-detail,
+.builder-view,
+.builder-scroll {
+  min-width: 0;
+}
+
+@supports (height: 100dvh) {
+  .app-shell {
+    height: 100dvh;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 680px) {
+  .inspector-grid,
+  .builder-grid,
+  .inline-form.three,
+  .effect-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .full-span,
+  .effects-builder {
+    grid-column: auto;
+  }
+
+  .builder-head,
+  .builder-actions,
+  .module-actions,
+  .loot-coins {
+    flex-wrap: wrap;
+  }
+}

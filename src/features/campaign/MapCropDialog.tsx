@@ -138,7 +138,7 @@ export function MapCropDialog({ file, maxBytes, onCancel, onConfirm, onError }: 
   };
 
   return (
-    <div className="map-crop-backdrop" role="dialog" aria-modal="true" aria-label="Обрезка карты">
+    <div className="map-crop-backdrop" data-wheel-isolation="true" role="dialog" aria-modal="true" aria-label="Обрезка карты">
       <section className="map-crop-dialog">
         <header><div><span className="eyebrow">ПОДГОТОВКА КАРТЫ</span><h2>Обрезать перед загрузкой</h2></div><button className="close-button" disabled={processing} onClick={onCancel}>×</button></header>
         <div className="map-crop-toolbar">

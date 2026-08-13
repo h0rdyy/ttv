@@ -84,7 +84,7 @@ export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged,
   );
 
   return (
-    <section className="actor-sheet-overlay classic-sheet-overlay" role="dialog" aria-modal="true" aria-label={`Лист ${actor.name}`}>
+    <section className="actor-sheet-overlay classic-sheet-overlay" data-wheel-isolation="true" role="dialog" aria-modal="true" aria-label={`Лист ${actor.name}`}>
       <header className="actor-sheet-head">
         <div className="actor-sheet-identity">
           <span className="actor-sheet-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
