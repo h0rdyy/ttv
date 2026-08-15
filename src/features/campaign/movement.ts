@@ -29,8 +29,8 @@ export function gridMovementDistance(
   return roundMovementDistance(cells * Math.max(0, distancePerCell));
 }
 
-export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, gridEnabled: boolean) {
-  if (!gridEnabled) return false;
+export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, distanceScaleAvailable: boolean) {
+  if (!distanceScaleAvailable) return false;
   if (!Number.isFinite(distance) || distance < 0) return true;
   if (distance === 0) return false;
   return roundMovementDistance(spent + distance) > roundMovementDistance(speed);
@@ -39,10 +39,12 @@ export function shouldBlockCombatGridMove(distance: number, spent: number, speed
 export function actorMovementSpeed(systemData: MovementSystemData | null | undefined, fallback = DEFAULT_MOVEMENT_SPEED) {
   const movement = systemData?.movement;
   const movementObject = movement && typeof movement === 'object' ? movement as Record<string, unknown> : null;
+  // `speed` is the editable field in the current Actor Sheet and therefore wins
+  // over legacy movement keys that may still exist on older characters.
   const candidates = [
+    systemData?.speed,
     movementObject?.walk,
     movementObject?.speed,
-    systemData?.speed,
     systemData?.walk_speed,
   ];
 
