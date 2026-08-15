@@ -8,18 +8,18 @@ import {
   shouldBlockCombatGridMove,
 } from '../src/features/campaign/movement.ts';
 
-// UX-lab regression coverage: movement, GM actor actions, optimistic HP and health compatibility must stay behavioral.
-test('grid movement counts square distance in five-foot cells', () => {
+// UX-lab regression coverage: movement, GM actor actions and health compatibility must stay behavioral.
+test('grid movement counts square distance in five-foot cells and charges intentional micro drags', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
+  assert.equal(gridMovementDistance(1, 0, 64), 5);
   assert.equal(gridMovementDistance(64, 0, 64), 5);
   assert.equal(gridMovementDistance(64, 64, 64), 5);
   assert.equal(gridMovementDistance(128, 64, 64), 10);
   assert.equal(gridMovementDistance(95, 20, 64), 5);
 });
 
-test('combat grid movement blocks zero-foot micro drags and over-budget moves', () => {
-  assert.equal(shouldBlockCombatGridMove(0, 0, 30, true), true);
-  assert.equal(shouldBlockCombatGridMove(0, 30, 30, true), true);
+test('combat grid movement allows clicks but blocks over-budget moves', () => {
+  assert.equal(shouldBlockCombatGridMove(0, 0, 30, true), false);
   assert.equal(shouldBlockCombatGridMove(5, 25, 30, true), false);
   assert.equal(shouldBlockCombatGridMove(5, 30, 30, true), true);
   assert.equal(shouldBlockCombatGridMove(10, 25, 30, true), true);
@@ -36,7 +36,7 @@ test('actor movement speed supports generic and nested movement data', () => {
 });
 
 test('immersion lab enforces movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration] = await Promise.all([
+  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration, tokenRefreshMigration] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
@@ -46,6 +46,7 @@ test('immersion lab enforces movement and uses one flexible character window', a
     readFile(new URL('../src/features/campaign/OnlineActorSheet.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0021_actor_hp_return_alias.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/0022_skip_token_position_full_refresh.sql', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
@@ -89,12 +90,21 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(hpMigration, /health_key = 'hit_points'/);
   assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
+  // Movement must clamp fast over-budget drags to a legal point instead of
+  // swallowing the whole drag, and position-only token DB writes must not force
+  // a full router refresh on every client.
+  assert.match(hud, /spent >= speed/);
+  assert.match(hud, /lastAllowedX/);
+  assert.match(hud, /new PointerEvent\('pointermove'/);
+  assert.match(hud, /target\.dispatchEvent\(clamped\)/);
+  assert.match(tokenRefreshMigration, /TG_TABLE_NAME = 'scene_tokens' and TG_OP = 'UPDATE'/);
+  assert.match(tokenRefreshMigration, /to_jsonb\(NEW\) - array\['x', 'y', 'updated_at'\]/);
+
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
   assert.match(hud, /shouldBlockCombatGridMove/);
   assert.match(hud, /stopImmediatePropagation/);
   assert.match(hud, /runtime\.combat_active && !isOwnTurn/);
-  assert.match(hud, /0-ft micro drags/);
   assert.match(hud, />◇ Персонаж<\/button>/);
   assert.doesNotMatch(hud, />◇ Лист<\/button>/);
   assert.doesNotMatch(hud, />🎒 Герой<\/button>/);
