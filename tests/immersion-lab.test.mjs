@@ -24,7 +24,7 @@ test('grid movement measures continuous square-grid distance to hundredths', () 
   assert.equal(formatMovementDistance(2.5), '2.50');
 });
 
-test('combat grid movement blocks only movement beyond the exact hundredth-foot budget', () => {
+test('combat movement blocks only movement beyond the exact hundredth-foot budget', () => {
   assert.equal(shouldBlockCombatGridMove(0, 0, 30, true), false);
   assert.equal(shouldBlockCombatGridMove(2.37, 27.63, 30, true), false);
   assert.equal(shouldBlockCombatGridMove(2.38, 27.63, 30, true), true);
@@ -32,17 +32,18 @@ test('combat grid movement blocks only movement beyond the exact hundredth-foot 
   assert.equal(shouldBlockCombatGridMove(0, 30, 30, false), false);
 });
 
-test('actor movement speed supports generic and nested movement data', () => {
-  assert.equal(actorMovementSpeed({ movement: { walk: 25 } }), 25);
-  assert.equal(actorMovementSpeed({ speed: 35 }), 35);
+test('actor movement limit is read from the character sheet speed field', () => {
+  assert.equal(actorMovementSpeed({ speed: 25 }), 25);
+  assert.equal(actorMovementSpeed({ speed: '17.5' }), 17.5);
+  assert.equal(actorMovementSpeed({ movement: { walk: 22.75 } }), 22.75);
   assert.equal(actorMovementSpeed({ walk_speed: '40' }), 40);
   assert.equal(actorMovementSpeed({}), 30);
-  assert.equal(remainingMovement(30, 10.11, 5.22), 14.67);
-  assert.equal(remainingMovement(30, 27.63, 2.37), 0);
+  assert.equal(remainingMovement(actorMovementSpeed({ speed: 25 }), 24.75, 0.25), 0);
+  assert.equal(shouldBlockCombatGridMove(0.26, 24.75, actorMovementSpeed({ speed: 25 }), true), true);
 });
 
 test('immersion lab enforces movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration, tokenRefreshMigration] = await Promise.all([
+  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration, tokenRefreshMigration, sheetSchema] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
@@ -53,6 +54,7 @@ test('immersion lab enforces movement and uses one flexible character window', a
     readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0021_actor_hp_return_alias.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0022_skip_token_position_full_refresh.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/actorSheets.ts', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
@@ -91,7 +93,14 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(hpMigration, /health_key = 'hit_points'/);
   assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
+  // `speed` in the character sheet must be the movement budget. Grid visibility
+  // is presentation only: combat movement still uses grid_size as its distance scale.
+  assert.match(sheetSchema, /field\('speed', 'Скорость', 'number'\)/);
+  assert.match(hud, /const speed = actorMovementSpeed\(actor\?\.system_data\)/);
+  assert.match(hud, /const cellPixels = scene \? Math\.max\(1, \(scene\.grid_size \|\| 64\) \* worldScale\) : 0/);
+  assert.doesNotMatch(hud, /scene\?\.grid_enabled && remainingMovement\(speed, spent\) <= 0/);
   assert.match(hud, /remainingMovement\(speed, spent\) <= 0/);
+  assert.match(hud, /shouldBlockCombatGridMove\(distance, spent, speed, current\.cellPixels > 0\)/);
   assert.match(hud, /lastAllowedX/);
   assert.match(hud, /new PointerEvent\('pointermove'/);
   assert.match(hud, /target\.dispatchEvent\(clamped\)/);
