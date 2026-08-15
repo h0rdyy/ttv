@@ -4,9 +4,6 @@ import { FormEvent, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 
-// `party` stays as a short-lived compatibility value because OnlineTable still
-// initializes the sidebar with the pre-redesign tab id. The sidebar normalizes
-// it to `characters`, so the visible navigation only exposes the new workflow tabs.
 export type GmSidebarTab = 'session' | 'characters' | 'content' | 'notes' | 'party';
 
 type Actor = {
@@ -48,43 +45,128 @@ type Props = {
   onMessage: (message: string) => void;
 };
 
-const tabs: [Exclude<GmSidebarTab, 'party'>, string][] = [
-  ['session', 'СЕССИЯ'],
-  ['characters', 'ПЕРСОНАЖИ'],
-  ['content', 'КОНТЕНТ'],
-  ['notes', 'ЗАМЕТКИ'],
+type InspectorView = 'sheet' | 'inventory' | 'token';
+
+const libraryTabs: [Exclude<GmSidebarTab, 'party'>, string, string][] = [
+  ['characters', 'ПЕРСОНАЖИ', '♟'],
+  ['content', 'КОНТЕНТ', '◆'],
+  ['notes', 'ЗАМЕТКИ', '✎'],
+  ['session', 'СЕССИЯ', '⚔'],
 ];
-
-// These are now character filters inside one workflow, not top-level sidebar tabs.
-const characterKinds = [
-  ['party', 'ГРУППА'],
-  ['npc', 'NPC'],
-] as const;
-
-type CharacterKind = 'all' | typeof characterKinds[number][0];
-type CharacterView = 'overview' | 'inventory';
 
 export function OnlineGmSidebar(props: Props) {
   const visibleTab = props.tab === 'party' ? 'characters' : props.tab;
+  const [libraryOpen, setLibraryOpen] = useState(true);
+
+  const selectLibrary = (tab: Exclude<GmSidebarTab, 'party'>) => {
+    if (visibleTab === tab) {
+      setLibraryOpen((value) => !value);
+      return;
+    }
+    props.onTab(tab);
+    setLibraryOpen(true);
+  };
 
   return (
-    <aside className="session-sidebar online-session-sidebar">
-      <nav className="sidebar-tabs" aria-label="Панель мастера">
-        {tabs.map(([id, label]) => (
-          <button key={id} className={visibleTab === id ? 'active' : ''} onClick={() => props.onTab(id)}>{label}</button>
-        ))}
-      </nav>
-      <div className="sidebar-body">
-        {visibleTab === 'session' && <SessionPanel {...props} />}
-        {visibleTab === 'characters' && <CharactersPanel {...props} />}
-        {visibleTab === 'content' && <ContentPanel {...props} />}
-        {visibleTab === 'notes' && <NotesPanel {...props} />}
-      </div>
-    </aside>
+    <>
+      <aside className={`gm-library ${libraryOpen ? 'expanded' : 'collapsed'}`} data-wheel-isolation="true">
+        <nav className="gm-library-rail" aria-label="Библиотека мастера">
+          <div className="gm-library-mark" title="Библиотека мастера">✥</div>
+          {libraryTabs.map(([id, label, icon]) => (
+            <button
+              key={id}
+              type="button"
+              className={visibleTab === id ? 'active' : ''}
+              title={label}
+              aria-label={label}
+              aria-pressed={visibleTab === id && libraryOpen}
+              onClick={() => selectLibrary(id)}
+            >
+              <span aria-hidden="true">{icon}</span>
+              <small>{label.slice(0, 4)}</small>
+            </button>
+          ))}
+          <button className="gm-library-collapse" type="button" title={libraryOpen ? 'Свернуть библиотеку' : 'Развернуть библиотеку'} onClick={() => setLibraryOpen((value) => !value)}>
+            {libraryOpen ? '‹' : '›'}
+          </button>
+        </nav>
+
+        {libraryOpen && (
+          <div className="gm-library-drawer">
+            {visibleTab === 'characters' && <CharacterLibrary {...props} />}
+            {visibleTab === 'content' && <ContentLibrary {...props} />}
+            {visibleTab === 'notes' && <NotesPanel {...props} />}
+            {visibleTab === 'session' && <SessionLibrary {...props} />}
+          </div>
+        )}
+      </aside>
+
+      <aside className="gm-inspector" data-wheel-isolation="true">
+        <ActorInspector {...props} />
+      </aside>
+    </>
   );
 }
 
-function SessionPanel({ runtime, actors, busy, onCombat }: Props) {
+function CharacterLibrary({ actors, selectedActorId, onSelectActor, busy, onCreateHero, onOpenWorkshop }: Props) {
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLocaleLowerCase('ru');
+  const filtered = actors.filter((actor) => !query || `${actor.name} ${actor.subtitle}`.toLocaleLowerCase('ru').includes(query));
+  const heroes = filtered.filter((actor) => actor.type === 'player');
+  const npcs = filtered.filter((actor) => actor.type !== 'player');
+
+  const actorRow = (actor: Actor) => (
+    <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
+      <span className="gm-library-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+      <span><strong>{actor.name}</strong><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
+      <em>{actor.system_data?.hp?.current ?? '—'}</em>
+    </button>
+  );
+
+  return (
+    <>
+      <header className="gm-library-header">
+        <div><span>БИБЛИОТЕКА</span><h2>Персонажи</h2></div>
+        <button className="button" disabled={busy} onClick={onCreateHero}>＋ Герой</button>
+      </header>
+      <input className="control full gm-library-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск персонажа…" />
+
+      <section className="gm-library-section">
+        <div className="gm-library-section-title"><strong>ГРУППА</strong><span>{heroes.length}</span></div>
+        <div className="gm-library-list">{heroes.map(actorRow)}</div>
+        {!heroes.length && <div className="online-small-empty">Героев не найдено.</div>}
+      </section>
+
+      <section className="gm-library-section">
+        <div className="gm-library-section-title"><strong>NPC</strong><span>{npcs.length}</span></div>
+        <div className="gm-library-list">{npcs.map(actorRow)}</div>
+        {!npcs.length && <div className="online-small-empty">NPC не найдены.</div>}
+        <button className="button full gm-library-secondary" onClick={onOpenWorkshop}>＋ Создать / редактировать NPC</button>
+      </section>
+    </>
+  );
+}
+
+function ContentLibrary({ actors, items, instances, onOpenWorkshop }: Props) {
+  const npcs = actors.filter((actor) => actor.type !== 'player').length;
+  const issuedItems = instances.reduce((total, instance) => total + Math.max(0, instance.quantity || 0), 0);
+
+  return (
+    <>
+      <header className="gm-library-header"><div><span>БИБЛИОТЕКА</span><h2>Контент</h2></div></header>
+      <p className="muted">Предметы, лут и таблицы собраны отдельно от управления персонажами.</p>
+      <div className="gm-library-stats">
+        <div><span>Предметы</span><strong>{items.length}</strong></div>
+        <div><span>Выдано</span><strong>{issuedItems}</strong></div>
+        <div><span>NPC</span><strong>{npcs}</strong></div>
+      </div>
+      <button className="button primary full" onClick={onOpenWorkshop}>⚒ Открыть мастерскую</button>
+      <div className="gm-library-hint">Предметы · NPC · Лут · Таблицы</div>
+    </>
+  );
+}
+
+function SessionLibrary({ runtime, actors, busy, onCombat }: Props) {
   const order = runtime.combat_order
     .map((id) => actors.find((actor) => actor.id === id))
     .filter((actor): actor is Actor => Boolean(actor));
@@ -94,90 +176,75 @@ function SessionPanel({ runtime, actors, busy, onCombat }: Props) {
 
   return (
     <>
-      <h3 className="sidebar-heading first">СЕССИЯ</h3>
-      <section className="online-actor-card">
-        <div className="online-section-title"><strong>Сейчас за столом</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
-        <div className="online-stat-grid">
-          <div><span>Герои</span><b>{heroes}</b></div>
-          <div><span>NPC</span><b>{npcs}</b></div>
-        </div>
-      </section>
+      <header className="gm-library-header"><div><span>ИГРОВОЙ СТОЛ</span><h2>Сессия</h2></div></header>
+      <div className="gm-library-stats">
+        <div><span>Герои</span><strong>{heroes}</strong></div>
+        <div><span>NPC</span><strong>{npcs}</strong></div>
+        <div><span>Раунд</span><strong>{runtime.combat_active ? runtime.combat_round : '—'}</strong></div>
+      </div>
 
-      <h3 className="sidebar-heading">БОЙ</h3>
-      {!runtime.combat_active ? (
-        <>
-          <p className="muted">Бой сейчас не идёт. Запускайте его отсюда — основные действия сессии остаются в одном месте.</p>
-          <button className="button primary sidebar-primary" disabled={busy} onClick={() => onCombat('start')}>⚔ Начать бой</button>
-        </>
-      ) : (
-        <>
-          <div className="combat-focus"><h3>Раунд {runtime.combat_round}</h3><p>Сейчас ходит: <strong>{current?.name ?? '—'}</strong></p></div>
-          <div className="combat-list">
-            {order.map((actor, index) => (
-              <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
-                <span>{index + 1}</span>
-                <strong>{actor.name}</strong>
-                <small>{actor.system_data?.hp?.current ?? '—'} HP</small>
-                {index === runtime.combat_turn && <i>ХОД</i>}
-              </div>
-            ))}
-          </div>
-          <button className="button primary sidebar-primary" disabled={busy} onClick={() => onCombat('next')}>Следующий ход →</button>
-          <button className="button sidebar-primary" disabled={busy} onClick={() => onCombat('stop')}>Закончить бой</button>
-        </>
-      )}
+      <section className="gm-library-section">
+        <div className="gm-library-section-title"><strong>БОЙ</strong><span>{runtime.combat_active ? 'ИДЁТ' : 'ПАУЗА'}</span></div>
+        {!runtime.combat_active ? (
+          <button className="button primary full" disabled={busy} onClick={() => onCombat('start')}>⚔ Начать бой</button>
+        ) : (
+          <>
+            <div className="gm-combat-focus"><span>Сейчас ходит</span><strong>{current?.name ?? '—'}</strong></div>
+            <div className="gm-combat-order">
+              {order.map((actor, index) => (
+                <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
+                  <span>{index + 1}</span><strong>{actor.name}</strong><small>{actor.system_data?.hp?.current ?? '—'} HP</small>
+                </div>
+              ))}
+            </div>
+            <button className="button primary full" disabled={busy} onClick={() => onCombat('next')}>Следующий ход →</button>
+            <button className="button full" disabled={busy} onClick={() => onCombat('stop')}>Закончить бой</button>
+          </>
+        )}
+      </section>
     </>
   );
 }
 
-function CharactersPanel(props: Props) {
+function ActorInspector(props: Props) {
   const {
     campaignId,
     actors,
     selectedActorId,
     onSelectActor,
-    busy,
-    onCreateHero,
-    onHp,
     inventories,
     containers,
     instances,
     items,
+    runtime,
+    onHp,
+    onOpenWorkshop,
     onChanged,
     onMessage,
-    onOpenWorkshop,
   } = props;
-  const [kind, setKind] = useState<CharacterKind>('all');
-  const [view, setView] = useState<CharacterView>('overview');
+  const [view, setView] = useState<InspectorView>('sheet');
   const [deleting, setDeleting] = useState(false);
   const [dragged, setDragged] = useState<string | null>(null);
-  const selected = actors.find((actor) => actor.id === selectedActorId) ?? actors[0] ?? null;
+  const actor = actors.find((value) => value.id === selectedActorId) ?? null;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-
-  const filtered = actors.filter((actor) => {
-    if (kind === 'all') return true;
-    if (kind === 'party') return actor.type === 'player';
-    return actor.type !== 'player';
-  });
-
-  const inventory = inventories.find((value) => value.owner_actor_id === selected?.id);
+  const inventory = inventories.find((value) => value.owner_actor_id === actor?.id);
   const actorContainers = inventory ? containers.filter((value) => value.inventory_id === inventory.id) : [];
 
   const deleteHero = async () => {
-    if (!selected || selected.type !== 'player' || !window.confirm(`Удалить героя «${selected.name}» из кампании? Вместе с ним удалятся его фишки, лист и инвентарь. Игрок останется участником кампании.`)) return;
+    if (!actor || actor.type !== 'player' || !window.confirm(`Удалить героя «${actor.name}» из кампании? Вместе с ним удалятся его фишки, лист и инвентарь. Игрок останется участником кампании.`)) return;
     setDeleting(true);
     const supabase = createClient();
-    const { error } = await supabase.rpc('delete_campaign_actor', { target_campaign: campaignId, target_actor: selected.id });
+    const { error } = await supabase.rpc('delete_campaign_actor', { target_campaign: campaignId, target_actor: actor.id });
     if (error) onMessage(friendlyError(error, 'Не удалось удалить героя.'));
     else {
       onSelectActor('');
-      onMessage(`Герой «${selected.name}» удалён.`);
+      onMessage(`Герой «${actor.name}» удалён.`);
       onChanged();
     }
     setDeleting(false);
   };
 
-  const move = async (containerId: string) => {
+  const moveItem = async (containerId: string) => {
     if (!dragged) return;
     const supabase = createClient();
     const { error } = await supabase.rpc('move_item_instance', { target_campaign: campaignId, target_instance: dragged, target_container: containerId });
@@ -193,111 +260,100 @@ function CharactersPanel(props: Props) {
     else onChanged();
   };
 
-  return (
-    <>
-      <div className="sidebar-heading-row">
-        <h3 className="sidebar-heading first">ПЕРСОНАЖИ</h3>
-        <button className="button" disabled={busy} onClick={onCreateHero}>＋ Герой</button>
-      </div>
-
-      <div className="filter-row">
-        <button className={`button ${kind === 'all' ? 'active' : ''}`} onClick={() => setKind('all')}>Все</button>
-        {characterKinds.map(([id, label]) => (
-          <button key={id} className={`button ${kind === id ? 'active' : ''}`} onClick={() => setKind(id)}>{label}</button>
-        ))}
-      </div>
-
-      <div className="online-actor-list">
-        {filtered.map((actor) => (
-          <button key={actor.id} className={selected?.id === actor.id ? 'selected' : ''} onClick={() => onSelectActor(actor.id)}>
-            <span>{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
-            <span><b>{actor.name}</b><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
-            <em>{actor.system_data?.hp?.current ?? '—'} HP</em>
-          </button>
-        ))}
-      </div>
-      {!filtered.length && <div className="online-small-empty">В этой группе персонажей пока нет.</div>}
-
-      {selected && (
-        <section className="online-actor-card">
-          <div className="online-actor-title">
-            <span>{selected.avatar || (selected.type === 'player' ? '🧙' : '👤')}</span>
-            <div><h2>{selected.name}</h2><p>{selected.subtitle || (selected.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</p></div>
-          </div>
-
-          <div className="filter-row">
-            <button className={`button ${view === 'overview' ? 'active' : ''}`} onClick={() => setView('overview')}>Обзор</button>
-            <button className={`button ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>Инвентарь</button>
-          </div>
-
-          {view === 'overview' && (
-            <>
-              {selected.system_data?.hp && (
-                <div className="online-hp-box">
-                  <span>Здоровье</span>
-                  <b>{selected.system_data.hp.current} / {selected.system_data.hp.max}</b>
-                  <div><button onClick={() => onHp(selected, -1)}>−</button><button onClick={() => onHp(selected, 1)}>＋</button></div>
-                </div>
-              )}
-              {selected.type !== 'player' && <button className="button full sidebar-primary" onClick={onOpenWorkshop}>⚒ Редактировать NPC</button>}
-              {selected.type === 'player' && (
-                <button className="button danger full party-delete-hero" disabled={deleting} onClick={() => void deleteHero()}>{deleting ? 'Удаление…' : 'Удалить героя'}</button>
-              )}
-            </>
-          )}
-
-          {view === 'inventory' && (
-            <>
-              {!actorContainers.length && <div className="online-small-empty">У персонажа пока нет контейнеров инвентаря.</div>}
-              {actorContainers.map((container) => {
-                const rows = instances.filter((row) => row.container_id === container.id);
-                return (
-                  <section className="inventory-container" key={container.id} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(container.id)}>
-                    <header><strong>{container.name}</strong><span>{rows.length}</span></header>
-                    <div className="inventory-slot-list">
-                      {rows.map((instance) => {
-                        const item = itemMap.get(instance.definition_id);
-                        return (
-                          <div className="inventory-row" draggable key={instance.id} onDragStart={() => setDragged(instance.id)} onDragEnd={() => setDragged(null)}>
-                            <span className="inventory-icon">{item?.icon ?? '📦'}</span>
-                            <span><strong>{instance.custom_name || item?.name || 'Предмет'}</strong><small>{item?.category ?? ''}{item?.weight != null ? ` · ${item.weight}` : ''}</small></span>
-                            <b>×{instance.quantity}</b>
-                            <button className="close-button tiny" title="Убрать" onClick={() => void removeItem(instance.id)}>×</button>
-                          </div>
-                        );
-                      })}
-                      {!rows.length && <div className="empty-drop">Перетащите предмет сюда</div>}
-                    </div>
-                  </section>
-                );
-              })}
-              <button className="button sidebar-primary" onClick={onOpenWorkshop}>⚒ Предметы и лут</button>
-            </>
-          )}
-        </section>
-      )}
-    </>
-  );
-}
-
-function ContentPanel({ actors, items, instances, onOpenWorkshop }: Props) {
-  const npcs = actors.filter((actor) => actor.type !== 'player').length;
-  const issuedItems = instances.reduce((total, instance) => total + Math.max(0, instance.quantity || 0), 0);
-
-  return (
-    <>
-      <h3 className="sidebar-heading first">КОНТЕНТ</h3>
-      <p className="muted">Подготовка мира вынесена из игрового управления: предметы, лут и таблицы живут здесь, а персонажи — во вкладке «Персонажи».</p>
-      <section className="online-actor-card">
-        <div className="online-section-title"><strong>Библиотека кампании</strong></div>
-        <div className="online-stat-grid">
-          <div><span>Предметы</span><b>{items.length}</b></div>
-          <div><span>Выдано</span><b>{issuedItems}</b></div>
-          <div><span>NPC</span><b>{npcs}</b></div>
-          <div><span>Инструменты</span><b>Лут · Таблицы</b></div>
+  if (!actor) {
+    const heroes = actors.filter((value) => value.type === 'player').length;
+    return (
+      <div className="gm-inspector-empty">
+        <span className="gm-inspector-sigil">✥</span>
+        <h2>Ничего не выбрано</h2>
+        <p>Выберите фишку на карте или персонажа в библиотеке — здесь появятся его лист, инвентарь и настройки.</p>
+        <div className="gm-library-stats">
+          <div><span>Герои</span><strong>{heroes}</strong></div>
+          <div><span>NPC</span><strong>{actors.length - heroes}</strong></div>
+          <div><span>Бой</span><strong>{runtime.combat_active ? `Раунд ${runtime.combat_round}` : 'Нет'}</strong></div>
         </div>
-      </section>
-      <button className="button primary sidebar-primary" onClick={onOpenWorkshop}>⚒ Открыть мастерскую</button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <header className="gm-inspector-head">
+        <div className="gm-inspector-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</div>
+        <div><span>{actor.type === 'player' ? 'ПЕРСОНАЖ ИГРОКА' : 'NPC'}</span><h2>{actor.name}</h2><p>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</p></div>
+        <button className="close-button" title="Снять выбор" onClick={() => onSelectActor('')}>×</button>
+      </header>
+
+      <nav className="gm-inspector-tabs" aria-label="Выбранный персонаж">
+        <button className={view === 'sheet' ? 'active' : ''} onClick={() => setView('sheet')}>Лист</button>
+        <button className={view === 'inventory' ? 'active' : ''} onClick={() => setView('inventory')}>Инвентарь</button>
+        <button className={view === 'token' ? 'active' : ''} onClick={() => setView('token')}>Фишка</button>
+      </nav>
+
+      <div className="gm-inspector-body">
+        {view === 'sheet' && (
+          <>
+            <section className="gm-inspector-card">
+              <div className="gm-inspector-card-title"><strong>Быстрые параметры</strong><span>Контекст персонажа</span></div>
+              {actor.system_data?.hp ? (
+                <div className="gm-hp-control">
+                  <div><span>Здоровье</span><strong>{actor.system_data.hp.current} / {actor.system_data.hp.max}</strong></div>
+                  <div className="gm-hp-actions">
+                    <button onClick={() => onHp(actor, -5)}>−5</button>
+                    <button onClick={() => onHp(actor, -1)}>−1</button>
+                    <button onClick={() => onHp(actor, 1)}>＋1</button>
+                    <button onClick={() => onHp(actor, 5)}>＋5</button>
+                  </div>
+                </div>
+              ) : <div className="online-small-empty">Для персонажа не задан ресурс здоровья.</div>}
+              <div className="gm-quick-stats">
+                <div><span>Броня</span><strong>{actor.system_data?.armor ?? actor.system_data?.ac ?? '—'}</strong></div>
+                <div><span>Тип</span><strong>{actor.type === 'player' ? 'Герой' : 'NPC'}</strong></div>
+              </div>
+            </section>
+
+            <div className="gm-inspector-note">Полный классический лист открывается кнопкой «Лист» в нижней панели. Выбор персонажа уже синхронизирован с ней.</div>
+            {actor.type !== 'player' && <button className="button full" onClick={onOpenWorkshop}>⚒ Открыть NPC в мастерской</button>}
+            {actor.type === 'player' && <button className="button danger full" disabled={deleting} onClick={() => void deleteHero()}>{deleting ? 'Удаление…' : 'Удалить героя'}</button>}
+          </>
+        )}
+
+        {view === 'inventory' && (
+          <>
+            {!actorContainers.length && <div className="online-small-empty">У персонажа пока нет контейнеров инвентаря.</div>}
+            {actorContainers.map((container) => {
+              const rows = instances.filter((row) => row.container_id === container.id);
+              return (
+                <section className="inventory-container" key={container.id} onDragOver={(event) => event.preventDefault()} onDrop={() => void moveItem(container.id)}>
+                  <header><strong>{container.name}</strong><span>{rows.length}</span></header>
+                  <div className="inventory-slot-list">
+                    {rows.map((instance) => {
+                      const item = itemMap.get(instance.definition_id);
+                      return (
+                        <div className="inventory-row" draggable key={instance.id} onDragStart={() => setDragged(instance.id)} onDragEnd={() => setDragged(null)}>
+                          <span className="inventory-icon">{item?.icon ?? '📦'}</span>
+                          <span><strong>{instance.custom_name || item?.name || 'Предмет'}</strong><small>{item?.category ?? ''}{item?.weight != null ? ` · ${item.weight}` : ''}</small></span>
+                          <b>×{instance.quantity}</b>
+                          <button className="close-button tiny" title="Убрать" onClick={() => void removeItem(instance.id)}>×</button>
+                        </div>
+                      );
+                    })}
+                    {!rows.length && <div className="empty-drop">Перетащите предмет сюда</div>}
+                  </div>
+                </section>
+              );
+            })}
+            <button className="button full" onClick={onOpenWorkshop}>⚒ Предметы и лут</button>
+          </>
+        )}
+
+        {view === 'token' && (
+          <section className="gm-inspector-card">
+            <div className="gm-inspector-card-title"><strong>Фишка на сцене</strong><span>Контекст карты</span></div>
+            <p className="muted">Размер, видимость, изображение и удаление фишки пока остаются в «Сцена → Настройки сцены». Этот раздел уже зарезервирован под перенос этих действий сюда следующим шагом.</p>
+          </section>
+        )}
+      </div>
     </>
   );
 }
@@ -352,31 +408,29 @@ function NotesPanel({ campaignId, notes, onChanged, onMessage }: Props) {
 
   if (editing) {
     return (
-      <form onSubmit={save}>
-        <h3 className="sidebar-heading first">{selectedId ? 'ЗАМЕТКА' : 'НОВАЯ ЗАМЕТКА'}</h3>
+      <form className="gm-notes-editor" onSubmit={save}>
+        <header className="gm-library-header"><div><span>ЗАМЕТКИ</span><h2>{selectedId ? 'Редактирование' : 'Новая заметка'}</h2></div></header>
         <input className="control full" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Заголовок" />
         <textarea className="control notes-area" value={body} onChange={(event) => setBody(event.target.value)} placeholder="Текст заметки..." />
         <label><input type="checkbox" checked={pinned} onChange={(event) => setPinned(event.target.checked)} /> Закрепить</label>
-        <button className="button primary sidebar-primary">Сохранить</button>
-        <button type="button" className="button sidebar-primary" onClick={() => setEditing(false)}>Отмена</button>
+        <button className="button primary full">Сохранить</button>
+        <button type="button" className="button full" onClick={() => setEditing(false)}>Отмена</button>
       </form>
     );
   }
 
   return (
     <>
-      <h3 className="sidebar-heading first">ЗАМЕТКИ</h3>
-      <button className="button primary sidebar-primary" onClick={openNew}>＋ Новая заметка</button>
-      {notes.map((note) => (
-        <div className="note-card" key={note.id}>
-          <strong>{note.pinned ? '📌 ' : ''}{note.title || 'Без названия'}</strong>
-          <p>{note.body || 'Пустая заметка'}</p>
-          <div>
-            <button className="button" onClick={() => openEdit(note)}>Править</button>{' '}
-            <button className="button danger" onClick={() => void remove(note)}>Удалить</button>
-          </div>
-        </div>
-      ))}
+      <header className="gm-library-header"><div><span>БИБЛИОТЕКА</span><h2>Заметки</h2></div><button className="button" onClick={openNew}>＋</button></header>
+      <div className="gm-note-list">
+        {notes.map((note) => (
+          <article className="note-card" key={note.id}>
+            <strong>{note.pinned ? '📌 ' : ''}{note.title || 'Без названия'}</strong>
+            <p>{note.body || 'Пустая заметка'}</p>
+            <div><button className="button" onClick={() => openEdit(note)}>Править</button> <button className="button danger" onClick={() => void remove(note)}>Удалить</button></div>
+          </article>
+        ))}
+      </div>
       {!notes.length && <div className="online-small-empty">Заметок пока нет.</div>}
     </>
   );
