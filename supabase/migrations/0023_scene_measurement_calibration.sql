@@ -38,7 +38,6 @@ begin
     raise exception 'invalid measurement unit';
   end if;
   if scene_units_per_map_width is null
-     or not isfinite(scene_units_per_map_width)
      or scene_units_per_map_width <= 0
      or scene_units_per_map_width > 1000000000 then
     raise exception 'invalid measurement scale';
