@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 import {
@@ -42,9 +42,45 @@ type ValueFieldProps = {
 
 export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged, onMessage }: Props) {
   const [data, setData] = useState<Record<string, any>>(() => clone(actor.system_data));
+  const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
+  const loadedActorIdRef = useRef(actor.id);
+  const pendingSavedRef = useRef(new Map<string, unknown>());
 
-  useEffect(() => setData(clone(actor.system_data)), [actor.id, actor.system_data]);
+  useEffect(() => {
+    if (loadedActorIdRef.current !== actor.id) {
+      loadedActorIdRef.current = actor.id;
+      pendingSavedRef.current.clear();
+      setData(clone(actor.system_data));
+      setDirtyKeys(new Set());
+      return;
+    }
+
+    setData((current) => {
+      const incoming = clone(actor.system_data);
+
+      for (const [key, savedValue] of pendingSavedRef.current) {
+        if (sameValue(incoming[key], savedValue)) pendingSavedRef.current.delete(key);
+        else incoming[key] = cloneValue(savedValue);
+      }
+
+      for (const key of dirtyKeys) {
+        if (Object.prototype.hasOwnProperty.call(current, key)) incoming[key] = current[key];
+      }
+
+      return incoming;
+    });
+  }, [actor.id, actor.system_data, dirtyKeys]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (dirtyKeys.size > 0 && !window.confirm('В листе есть несохранённые изменения. Закрыть без сохранения?')) return;
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [dirtyKeys.size, onClose]);
 
   const schema = useMemo(
     () => template ? normalizeSheetSchema(template.schema) : classicFantasySheetSchema(),
@@ -53,20 +89,40 @@ export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged,
   const sections = useMemo(() => groupSections(schema.sections), [schema.sections]);
 
   const patch = (key: string, value: unknown) => {
+    pendingSavedRef.current.delete(key);
     setData((current) => ({ ...current, [key]: value }));
+    setDirtyKeys((current) => {
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const requestClose = () => {
+    if (dirtyKeys.size > 0 && !window.confirm('В листе есть несохранённые изменения. Закрыть без сохранения?')) return;
+    onClose();
   };
 
   const save = async () => {
-    if (!canEdit || !template) return;
+    if (!canEdit || !template || dirtyKeys.size === 0) return;
     setBusy(true);
+    const keys = [...dirtyKeys];
+    const patchData = keys.reduce<Record<string, unknown>>((result, key) => {
+      result[key] = data[key];
+      return result;
+    }, {});
+
     const supabase = createClient();
     const { data: saved, error } = await supabase.rpc('update_actor_sheet', {
       target_actor: actor.id,
-      actor_system_data: data,
+      actor_system_data: patchData,
     });
     if (error) onMessage(friendlyError(error, 'Не удалось сохранить лист персонажа.'));
     else {
-      if (saved && typeof saved === 'object') setData(saved as Record<string, any>);
+      const savedData = saved && typeof saved === 'object' ? saved as Record<string, any> : { ...data };
+      for (const key of keys) pendingSavedRef.current.set(key, cloneValue(savedData[key]));
+      setData(clone(savedData));
+      setDirtyKeys(new Set());
       onMessage('Лист персонажа сохранён.');
       onChanged();
     }
@@ -92,7 +148,7 @@ export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged,
         </div>
         <div className="actor-sheet-head-actions">
           {template && <span className="sheet-template-badge">{template.name}</span>}
-          <button className="close-button" onClick={onClose} aria-label="Закрыть лист">×</button>
+          <button className="close-button" onClick={requestClose} aria-label="Закрыть лист">×</button>
         </div>
       </header>
 
@@ -153,8 +209,10 @@ export function OnlineActorSheet({ actor, template, canEdit, onClose, onChanged,
       <footer className="actor-sheet-actions">
         {!canEdit && <span className="muted">Этот лист доступен только для просмотра.</span>}
         {canEdit && !template && <span className="muted">Для сохранения мастер должен назначить шаблон.</span>}
-        <button className="button" onClick={onClose}>Закрыть</button>
-        {canEdit && template && <button className="button primary" disabled={busy} onClick={() => void save()}>{busy ? 'Сохраняем…' : 'Сохранить лист'}</button>}
+        {canEdit && template && dirtyKeys.size > 0 && <span className="muted">Есть несохранённые изменения.</span>}
+        {canEdit && template && dirtyKeys.size === 0 && <span className="muted">Все изменения сохранены.</span>}
+        <button className="button" onClick={requestClose}>Закрыть</button>
+        {canEdit && template && <button className="button primary" disabled={busy || dirtyKeys.size === 0} onClick={() => void save()}>{busy ? 'Сохраняем…' : dirtyKeys.size > 0 ? 'Сохранить лист' : 'Сохранено'}</button>}
       </footer>
     </section>
   );
@@ -275,6 +333,15 @@ function stringValue(value: unknown) {
 
 function signed(value: number) {
   return value >= 0 ? `+${value}` : String(value);
+}
+
+function sameValue(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function cloneValue<T>(value: T): T {
+  if (value == null || typeof value !== 'object') return value;
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function clone(value: Record<string, any>) {
