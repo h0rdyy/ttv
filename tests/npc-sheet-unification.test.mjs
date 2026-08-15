@@ -18,6 +18,7 @@ test('NPCs are created from Characters and use the shared Actor Sheet', async ()
   assert.doesNotMatch(sidebar, /Открыть NPC в мастерской/);
   assert.match(sidebar, /Предметы · Лут · Таблицы/);
 
+  // The content workshop must not contain a second NPC editor path.
   assert.match(workshop, /\['items',\s*'ПРЕДМЕТЫ'\][\s\S]*\['loot',\s*'ЛУТ'\][\s\S]*\['tables',\s*'ТАБЛИЦЫ'\]/);
   assert.doesNotMatch(workshop, /\['npc',\s*'NPC'\]/);
   assert.doesNotMatch(workshop, /OnlineNpcWorkshop/);
