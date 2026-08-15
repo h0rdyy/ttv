@@ -7,6 +7,7 @@ import './player-switch.css';
 import './auth.css';
 import './online-table.css';
 import './online-table-contextual.css';
+import './online-table-immersion.css';
 import './scene-v04.css';
 import './sheet-v05.css';
 
