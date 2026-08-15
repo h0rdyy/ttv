@@ -21,7 +21,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   const [{ data: scenes }, { data: actors }, { data: inventories }, { data: definitions }, { data: sheetTemplates }] = await Promise.all([
     supabase
       .from('scenes')
-      .select('id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at')
+      .select('id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,measurement_unit,measurement_units_per_map_width,created_at')
       .eq('campaign_id', campaignId)
       .order('created_at'),
     supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data,sheet_template_id').eq('campaign_id', campaignId).order('created_at'),
