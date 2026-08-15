@@ -35,6 +35,7 @@ test('combat movement blocks only movement beyond the exact hundredth-foot budge
 test('actor movement limit is read from the character sheet speed field', () => {
   assert.equal(actorMovementSpeed({ speed: 25 }), 25);
   assert.equal(actorMovementSpeed({ speed: '17.5' }), 17.5);
+  assert.equal(actorMovementSpeed({ speed: 20, movement: { walk: 30 } }), 20);
   assert.equal(actorMovementSpeed({ movement: { walk: 22.75 } }), 22.75);
   assert.equal(actorMovementSpeed({ walk_speed: '40' }), 40);
   assert.equal(actorMovementSpeed({}), 30);
