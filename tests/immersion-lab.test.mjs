@@ -36,12 +36,13 @@ test('actor movement speed supports generic and nested movement data', () => {
 });
 
 test('player immersion lab enforces combat movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss] = await Promise.all([
+  const [wrapper, hud, css, character, characterCss, layout] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerCharacterWindow.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/player-character-window.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/layout.tsx', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
@@ -77,4 +78,5 @@ test('player immersion lab enforces combat movement and uses one flexible charac
   assert.match(characterCss, /\.foundry-character-window/);
   assert.match(characterCss, /\.foundry-character-tabs/);
   assert.match(characterCss, /\.foundry-quick-stats/);
+  assert.match(layout, /player-character-window\.css/);
 });
