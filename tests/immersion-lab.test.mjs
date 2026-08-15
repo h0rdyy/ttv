@@ -36,7 +36,7 @@ test('actor movement speed supports generic and nested movement data', () => {
 });
 
 test('immersion lab enforces movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss, layout, legacySheet] = await Promise.all([
+  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
@@ -44,6 +44,8 @@ test('immersion lab enforces movement and uses one flexible character window', a
     readFile(new URL('../src/app/player-character-window.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/OnlineActorSheet.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/0021_actor_hp_return_alias.sql', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
@@ -67,13 +69,25 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(wrapper, /blockRightDrag/);
 
   // The flexible character sheet writes `hit_points`, while older table widgets
-  // still consume `hp`. The wrapper must expose one read-only compatibility alias
-  // so hero HP stays visible everywhere without duplicating persisted data.
+  // still consume `hp`. The wrapper exposes a read-only alias without persisting
+  // duplicate health data.
   assert.match(wrapper, /const actors = props\.initialActors\.map\(withCompatibleHealth\)/);
   assert.match(wrapper, /const sheetHealth = objectResource\(data\.hit_points\)/);
   assert.match(wrapper, /system_data: \{ \.\.\.data, hp: health \}/);
   assert.match(wrapper, /initialActors=\{actors\}/);
   assert.match(wrapper, /actors=\{actors\}/);
+
+  // GM quick HP must update immediately and serialize network mutations. All GM
+  // health displays read either the canonical key or the old compatibility key.
+  assert.match(gmSidebar, /type OptimisticHealth/);
+  assert.match(gmSidebar, /hpQueueRef/);
+  assert.match(gmSidebar, /changeQuickHp/);
+  assert.match(gmSidebar, /effectiveDelta/);
+  assert.match(gmSidebar, /adjust_actor_hp/);
+  assert.match(gmSidebar, /objectResource\(data\?\.hit_points\) \?\? objectResource\(data\?\.hp\)/);
+  assert.doesNotMatch(gmSidebar, /actor\.system_data\?\.hp\?\.current/);
+  assert.match(hpMigration, /health_key = 'hit_points'/);
+  assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
