@@ -259,10 +259,6 @@
 .gm-note-list { display: grid; gap: 8px; }
 .gm-notes-editor { display: grid; gap: 8px; }
 
-/* NPCs are Actors, not a second content type. Keep the legacy NPC workshop
-   unreachable while its old editor code is removed in the cleanup pass. */
-.workshop-tabs > button:nth-child(2) { display: none; }
-
 @media (max-width: 1300px) {
   .gm-library-drawer { width: 245px; }
   .gm-inspector { width: 300px; }
