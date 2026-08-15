@@ -36,9 +36,7 @@ type Props = {
   actors: Actor[];
   scene: Scene | null;
   runtime: Runtime;
-  detailsOpen: boolean;
-  onToggleDetails: () => void;
-  onOpenSheet: () => void;
+  onOpenCharacter: () => void;
 };
 
 type ActiveDrag = {
@@ -49,9 +47,16 @@ type ActiveDrag = {
   y: number;
   cellPixels: number;
   distance: number;
+  lastAllowedDistance: number;
 };
 
-export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, detailsOpen, onToggleDetails, onOpenSheet }: Props) {
+function blockPointerEvent(event: PointerEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+}
+
+export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, onOpenCharacter }: Props) {
   const [drag, setDrag] = useState<ActiveDrag | null>(null);
   const dragRef = useRef<ActiveDrag | null>(null);
   const [spent, setSpent] = useState(0);
@@ -97,6 +102,13 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       if (!(target instanceof Element)) return;
       const token = target.closest<HTMLButtonElement>('.online-table-shell.player-mode .token.selected');
       if (!token) return;
+
+      if (runtime.combat_active && !isOwnTurn) {
+        blockPointerEvent(event);
+        setNotice(currentActor ? `Сейчас ходит ${currentActor.name}` : 'Сейчас не ваш ход');
+        return;
+      }
+
       const world = token.closest<HTMLElement>('.online-map-world');
       if (!world) return;
 
@@ -112,6 +124,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         y: event.clientY,
         cellPixels,
         distance: 0,
+        lastAllowedDistance: 0,
       };
       dragRef.current = next;
       setDrag(next);
@@ -123,9 +136,20 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const distance = current.cellPixels > 0
         ? gridMovementDistance(event.clientX - current.startX, event.clientY - current.startY, current.cellPixels, distancePerCell)
         : 0;
-      const next = { ...current, x: event.clientX, y: event.clientY, distance };
+      const exceedsBudget = runtime.combat_active && isOwnTurn && current.cellPixels > 0 && spent + distance > speed;
+      const next = {
+        ...current,
+        x: event.clientX,
+        y: event.clientY,
+        distance,
+        lastAllowedDistance: exceedsBudget ? current.lastAllowedDistance : distance,
+      };
       dragRef.current = next;
       setDrag(next);
+
+      // In combat the player movement budget is authoritative: pointer moves
+      // beyond the remaining speed never reach the map/token drag handler.
+      if (exceedsBudget) blockPointerEvent(event);
     };
 
     const finish = (event: PointerEvent) => {
@@ -133,12 +157,13 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       if (!current || current.pointerId !== event.pointerId) return;
       dragRef.current = null;
       setDrag(null);
-      if (!runtime.combat_active || current.distance <= 0) return;
-      if (!isOwnTurn) {
-        setNotice(currentActor ? `Сейчас ходит ${currentActor.name}` : 'Сейчас не ваш ход');
-        return;
+      if (!runtime.combat_active || !isOwnTurn) return;
+
+      const committedDistance = current.lastAllowedDistance;
+      if (current.cellPixels > 0 && current.distance > committedDistance) {
+        setNotice(`Лимит движения ${speed} ${distanceUnit} — фишка остановлена на последней допустимой клетке`);
       }
-      setSpent((value) => value + current.distance);
+      if (committedDistance > 0) setSpent((value) => Math.min(speed, value + committedDistance));
     };
 
     const cancel = (event: PointerEvent) => {
@@ -158,7 +183,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       window.removeEventListener('pointerup', finish, true);
       window.removeEventListener('pointercancel', cancel, true);
     };
-  }, [actor, currentActor, distancePerCell, isOwnTurn, runtime.combat_active, scene?.grid_enabled, scene?.grid_size]);
+  }, [actor, currentActor, distancePerCell, distanceUnit, isOwnTurn, runtime.combat_active, scene?.grid_enabled, scene?.grid_size, speed, spent]);
 
   const hp = actor?.system_data?.hp && typeof actor.system_data.hp === 'object'
     ? actor.system_data.hp as Record<string, unknown>
@@ -168,7 +193,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const preview = drag?.distance ?? 0;
   const projected = spent + preview;
   const remaining = remainingMovement(speed, spent, preview);
-  const overBudget = isOwnTurn && projected > speed;
+  const overBudget = isOwnTurn && drag !== null && drag.cellPixels > 0 && projected > speed;
   const ruler = useMemo(() => {
     if (!drag) return null;
     const dx = drag.x - drag.startX;
@@ -205,7 +230,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
             {scene?.grid_enabled ? (
               <>
                 <strong>{drag.distance} {distanceUnit}</strong>
-                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `превышение +${projected - speed}` : `осталось ${remaining}`} {distanceUnit}</small>}
+                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${speed} · дальше нельзя` : `осталось ${remaining}`} {distanceUnit}</small>}
               </>
             ) : (
               <><strong>Свободное движение</strong><small>На сцене выключена сетка</small></>
@@ -220,13 +245,12 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
           <span><strong>{actor.name}</strong><small>{runtime.combat_active ? (isOwnTurn ? 'Ваш ход' : `Ход: ${currentActor?.name ?? 'мастера'}`) : 'Свободная сцена'}</small></span>
         </div>
         <div className="player-vital-chip"><span>HP</span><strong>{Number.isFinite(hpCurrent) ? hpCurrent : '—'} / {Number.isFinite(hpMax) ? hpMax : '—'}</strong></div>
-        <div className={`player-movement-chip ${spent > speed ? 'over' : ''}`}>
+        <div className={`player-movement-chip ${spent >= speed && isOwnTurn ? 'over' : ''}`}>
           <span>Движение</span>
           <strong>{runtime.combat_active && isOwnTurn ? `${spent} / ${speed}` : `${speed}`} {distanceUnit}</strong>
           <i><b style={{ width: `${Math.min(100, speed > 0 ? (spent / speed) * 100 : 0)}%` }} /></i>
         </div>
-        <button type="button" onClick={onOpenSheet}>◇ Лист</button>
-        <button type="button" className={detailsOpen ? 'active' : ''} onClick={onToggleDetails}>🎒 Герой</button>
+        <button type="button" onClick={onOpenCharacter}>◇ Персонаж</button>
       </div>
 
       {notice && <div className="player-immersion-notice">{notice}</div>}
