@@ -76,7 +76,6 @@ export function OnlineTableV05(props: Props) {
   const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
-  const [playerDetailsOpen, setPlayerDetailsOpen] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -85,7 +84,6 @@ export function OnlineTableV05(props: Props) {
       if (sheetActorId && sheetActorId !== ownActor?.id) setSheetActorId(null);
       return;
     }
-    setPlayerDetailsOpen(false);
     if (!selectedActorId || props.initialActors.some((actor) => actor.id === selectedActorId)) return;
     setSelectedActorId('');
   }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, sheetActorId]);
@@ -94,9 +92,8 @@ export function OnlineTableV05(props: Props) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       // OnlineActorSheet owns its own Escape handling so dirty values cannot be
-      // discarded by this outer layer before the sheet asks for confirmation.
+      // discarded by this outer layer before the character window asks first.
       setManagerOpen(false);
-      setPlayerDetailsOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -107,17 +104,12 @@ export function OnlineTableV05(props: Props) {
   const template = sheetActor ? initialSheetTemplates.find((value) => value.id === sheetActor.sheet_template_id) ?? null : null;
 
   const refresh = () => router.refresh();
-  const openSelectedSheet = () => {
+  const openSelectedCharacter = () => {
     const actor = props.mode === 'player' ? ownActor : selectedActor;
-    if (actor) {
-      setPlayerDetailsOpen(false);
-      setSheetActorId(actor.id);
-    }
+    if (actor) setSheetActorId(actor.id);
   };
 
-  const immersionClasses = props.mode === 'player'
-    ? ` player-immersion${playerDetailsOpen ? ' player-immersion-details-open' : ''}`
-    : '';
+  const immersionClasses = props.mode === 'player' ? ' player-immersion' : '';
 
   return (
     <div className={`v05-table-layer${immersionClasses}`}>
@@ -134,9 +126,7 @@ export function OnlineTableV05(props: Props) {
           actors={props.initialActors}
           scene={activeScene}
           runtime={props.initialRuntime}
-          detailsOpen={playerDetailsOpen}
-          onToggleDetails={() => setPlayerDetailsOpen((value) => !value)}
-          onOpenSheet={openSelectedSheet}
+          onOpenCharacter={openSelectedCharacter}
         />
       )}
 
@@ -146,7 +136,7 @@ export function OnlineTableV05(props: Props) {
             <option value="">Выберите персонажа…</option>
             {props.initialActors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </select>
-          <button className="button" disabled={!selectedActor} onClick={openSelectedSheet}>◇ Лист</button>
+          <button className="button" disabled={!selectedActor} onClick={openSelectedCharacter}>◇ Лист</button>
           {gmAllowed && <button className={`button ${managerOpen ? 'active' : ''}`} onClick={() => { setManagerOpen((value) => !value); setSheetActorId(null); }}>⚒ Листы</button>}
         </div>
       )}
@@ -170,14 +160,16 @@ export function OnlineTableV05(props: Props) {
       )}
 
       {sheetActor && (
-        <OnlineActorSheet
-          actor={sheetActor}
-          template={template}
-          canEdit={gmAllowed || sheetActor.owner_user_id === props.currentUserId}
-          onClose={() => setSheetActorId(null)}
-          onChanged={refresh}
-          onMessage={setMessage}
-        />
+        <div className={props.mode === 'player' ? 'player-character-window' : undefined}>
+          <OnlineActorSheet
+            actor={sheetActor}
+            template={template}
+            canEdit={gmAllowed || sheetActor.owner_user_id === props.currentUserId}
+            onClose={() => setSheetActorId(null)}
+            onChanged={refresh}
+            onMessage={setMessage}
+          />
+        </div>
       )}
 
       {message && <div className="auth-status online-table-message v05-sheet-message" onClick={() => setMessage('')}>{message}</div>}
