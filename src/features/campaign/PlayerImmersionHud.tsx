@@ -95,6 +95,10 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
     : 'free';
   const storageKey = actor ? `ttv:movement:${campaignId}:${actor.id}:${turnKey}` : '';
 
+  // Restore movement budget for this exact combat turn. Do not mirror `spent`
+  // back to storage from an effect: on mount React runs effects with the initial
+  // spent=0 state before the restored state render, which used to overwrite a
+  // valid saved budget. Writes now happen synchronously only when a move commits.
   useEffect(() => {
     if (!storageKey || !runtime.combat_active) {
       setSpent(0);
@@ -103,11 +107,6 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
     const stored = Number(window.sessionStorage.getItem(storageKey) ?? 0);
     setSpent(Number.isFinite(stored) && stored > 0 ? roundMovementDistance(stored) : 0);
   }, [storageKey, runtime.combat_active]);
-
-  useEffect(() => {
-    if (!storageKey || !runtime.combat_active) return;
-    window.sessionStorage.setItem(storageKey, String(roundMovementDistance(spent)));
-  }, [spent, storageKey, runtime.combat_active]);
 
   useEffect(() => {
     if (!notice) return;
@@ -248,7 +247,11 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         setNotice(`Лимит движения ${formatMovementDistance(speed)} ${distanceUnit} — фишка остановлена на точной допустимой позиции`);
       }
       if (committedDistance > 0) {
-        setSpent((value) => roundMovementDistance(Math.min(speed, value + committedDistance)));
+        setSpent((value) => {
+          const nextSpent = roundMovementDistance(Math.min(speed, value + committedDistance));
+          if (storageKey) window.sessionStorage.setItem(storageKey, String(nextSpent));
+          return nextSpent;
+        });
       }
     };
 
@@ -279,6 +282,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
     scene?.measurement_units_per_map_width,
     speed,
     spent,
+    storageKey,
   ]);
 
   const hp = resourceValue(actor?.system_data, 'hit_points', 'hp');
