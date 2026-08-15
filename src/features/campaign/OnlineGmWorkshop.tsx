@@ -50,7 +50,6 @@ type Props = {
 
 const tabs = [
   ['items', 'ПРЕДМЕТЫ'],
-  ['npc', 'NPC'],
   ['loot', 'ЛУТ'],
   ['tables', 'ТАБЛИЦЫ'],
 ] as const;
@@ -83,7 +82,6 @@ export function OnlineGmWorkshop(props: Props) {
       </header>
       <div className="workshop-module-body">
         {tab === 'items' && <OnlineItemWorkshop {...props} />}
-        {tab === 'npc' && <OnlineNpcWorkshop {...props} />}
         {tab === 'loot' && <OnlineLootWorkshop {...props} />}
         {tab === 'tables' && <OnlineTablesWorkshop {...props} />}
       </div>
@@ -352,112 +350,6 @@ function OnlineItemBuilder({ draft, busy, onCancel, onSave }: { draft: ItemDraft
       </div>
       <footer className="builder-actions"><button type="button" className="button" onClick={onCancel}>Отмена</button><button className="button primary" disabled={busy}>Сохранить предмет</button></footer>
     </form>
-  );
-}
-
-function OnlineNpcWorkshop({ campaignId, activeSceneId, actors, onChanged, onMessage }: Props) {
-  const npcs = actors.filter((actor) => actor.type !== 'player');
-  const [selectedId, setSelectedId] = useState(npcs[0]?.id ?? '');
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Actor | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (selectedId && npcs.some((npc) => npc.id === selectedId)) return;
-    setSelectedId(npcs[0]?.id ?? '');
-  }, [npcs, selectedId]);
-
-  const selected = npcs.find((npc) => npc.id === selectedId) ?? npcs[0] ?? null;
-
-  const createNpc = async () => {
-    setBusy(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.rpc('create_campaign_actor', {
-      target_campaign: campaignId,
-      actor_name: 'Новый NPC',
-      actor_kind: 'npc',
-      target_scene: activeSceneId,
-    });
-    if (error) onMessage(friendlyError(error, 'Не удалось создать NPC.'));
-    else {
-      if (typeof data === 'string') setSelectedId(data);
-      onChanged();
-    }
-    setBusy(false);
-  };
-
-  const saveNpc = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!draft) return;
-    setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('update_campaign_actor', {
-      target_campaign: campaignId,
-      target_actor: draft.id,
-      actor_name: draft.name,
-      actor_subtitle: draft.subtitle,
-      actor_avatar: draft.avatar,
-      actor_system_data: draft.system_data,
-    });
-    if (error) onMessage(friendlyError(error, 'Не удалось сохранить NPC.'));
-    else {
-      setEditing(false);
-      setDraft(null);
-      onChanged();
-    }
-    setBusy(false);
-  };
-
-  const place = async () => {
-    if (!selected || !activeSceneId) return;
-    setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('place_actor_on_scene', {
-      target_campaign: campaignId,
-      target_actor: selected.id,
-      target_scene: activeSceneId,
-    });
-    if (error) onMessage(friendlyError(error, 'Не удалось добавить NPC на сцену.'));
-    else { onMessage(`${selected.name} добавлен на сцену.`); onChanged(); }
-    setBusy(false);
-  };
-
-  const remove = async () => {
-    if (!selected || !window.confirm(`Удалить NPC «${selected.name}» из кампании?`)) return;
-    setBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('delete_campaign_actor', { target_campaign: campaignId, target_actor: selected.id });
-    if (error) onMessage(friendlyError(error, 'Не удалось удалить NPC.'));
-    else { setSelectedId(''); onChanged(); }
-    setBusy(false);
-  };
-
-  if (editing && draft) {
-    const hp = draft.system_data?.hp ?? { current: 10, max: 10 };
-    return (
-      <form className="builder-view" onSubmit={saveNpc}>
-        <header className="builder-head"><div><h2>РЕДАКТОР NPC</h2><p>Основные данные персонажа мира.</p></div><button type="button" className="button" onClick={() => { setEditing(false); setDraft(null); }}>← Назад</button></header>
-        <div className="builder-scroll"><section className="builder-section"><div className="builder-grid">
-          <Field label="Имя"><input required value={draft.name} onChange={(e)=>setDraft({...draft,name:e.target.value})}/></Field>
-          <Field label="Иконка"><input value={draft.avatar} onChange={(e)=>setDraft({...draft,avatar:e.target.value})}/></Field>
-          <Field label="Роль / описание"><input value={draft.subtitle} onChange={(e)=>setDraft({...draft,subtitle:e.target.value})}/></Field>
-          <Field label="Здоровье"><input type="number" min={0} value={hp.current ?? 0} onChange={(e)=>setDraft({...draft,system_data:{...draft.system_data,hp:{...hp,current:Number(e.target.value)}}})}/></Field>
-          <Field label="Макс. здоровье"><input type="number" min={1} value={hp.max ?? 10} onChange={(e)=>setDraft({...draft,system_data:{...draft.system_data,hp:{...hp,max:Number(e.target.value)}}})}/></Field>
-          <Field label="Защита"><input type="number" value={draft.system_data?.armor ?? 10} onChange={(e)=>setDraft({...draft,system_data:{...draft.system_data,armor:Number(e.target.value)}})}/></Field>
-        </div></section></div>
-        <footer className="builder-actions"><button type="button" className="button" onClick={()=>{setEditing(false);setDraft(null);}}>Отмена</button><button className="button primary" disabled={busy}>Сохранить NPC</button></footer>
-      </form>
-    );
-  }
-
-  return (
-    <div className="module-split">
-      <section className="module-list">
-        <div className="library-meta-row"><strong>NPC кампании</strong><button className="button" disabled={busy} onClick={createNpc}>＋ Создать</button></div>
-        <div className="module-list-scroll">{npcs.map((npc)=><button key={npc.id} className={`module-row ${selected?.id===npc.id?'selected':''}`} onClick={()=>setSelectedId(npc.id)}><span className="module-avatar">{npc.avatar || npc.name.slice(0,1)}</span><span><strong>{npc.name}</strong><small>{npc.subtitle || 'Персонаж мира'}</small></span><b>{npc.system_data?.hp?.current ?? '—'} HP</b></button>)}{!npcs.length && <div className="online-small-empty">NPC пока нет.</div>}</div>
-      </section>
-      <section className="module-detail">{selected ? <><div className="inspector-header"><div><h2>{selected.name}</h2><p>{selected.subtitle || 'Персонаж мира'}</p></div><button className="button primary" disabled={!activeSceneId || busy} onClick={place}>Добавить на сцену</button></div><div className="settings-kv two-col"><div><span>HP</span><b>{selected.system_data?.hp?.current ?? '—'} / {selected.system_data?.hp?.max ?? '—'}</b></div><div><span>Защита</span><b>{selected.system_data?.armor ?? '—'}</b></div></div><div className="module-actions"><button className="button" onClick={()=>{setDraft(JSON.parse(JSON.stringify(selected)));setEditing(true);}}>Редактировать</button><button className="button danger" disabled={busy} onClick={remove}>Удалить</button></div></> : <div className="placeholder-panel"><h2>NPC не выбран</h2></div>}</section>
-    </div>
   );
 }
 
