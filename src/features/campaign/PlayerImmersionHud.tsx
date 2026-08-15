@@ -7,6 +7,7 @@ import {
   actorMovementSpeed,
   gridMovementDistance,
   remainingMovement,
+  shouldBlockCombatGridMove,
 } from './movement';
 
 type Scene = {
@@ -54,6 +55,14 @@ function blockPointerEvent(event: PointerEvent) {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
+}
+
+function resourceValue(systemData: Record<string, unknown> | undefined, ...keys: string[]) {
+  for (const key of keys) {
+    const value = systemData?.[key];
+    if (value && typeof value === 'object') return value as Record<string, unknown>;
+  }
+  return null;
 }
 
 export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, onOpenCharacter }: Props) {
@@ -136,20 +145,23 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const distance = current.cellPixels > 0
         ? gridMovementDistance(event.clientX - current.startX, event.clientY - current.startY, current.cellPixels, distancePerCell)
         : 0;
-      const exceedsBudget = runtime.combat_active && isOwnTurn && current.cellPixels > 0 && spent + distance > speed;
+      const blockGridMove = runtime.combat_active
+        && isOwnTurn
+        && shouldBlockCombatGridMove(distance, spent, speed, current.cellPixels > 0);
       const next = {
         ...current,
         x: event.clientX,
         y: event.clientY,
         distance,
-        lastAllowedDistance: exceedsBudget ? current.lastAllowedDistance : distance,
+        lastAllowedDistance: blockGridMove ? current.lastAllowedDistance : distance,
       };
       dragRef.current = next;
       setDrag(next);
 
-      // In combat the player movement budget is authoritative: pointer moves
-      // beyond the remaining speed never reach the map/token drag handler.
-      if (exceedsBudget) blockPointerEvent(event);
+      // This capture listener is intentionally authoritative for player combat
+      // movement. 0-ft micro drags and over-budget drags never reach OnlineTable,
+      // so repeating tiny clicks cannot advance the token for free.
+      if (blockGridMove) blockPointerEvent(event);
     };
 
     const finish = (event: PointerEvent) => {
@@ -161,7 +173,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
       const committedDistance = current.lastAllowedDistance;
       if (current.cellPixels > 0 && current.distance > committedDistance) {
-        setNotice(`Лимит движения ${speed} ${distanceUnit} — фишка остановлена на последней допустимой клетке`);
+        setNotice(`Лимит движения ${speed} ${distanceUnit} — дальше фишка не идёт`);
       }
       if (committedDistance > 0) setSpent((value) => Math.min(speed, value + committedDistance));
     };
@@ -185,9 +197,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
     };
   }, [actor, currentActor, distancePerCell, distanceUnit, isOwnTurn, runtime.combat_active, scene?.grid_enabled, scene?.grid_size, speed, spent]);
 
-  const hp = actor?.system_data?.hp && typeof actor.system_data.hp === 'object'
-    ? actor.system_data.hp as Record<string, unknown>
-    : null;
+  const hp = resourceValue(actor?.system_data, 'hit_points', 'hp');
   const hpCurrent = Number(hp?.current);
   const hpMax = Number(hp?.max);
   const preview = drag?.distance ?? 0;
