@@ -17,6 +17,15 @@ export function gridMovementDistance(
   return Math.max(0, cells * Math.max(0, distancePerCell));
 }
 
+export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, gridEnabled: boolean) {
+  if (!gridEnabled) return false;
+  // A drag that has not crossed into another grid cell must never reach the
+  // token mover. Otherwise repeated tiny drags can move the token while each
+  // individual drag still reports 0 ft.
+  if (!Number.isFinite(distance) || distance <= 0) return true;
+  return spent + distance > speed;
+}
+
 export function actorMovementSpeed(systemData: MovementSystemData | null | undefined, fallback = DEFAULT_MOVEMENT_SPEED) {
   const movement = systemData?.movement;
   const movementObject = movement && typeof movement === 'object' ? movement as Record<string, unknown> : null;
