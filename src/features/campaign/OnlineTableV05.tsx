@@ -8,6 +8,7 @@ import { OnlineTable } from './OnlineTable';
 import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
+import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -26,6 +27,8 @@ type Scene = {
   grid_offset_y: number;
   grid_snap: boolean;
   fog_reveals: FogReveal[];
+  measurement_unit: string | null;
+  measurement_units_per_map_width: number | null;
   created_at: string;
 };
 type Token = { id: string; scene_id: string; actor_id: string; x: number; y: number; size: number; rotation: number; enemy: boolean; hidden: boolean };
@@ -228,6 +231,15 @@ export function OnlineTableV05(props: Props) {
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
       />
+
+      {props.mode === 'gm' && gmAllowed && (
+        <SceneMeasurementCalibrator
+          campaignId={props.campaign.id}
+          scene={activeScene}
+          onChanged={refresh}
+          onMessage={setMessage}
+        />
+      )}
 
       {props.mode === 'player' && (
         <PlayerImmersionHud
