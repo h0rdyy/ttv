@@ -119,7 +119,11 @@ test('immersion lab enforces movement, calibrated scenes and one flexible charac
   assert.match(hud, /remainingMovement\(speed, spent\) <= 0/);
   assert.match(hud, /new PointerEvent\('pointermove'/);
   assert.match(hud, /formatMovementDistance\(drag\.distance\)/);
-  assert.match(hud, /roundMovementDistance\(Math\.min\(speed, value \+ committedDistance\)\)/);
+  assert.match(hud, /const nextSpent = roundMovementDistance\(Math\.min\(speed, value \+ committedDistance\)\)/);
+  assert.match(hud, /sessionStorage\.getItem\(storageKey\)/);
+  const storageWrites = hud.match(/sessionStorage\.setItem/g) ?? [];
+  assert.equal(storageWrites.length, 1, 'movement storage must only be written when a move commits');
+  assert.ok(hud.indexOf('window.sessionStorage.setItem') > hud.indexOf('const finish ='), 'movement budget persistence must happen inside finish, never in a mount effect');
 
   assert.match(measurementMigration, /measurement_units_per_map_width double precision/);
   assert.match(measurementMigration, /create or replace function public\.set_scene_measurement/);
