@@ -11,18 +11,22 @@ export function gridMovementDistance(
   distancePerCell = DEFAULT_CELL_DISTANCE,
 ) {
   if (!Number.isFinite(cellPixels) || cellPixels <= 0) return 0;
+  const displacement = Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx));
+  // A true click is free, but any intentional drag counts as at least one cell.
+  // This prevents repeated 1-2 px drags from advancing a snapped token for 0 ft.
+  if (!Number.isFinite(displacement) || displacement < 0.75) return 0;
   // Experimental Foundry-like square-grid rule: diagonal movement costs one cell
   // per crossed square. This can later become a per-system diagonal policy.
-  const cells = Math.round(Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx)) / cellPixels);
-  return Math.max(0, cells * Math.max(0, distancePerCell));
+  const cells = Math.max(1, Math.round(displacement / cellPixels));
+  return cells * Math.max(0, distancePerCell);
 }
 
 export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, gridEnabled: boolean) {
   if (!gridEnabled) return false;
-  // A drag that has not crossed into another grid cell must never reach the
-  // token mover. Otherwise repeated tiny drags can move the token while each
-  // individual drag still reports 0 ft.
-  if (!Number.isFinite(distance) || distance <= 0) return true;
+  if (!Number.isFinite(distance) || distance < 0) return true;
+  // Zero means the pointer has not actually moved. Full-budget blocking happens
+  // on pointerdown so a simple click never breaks token selection.
+  if (distance === 0) return false;
   return spent + distance > speed;
 }
 
