@@ -17,6 +17,7 @@ type Scene = {
   grid_size: number;
   measurement_unit: string | null;
   measurement_units_per_map_width: number | null;
+  measurement_supported?: boolean;
 };
 
 type Props = {
@@ -65,11 +66,16 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
   const draftRef = useRef<CalibrationDraft | null>(null);
   const initializedSceneRef = useRef(new Set<string>());
 
+  const measurementSupported = scene?.measurement_supported !== false;
   const sceneScale = validScale(scene?.measurement_units_per_map_width);
   const sceneUnit = scene?.measurement_unit?.trim() || DEFAULT_DISTANCE_UNIT;
 
   const saveMeasurement = async (scale: number, unit = sceneUnit, announce = true) => {
     if (!scene || !Number.isFinite(scale) || scale <= 0) return false;
+    if (!measurementSupported) {
+      if (announce) onMessage('Калибровка станет доступна после применения миграции 0023_scene_measurement_calibration.sql.');
+      return false;
+    }
     setBusy(true);
     const supabase = createClient();
     const { error } = await supabase.rpc('set_scene_measurement', {
@@ -79,7 +85,7 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
       scene_units_per_map_width: scale,
     });
     if (error) {
-      onMessage(friendlyError(error, 'Не удалось сохранить масштаб расстояний.'));
+      if (announce) onMessage(friendlyError(error, 'Не удалось сохранить масштаб расстояний.'));
       setBusy(false);
       return false;
     }
@@ -91,6 +97,10 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
 
   const useCurrentGridAsFiveFeet = async (announce = true) => {
     if (!scene) return false;
+    if (!measurementSupported) {
+      if (announce) onMessage('Схема БД ещё без калибровки. Пока движение использует старый масштаб сетки.');
+      return false;
+    }
     const world = mapWorld();
     if (!world || world.offsetWidth <= 0) {
       if (announce) onMessage('Карта ещё не готова для калибровки.');
@@ -105,7 +115,7 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
   // freeze their current visual cell as 5 ft once. After this one-time bridge,
   // changing grid_size never changes movement math again.
   useEffect(() => {
-    if (!scene || sceneScale || initializedSceneRef.current.has(scene.id)) return;
+    if (!scene || !measurementSupported || sceneScale || initializedSceneRef.current.has(scene.id)) return;
     initializedSceneRef.current.add(scene.id);
     let cancelled = false;
     let attempts = 0;
@@ -121,10 +131,10 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
     };
     window.requestAnimationFrame(tryInitialize);
     return () => { cancelled = true; };
-  }, [scene?.id, sceneScale]);
+  }, [scene?.id, sceneScale, measurementSupported]);
 
   useEffect(() => {
-    if (!calibrating || !scene) return;
+    if (!calibrating || !scene || !measurementSupported) return;
 
     const pointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
@@ -202,7 +212,7 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
       window.removeEventListener('pointerup', pointerUp, true);
       window.removeEventListener('keydown', keyDown, true);
     };
-  }, [calibrating, scene?.id, sceneUnit]);
+  }, [calibrating, scene?.id, sceneUnit, measurementSupported]);
 
   if (!scene) return null;
 
@@ -233,24 +243,24 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
             <header><strong>Расстояния</strong><button type="button" onClick={() => setOpen(false)}>×</button></header>
             <p>Сетка отвечает только за вид и snap. Этот масштаб отдельно определяет футы движения.</p>
             <div className="scene-measurement-status">
-              <span>{sceneScale ? 'МАСШТАБ ЗАФИКСИРОВАН' : 'НАСЛЕДУЕМЫЙ МАСШТАБ'}</span>
-              <strong>{sceneScale ? `${formatMovementDistance(sceneScale)} ${sceneUnit} по ширине карты` : 'Текущая клетка временно считается за 5 ft'}</strong>
+              <span>{!measurementSupported ? 'НУЖНО ОБНОВИТЬ СХЕМУ БД' : sceneScale ? 'МАСШТАБ ЗАФИКСИРОВАН' : 'НАСЛЕДУЕМЫЙ МАСШТАБ'}</span>
+              <strong>{!measurementSupported ? 'Пока используется старый масштаб сетки' : sceneScale ? `${formatMovementDistance(sceneScale)} ${sceneUnit} по ширине карты` : 'Текущая клетка временно считается за 5 ft'}</strong>
               {currentCellDistance !== null && <small>Текущая визуальная клетка ≈ {formatMovementDistance(currentCellDistance)} {sceneUnit}</small>}
             </div>
             <label className="scene-measurement-unit">
               <span>Единица</span>
-              <select className="control" value={sceneUnit} disabled={busy || !sceneScale} onChange={(event) => void changeUnit(event.target.value)}>
+              <select className="control" value={sceneUnit} disabled={busy || !sceneScale || !measurementSupported} onChange={(event) => void changeUnit(event.target.value)}>
                 <option value="ft">ft</option>
                 <option value="m">m</option>
               </select>
             </label>
-            <button type="button" className="button full" disabled={busy} onClick={() => void useCurrentGridAsFiveFeet(true)}>
+            <button type="button" className="button full" disabled={busy || !measurementSupported} onClick={() => void useCurrentGridAsFiveFeet(true)}>
               Текущая клетка = 5 {sceneUnit}
             </button>
-            <button type="button" className="button primary full" disabled={busy} onClick={() => { setOpen(false); setCalibrating(true); }}>
+            <button type="button" className="button primary full" disabled={busy || !measurementSupported} onClick={() => { setOpen(false); setCalibrating(true); }}>
               Калибровать по карте
             </button>
-            <small>Проведите линию между двумя известными точками и введите реальное расстояние.</small>
+            <small>{measurementSupported ? 'Проведите линию между двумя известными точками и введите реальное расстояние.' : 'Примените миграцию 0023_scene_measurement_calibration.sql — стол продолжит работать и до неё.'}</small>
           </section>
         )}
       </div>
