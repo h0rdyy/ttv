@@ -71,7 +71,7 @@ export function OnlineTableV05(props: Props) {
   const { initialSheetTemplates, ...tableProps } = props;
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(props.role);
   const ownActor = props.initialActors.find((actor) => actor.owner_user_id === props.currentUserId) ?? null;
-  const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '');
+  const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
   const [message, setMessage] = useState('');
@@ -82,14 +82,15 @@ export function OnlineTableV05(props: Props) {
       if (sheetActorId && sheetActorId !== ownActor?.id) setSheetActorId(null);
       return;
     }
-    if (selectedActorId && props.initialActors.some((actor) => actor.id === selectedActorId)) return;
-    setSelectedActorId(props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '');
+    if (!selectedActorId || props.initialActors.some((actor) => actor.id === selectedActorId)) return;
+    setSelectedActorId('');
   }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, sheetActorId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setSheetActorId(null);
+      // OnlineActorSheet owns its own Escape handling so dirty values cannot be
+      // discarded by this outer layer before the sheet asks for confirmation.
       setManagerOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
@@ -117,6 +118,7 @@ export function OnlineTableV05(props: Props) {
       <div className={`sheet-dock ${props.mode === 'player' ? 'player' : 'gm'}`}>
         {props.mode === 'gm' && (
           <select value={selectedActor?.id ?? ''} onChange={(event) => setSelectedActorId(event.target.value)} aria-label="Персонаж для листа">
+            <option value="">Выберите персонажа…</option>
             {props.initialActors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </select>
         )}
