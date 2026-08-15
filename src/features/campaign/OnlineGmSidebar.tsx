@@ -113,12 +113,31 @@ export function OnlineGmSidebar(props: Props) {
   );
 }
 
-function CharacterLibrary({ actors, selectedActorId, onSelectActor, busy, onCreateHero, onOpenWorkshop }: Props) {
+function CharacterLibrary({ campaignId, actors, selectedActorId, onSelectActor, busy, onCreateHero, onChanged, onMessage }: Props) {
   const [search, setSearch] = useState('');
+  const [creatingNpc, setCreatingNpc] = useState(false);
   const query = search.trim().toLocaleLowerCase('ru');
   const filtered = actors.filter((actor) => !query || `${actor.name} ${actor.subtitle}`.toLocaleLowerCase('ru').includes(query));
   const heroes = filtered.filter((actor) => actor.type === 'player');
   const npcs = filtered.filter((actor) => actor.type !== 'player');
+
+  const createNpc = async () => {
+    setCreatingNpc(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('create_campaign_actor', {
+      target_campaign: campaignId,
+      actor_name: 'Новый NPC',
+      actor_kind: 'npc',
+      target_scene: null,
+    });
+    if (error) onMessage(friendlyError(error, 'Не удалось создать NPC.'));
+    else {
+      if (typeof data === 'string') onSelectActor(data);
+      onMessage('NPC создан. Его характеристики редактируются через единый лист персонажа.');
+      onChanged();
+    }
+    setCreatingNpc(false);
+  };
 
   const actorRow = (actor: Actor) => (
     <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
@@ -146,15 +165,16 @@ function CharacterLibrary({ actors, selectedActorId, onSelectActor, busy, onCrea
         <div className="gm-library-section-title"><strong>{actorLibraryGroups[1][1]}</strong><span>{npcs.length}</span></div>
         <div className="gm-library-list">{npcs.map(actorRow)}</div>
         {!npcs.length && <div className="online-small-empty">NPC не найдены.</div>}
-        <button className="button full gm-library-secondary" onClick={onOpenWorkshop}>＋ Создать / редактировать NPC</button>
+        <button className="button full gm-library-secondary" disabled={busy || creatingNpc} onClick={() => void createNpc()}>{creatingNpc ? 'Создание…' : '＋ Создать NPC'}</button>
+        <div className="gm-library-hint">NPC используют тот же лист персонажа, что и герои.</div>
       </section>
     </>
   );
 }
 
-function ContentLibrary({ actors, items, instances, onOpenWorkshop }: Props) {
-  const npcs = actors.filter((actor) => actor.type !== 'player').length;
+function ContentLibrary({ items, instances, onOpenWorkshop }: Props) {
   const issuedItems = instances.reduce((total, instance) => total + Math.max(0, instance.quantity || 0), 0);
+  const categories = new Set(items.map((item) => item.category)).size;
 
   return (
     <>
@@ -163,10 +183,10 @@ function ContentLibrary({ actors, items, instances, onOpenWorkshop }: Props) {
       <div className="gm-library-stats">
         <div><span>Предметы</span><strong>{items.length}</strong></div>
         <div><span>Выдано</span><strong>{issuedItems}</strong></div>
-        <div><span>NPC</span><strong>{npcs}</strong></div>
+        <div><span>Категории</span><strong>{categories}</strong></div>
       </div>
       <button className="button primary full" onClick={onOpenWorkshop}>⚒ Открыть мастерскую</button>
-      <div className="gm-library-hint">Предметы · NPC · Лут · Таблицы</div>
+      <div className="gm-library-hint">Предметы · Лут · Таблицы</div>
     </>
   );
 }
@@ -317,8 +337,7 @@ function ActorInspector(props: Props) {
               </div>
             </section>
 
-            <div className="gm-inspector-note">Полный классический лист открывается кнопкой «Лист» в нижней панели. Выбор персонажа уже синхронизирован с ней.</div>
-            {actor.type !== 'player' && <button className="button full" onClick={onOpenWorkshop}>⚒ Открыть NPC в мастерской</button>}
+            <div className="gm-inspector-note">Герои и NPC используют один Actor Sheet. Полный лист открывается кнопкой «Лист» в нижней панели; выбор персонажа уже синхронизирован с ней.</div>
             {actor.type === 'player' && <button className="button danger full" disabled={deleting} onClick={() => void deleteHero()}>{deleting ? 'Удаление…' : 'Удалить героя'}</button>}
           </>
         )}
