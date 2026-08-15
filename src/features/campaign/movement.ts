@@ -3,6 +3,16 @@ export type MovementSystemData = Record<string, unknown>;
 export const DEFAULT_CELL_DISTANCE = 5;
 export const DEFAULT_DISTANCE_UNIT = 'ft';
 export const DEFAULT_MOVEMENT_SPEED = 30;
+export const MOVEMENT_PRECISION = 100;
+
+export function roundMovementDistance(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round((value + Number.EPSILON) * MOVEMENT_PRECISION) / MOVEMENT_PRECISION;
+}
+
+export function formatMovementDistance(value: number) {
+  return roundMovementDistance(value).toFixed(2);
+}
 
 export function gridMovementDistance(
   deltaXpx: number,
@@ -12,22 +22,18 @@ export function gridMovementDistance(
 ) {
   if (!Number.isFinite(cellPixels) || cellPixels <= 0) return 0;
   const displacement = Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx));
-  // A true click is free, but any intentional drag counts as at least one cell.
-  // This prevents repeated 1-2 px drags from advancing a snapped token for 0 ft.
+  // Keep a tiny dead-zone so a normal click remains free. After that, distance is
+  // continuous inside the square instead of jumping in whole 5-ft cells.
   if (!Number.isFinite(displacement) || displacement < 0.75) return 0;
-  // Experimental Foundry-like square-grid rule: diagonal movement costs one cell
-  // per crossed square. This can later become a per-system diagonal policy.
-  const cells = Math.max(1, Math.round(displacement / cellPixels));
-  return cells * Math.max(0, distancePerCell);
+  const cells = displacement / cellPixels;
+  return roundMovementDistance(cells * Math.max(0, distancePerCell));
 }
 
 export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, gridEnabled: boolean) {
   if (!gridEnabled) return false;
   if (!Number.isFinite(distance) || distance < 0) return true;
-  // Zero means the pointer has not actually moved. Full-budget blocking happens
-  // on pointerdown so a simple click never breaks token selection.
   if (distance === 0) return false;
-  return spent + distance > speed;
+  return roundMovementDistance(spent + distance) > roundMovementDistance(speed);
 }
 
 export function actorMovementSpeed(systemData: MovementSystemData | null | undefined, fallback = DEFAULT_MOVEMENT_SPEED) {
@@ -42,12 +48,12 @@ export function actorMovementSpeed(systemData: MovementSystemData | null | undef
 
   for (const candidate of candidates) {
     const value = typeof candidate === 'number' ? candidate : Number(candidate);
-    if (Number.isFinite(value) && value > 0) return value;
+    if (Number.isFinite(value) && value > 0) return roundMovementDistance(value);
   }
 
-  return fallback;
+  return roundMovementDistance(fallback);
 }
 
 export function remainingMovement(speed: number, spent: number, preview = 0) {
-  return Math.max(0, speed - spent - preview);
+  return roundMovementDistance(Math.max(0, speed - spent - preview));
 }
