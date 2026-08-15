@@ -78,6 +78,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const currentActorId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] ?? null : null;
   const currentActor = actors.find((value) => value.id === currentActorId) ?? null;
   const isOwnTurn = Boolean(actor && runtime.combat_active && currentActorId === actor.id);
+  // The Actor Sheet is the source of truth for movement. Grid visibility is only
+  // presentation; hiding the grid must never disable a combat movement limit.
   const speed = actorMovementSpeed(actor?.system_data);
   const distancePerCell = DEFAULT_CELL_DISTANCE;
   const distanceUnit = DEFAULT_DISTANCE_UNIT;
@@ -122,7 +124,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         setNotice(currentActor ? `Сейчас ходит ${currentActor.name}` : 'Сейчас не ваш ход');
         return;
       }
-      if (runtime.combat_active && isOwnTurn && scene?.grid_enabled && remainingMovement(speed, spent) <= 0) {
+      if (runtime.combat_active && isOwnTurn && remainingMovement(speed, spent) <= 0) {
         blockPointerEvent(event);
         setNotice(`Лимит движения ${formatMovementDistance(speed)} ${distanceUnit} уже израсходован`);
         return;
@@ -134,7 +136,9 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const tokenRect = token.getBoundingClientRect();
       const worldRect = world.getBoundingClientRect();
       const worldScale = world.offsetWidth > 0 ? worldRect.width / world.offsetWidth : 1;
-      const cellPixels = scene?.grid_enabled ? Math.max(1, (scene.grid_size || 64) * worldScale) : 0;
+      // grid_size is the distance scale even when the visual grid is hidden.
+      // This keeps combat physics stable while allowing the GM to hide grid lines.
+      const cellPixels = scene ? Math.max(1, (scene.grid_size || 64) * worldScale) : 0;
       const startX = tokenRect.left + tokenRect.width / 2;
       const startY = tokenRect.top + tokenRect.height / 2;
       const next: ActiveDrag = {
@@ -160,7 +164,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const distance = current.cellPixels > 0
         ? gridMovementDistance(event.clientX - current.startX, event.clientY - current.startY, current.cellPixels, distancePerCell)
         : 0;
-      const blockGridMove = runtime.combat_active
+      const blockCombatMove = runtime.combat_active
         && isOwnTurn
         && shouldBlockCombatGridMove(distance, spent, speed, current.cellPixels > 0);
 
@@ -168,7 +172,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       let lastAllowedX = current.lastAllowedX;
       let lastAllowedY = current.lastAllowedY;
 
-      if (!blockGridMove) {
+      if (!blockCombatMove) {
         lastAllowedDistance = distance;
         lastAllowedX = event.clientX;
         lastAllowedY = event.clientY;
@@ -194,7 +198,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       dragRef.current = next;
       setDrag(next);
 
-      if (blockGridMove) {
+      if (blockCombatMove) {
         // Instead of simply swallowing an over-budget move, send OnlineTable one
         // synthetic move at the furthest legal point. Precise fractional movement
         // therefore clamps to the exact remaining hundredths of a foot.
@@ -250,7 +254,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       window.removeEventListener('pointerup', finish, true);
       window.removeEventListener('pointercancel', cancel, true);
     };
-  }, [actor, currentActor, distancePerCell, distanceUnit, isOwnTurn, runtime.combat_active, scene?.grid_enabled, scene?.grid_size, speed, spent]);
+  }, [actor, currentActor, distancePerCell, distanceUnit, isOwnTurn, runtime.combat_active, scene?.grid_size, speed, spent]);
 
   const hp = resourceValue(actor?.system_data, 'hit_points', 'hp');
   const hpCurrent = Number(hp?.current);
@@ -292,13 +296,14 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
             }}
           />
           <div className={`player-movement-bubble ${overBudget ? 'over' : ''}`} style={{ left: `${drag.x + 14}px`, top: `${drag.y + 14}px` }}>
-            {scene?.grid_enabled ? (
+            {drag.cellPixels > 0 ? (
               <>
                 <strong>{formatMovementDistance(drag.distance)} {distanceUnit}</strong>
                 {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${formatMovementDistance(speed)} · фишка остановится раньше` : `осталось ${formatMovementDistance(remaining)}`} {distanceUnit}</small>}
+                {!runtime.combat_active && !scene?.grid_enabled && <small>Сетка скрыта · масштаб движения сохранён</small>}
               </>
             ) : (
-              <><strong>Свободное движение</strong><small>На сцене выключена сетка</small></>
+              <><strong>Свободное движение</strong><small>Для сцены не задан масштаб</small></>
             )}
           </div>
         </>
