@@ -108,7 +108,11 @@ export function OnlineTableV05(props: Props) {
 
   return (
     <div className="v05-table-layer">
-      <OnlineTable {...tableProps} />
+      <OnlineTable
+        {...tableProps}
+        selectedActorId={selectedActorId}
+        onSelectActor={setSelectedActorId}
+      />
 
       <div className={`sheet-dock ${props.mode === 'player' ? 'player' : 'gm'}`}>
         {props.mode === 'gm' && (
