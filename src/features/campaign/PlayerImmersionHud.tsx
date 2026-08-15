@@ -6,7 +6,8 @@ import {
   DEFAULT_DISTANCE_UNIT,
   actorMovementSpeed,
   formatMovementDistance,
-  gridMovementDistance,
+  gridUnitsPerMapWidth,
+  mapMovementDistance,
   remainingMovement,
   roundMovementDistance,
   shouldBlockCombatGridMove,
@@ -16,6 +17,8 @@ type Scene = {
   id: string;
   grid_enabled: boolean;
   grid_size: number;
+  measurement_unit: string | null;
+  measurement_units_per_map_width: number | null;
 };
 
 type Actor = {
@@ -48,7 +51,9 @@ type ActiveDrag = {
   startY: number;
   x: number;
   y: number;
-  cellPixels: number;
+  mapWidthPixels: number;
+  unitsPerMapWidth: number;
+  usingLegacyGridScale: boolean;
   distance: number;
   lastAllowedDistance: number;
   lastAllowedX: number;
@@ -69,6 +74,11 @@ function resourceValue(systemData: Record<string, unknown> | undefined, ...keys:
   return null;
 }
 
+function positiveNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, onOpenCharacter }: Props) {
   const [drag, setDrag] = useState<ActiveDrag | null>(null);
   const dragRef = useRef<ActiveDrag | null>(null);
@@ -78,11 +88,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const currentActorId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] ?? null : null;
   const currentActor = actors.find((value) => value.id === currentActorId) ?? null;
   const isOwnTurn = Boolean(actor && runtime.combat_active && currentActorId === actor.id);
-  // The Actor Sheet is the source of truth for movement. Grid visibility is only
-  // presentation; hiding the grid must never disable a combat movement limit.
   const speed = actorMovementSpeed(actor?.system_data);
-  const distancePerCell = DEFAULT_CELL_DISTANCE;
-  const distanceUnit = DEFAULT_DISTANCE_UNIT;
+  const distanceUnit = scene?.measurement_unit?.trim() || DEFAULT_DISTANCE_UNIT;
   const turnKey = runtime.combat_active
     ? `${runtime.combat_round}:${runtime.combat_turn}:${currentActorId ?? 'gm'}`
     : 'free';
@@ -132,13 +139,18 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
       const world = token.closest<HTMLElement>('.online-map-world');
       if (!world) return;
+      const worldRect = world.getBoundingClientRect();
+      if (worldRect.width <= 0) return;
 
       const tokenRect = token.getBoundingClientRect();
-      const worldRect = world.getBoundingClientRect();
-      const worldScale = world.offsetWidth > 0 ? worldRect.width / world.offsetWidth : 1;
-      // grid_size is the distance scale even when the visual grid is hidden.
-      // This keeps combat physics stable while allowing the GM to hide grid lines.
-      const cellPixels = scene ? Math.max(1, (scene.grid_size || 64) * worldScale) : 0;
+      const persistedScale = positiveNumber(scene?.measurement_units_per_map_width);
+      // Legacy scenes get a temporary bridge based on the current grid. The GM
+      // calibrator automatically freezes this value into the scene, after which
+      // changing grid_size no longer affects movement math.
+      const fallbackScale = scene && world.offsetWidth > 0
+        ? gridUnitsPerMapWidth(scene.grid_size || 64, world.offsetWidth, DEFAULT_CELL_DISTANCE)
+        : 0;
+      const unitsPerMapWidth = persistedScale ?? fallbackScale;
       const startX = tokenRect.left + tokenRect.width / 2;
       const startY = tokenRect.top + tokenRect.height / 2;
       const next: ActiveDrag = {
@@ -147,7 +159,9 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         startY,
         x: event.clientX,
         y: event.clientY,
-        cellPixels,
+        mapWidthPixels: worldRect.width,
+        unitsPerMapWidth,
+        usingLegacyGridScale: !persistedScale,
         distance: 0,
         lastAllowedDistance: 0,
         lastAllowedX: startX,
@@ -161,12 +175,16 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       if (syntheticMoves.has(event)) return;
       const current = dragRef.current;
       if (!current || current.pointerId !== event.pointerId) return;
-      const distance = current.cellPixels > 0
-        ? gridMovementDistance(event.clientX - current.startX, event.clientY - current.startY, current.cellPixels, distancePerCell)
-        : 0;
+      const distance = mapMovementDistance(
+        event.clientX - current.startX,
+        event.clientY - current.startY,
+        current.mapWidthPixels,
+        current.unitsPerMapWidth,
+      );
+      const scaleAvailable = current.mapWidthPixels > 0 && current.unitsPerMapWidth > 0;
       const blockCombatMove = runtime.combat_active
         && isOwnTurn
-        && shouldBlockCombatGridMove(distance, spent, speed, current.cellPixels > 0);
+        && shouldBlockCombatGridMove(distance, spent, speed, scaleAvailable);
 
       let lastAllowedDistance = current.lastAllowedDistance;
       let lastAllowedX = current.lastAllowedX;
@@ -199,9 +217,6 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       setDrag(next);
 
       if (blockCombatMove) {
-        // Instead of simply swallowing an over-budget move, send OnlineTable one
-        // synthetic move at the furthest legal point. Precise fractional movement
-        // therefore clamps to the exact remaining hundredths of a foot.
         const target = event.target;
         if (availableDistance(next) > 0 && target instanceof Element) {
           const clamped = new PointerEvent('pointermove', {
@@ -229,7 +244,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       if (!runtime.combat_active || !isOwnTurn) return;
 
       const committedDistance = roundMovementDistance(current.lastAllowedDistance);
-      if (current.cellPixels > 0 && current.distance > committedDistance) {
+      if (current.unitsPerMapWidth > 0 && current.distance > committedDistance) {
         setNotice(`Лимит движения ${formatMovementDistance(speed)} ${distanceUnit} — фишка остановлена на точной допустимой позиции`);
       }
       if (committedDistance > 0) {
@@ -254,7 +269,17 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       window.removeEventListener('pointerup', finish, true);
       window.removeEventListener('pointercancel', cancel, true);
     };
-  }, [actor, currentActor, distancePerCell, distanceUnit, isOwnTurn, runtime.combat_active, scene?.grid_size, speed, spent]);
+  }, [
+    actor,
+    currentActor,
+    distanceUnit,
+    isOwnTurn,
+    runtime.combat_active,
+    scene?.grid_size,
+    scene?.measurement_units_per_map_width,
+    speed,
+    spent,
+  ]);
 
   const hp = resourceValue(actor?.system_data, 'hit_points', 'hp');
   const hpCurrent = Number(hp?.current);
@@ -262,7 +287,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const preview = drag?.distance ?? 0;
   const projected = roundMovementDistance(spent + preview);
   const remaining = remainingMovement(speed, spent, preview);
-  const overBudget = isOwnTurn && drag !== null && drag.cellPixels > 0 && projected > speed;
+  const overBudget = isOwnTurn && drag !== null && drag.unitsPerMapWidth > 0 && projected > speed;
   const ruler = useMemo(() => {
     if (!drag) return null;
     const dx = drag.x - drag.startX;
@@ -296,11 +321,11 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
             }}
           />
           <div className={`player-movement-bubble ${overBudget ? 'over' : ''}`} style={{ left: `${drag.x + 14}px`, top: `${drag.y + 14}px` }}>
-            {drag.cellPixels > 0 ? (
+            {drag.unitsPerMapWidth > 0 ? (
               <>
                 <strong>{formatMovementDistance(drag.distance)} {distanceUnit}</strong>
                 {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${formatMovementDistance(speed)} · фишка остановится раньше` : `осталось ${formatMovementDistance(remaining)}`} {distanceUnit}</small>}
-                {!runtime.combat_active && !scene?.grid_enabled && <small>Сетка скрыта · масштаб движения сохранён</small>}
+                {drag.usingLegacyGridScale && <small>Масштаб сцены ещё фиксируется мастером</small>}
               </>
             ) : (
               <><strong>Свободное движение</strong><small>Для сцены не задан масштаб</small></>
