@@ -49,6 +49,8 @@ type ActiveDrag = {
   cellPixels: number;
   distance: number;
   lastAllowedDistance: number;
+  lastAllowedX: number;
+  lastAllowedY: number;
 };
 
 function blockPointerEvent(event: PointerEvent) {
@@ -104,6 +106,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
   useEffect(() => {
     if (!actor) return;
+    const syntheticMoves = new WeakSet<Event>();
 
     const begin = (event: PointerEvent) => {
       if (event.button !== 0) return;
@@ -117,6 +120,11 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         setNotice(currentActor ? `Сейчас ходит ${currentActor.name}` : 'Сейчас не ваш ход');
         return;
       }
+      if (runtime.combat_active && isOwnTurn && scene?.grid_enabled && spent >= speed) {
+        blockPointerEvent(event);
+        setNotice(`Лимит движения ${speed} ${distanceUnit} уже израсходован`);
+        return;
+      }
 
       const world = token.closest<HTMLElement>('.online-map-world');
       if (!world) return;
@@ -125,21 +133,26 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const worldRect = world.getBoundingClientRect();
       const worldScale = world.offsetWidth > 0 ? worldRect.width / world.offsetWidth : 1;
       const cellPixels = scene?.grid_enabled ? Math.max(1, (scene.grid_size || 64) * worldScale) : 0;
+      const startX = tokenRect.left + tokenRect.width / 2;
+      const startY = tokenRect.top + tokenRect.height / 2;
       const next: ActiveDrag = {
         pointerId: event.pointerId,
-        startX: tokenRect.left + tokenRect.width / 2,
-        startY: tokenRect.top + tokenRect.height / 2,
+        startX,
+        startY,
         x: event.clientX,
         y: event.clientY,
         cellPixels,
         distance: 0,
         lastAllowedDistance: 0,
+        lastAllowedX: startX,
+        lastAllowedY: startY,
       };
       dragRef.current = next;
       setDrag(next);
     };
 
     const move = (event: PointerEvent) => {
+      if (syntheticMoves.has(event)) return;
       const current = dragRef.current;
       if (!current || current.pointerId !== event.pointerId) return;
       const distance = current.cellPixels > 0
@@ -148,20 +161,58 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       const blockGridMove = runtime.combat_active
         && isOwnTurn
         && shouldBlockCombatGridMove(distance, spent, speed, current.cellPixels > 0);
-      const next = {
+
+      let lastAllowedDistance = current.lastAllowedDistance;
+      let lastAllowedX = current.lastAllowedX;
+      let lastAllowedY = current.lastAllowedY;
+
+      if (!blockGridMove) {
+        lastAllowedDistance = distance;
+        lastAllowedX = event.clientX;
+        lastAllowedY = event.clientY;
+      } else {
+        const available = Math.max(0, speed - spent);
+        if (available > 0 && distance > 0) {
+          const ratio = Math.max(0, Math.min(1, available / distance));
+          lastAllowedDistance = available;
+          lastAllowedX = current.startX + (event.clientX - current.startX) * ratio;
+          lastAllowedY = current.startY + (event.clientY - current.startY) * ratio;
+        }
+      }
+
+      const next: ActiveDrag = {
         ...current,
         x: event.clientX,
         y: event.clientY,
         distance,
-        lastAllowedDistance: blockGridMove ? current.lastAllowedDistance : distance,
+        lastAllowedDistance,
+        lastAllowedX,
+        lastAllowedY,
       };
       dragRef.current = next;
       setDrag(next);
 
-      // This capture listener is intentionally authoritative for player combat
-      // movement. 0-ft micro drags and over-budget drags never reach OnlineTable,
-      // so repeating tiny clicks cannot advance the token for free.
-      if (blockGridMove) blockPointerEvent(event);
+      if (blockGridMove) {
+        // Instead of simply swallowing an over-budget move, send OnlineTable one
+        // synthetic move at the furthest legal point. Fast drags therefore clamp
+        // to the remaining movement instead of making the token appear broken.
+        const target = event.target;
+        if (availableDistance(next) > 0 && target instanceof Element) {
+          const clamped = new PointerEvent('pointermove', {
+            bubbles: true,
+            cancelable: true,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            buttons: event.buttons || 1,
+            clientX: next.lastAllowedX,
+            clientY: next.lastAllowedY,
+          });
+          syntheticMoves.add(clamped);
+          target.dispatchEvent(clamped);
+        }
+        blockPointerEvent(event);
+      }
     };
 
     const finish = (event: PointerEvent) => {
@@ -173,7 +224,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
       const committedDistance = current.lastAllowedDistance;
       if (current.cellPixels > 0 && current.distance > committedDistance) {
-        setNotice(`Лимит движения ${speed} ${distanceUnit} — дальше фишка не идёт`);
+        setNotice(`Лимит движения ${speed} ${distanceUnit} — фишка остановлена на допустимой клетке`);
       }
       if (committedDistance > 0) setSpent((value) => Math.min(speed, value + committedDistance));
     };
@@ -240,7 +291,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
             {scene?.grid_enabled ? (
               <>
                 <strong>{drag.distance} {distanceUnit}</strong>
-                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${speed} · дальше нельзя` : `осталось ${remaining}`} {distanceUnit}</small>}
+                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${speed} · фишка остановится раньше` : `осталось ${remaining}`} {distanceUnit}</small>}
               </>
             ) : (
               <><strong>Свободное движение</strong><small>На сцене выключена сетка</small></>
@@ -266,4 +317,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       {notice && <div className="player-immersion-notice">{notice}</div>}
     </>
   );
+}
+
+function availableDistance(drag: ActiveDrag) {
+  return drag.lastAllowedDistance;
 }
