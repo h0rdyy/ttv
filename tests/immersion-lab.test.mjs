@@ -66,6 +66,15 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(wrapper, /delete_campaign_actor/);
   assert.match(wrapper, /blockRightDrag/);
 
+  // The flexible character sheet writes `hit_points`, while older table widgets
+  // still consume `hp`. The wrapper must expose one read-only compatibility alias
+  // so hero HP stays visible everywhere without duplicating persisted data.
+  assert.match(wrapper, /const actors = props\.initialActors\.map\(withCompatibleHealth\)/);
+  assert.match(wrapper, /const sheetHealth = objectResource\(data\.hit_points\)/);
+  assert.match(wrapper, /system_data: \{ \.\.\.data, hp: health \}/);
+  assert.match(wrapper, /initialActors=\{actors\}/);
+  assert.match(wrapper, /actors=\{actors\}/);
+
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
   assert.match(hud, /shouldBlockCombatGridMove/);
