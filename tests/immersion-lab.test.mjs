@@ -7,6 +7,7 @@ import {
   remainingMovement,
 } from '../src/features/campaign/movement.ts';
 
+// UX-lab regression coverage: movement limits must remain behavioral, not cosmetic.
 test('grid movement counts square distance in five-foot cells', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
   assert.equal(gridMovementDistance(64, 0, 64), 5);
