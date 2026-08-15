@@ -71,10 +71,12 @@ type Props = {
   initialNotes: Note[];
   initialRollTables: RollTable[];
   initialRuntime: Runtime;
+  selectedActorId: string;
+  onSelectActor: (id: string) => void;
 };
 
 export function OnlineTable(props: Props) {
-  const { role, mode, currentUserId, displayName } = props;
+  const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId } = props;
   const router = useRouter();
   const [campaign, setCampaign] = useState(props.campaign);
   const [actors, setActors] = useState(props.initialActors);
@@ -88,10 +90,6 @@ export function OnlineTable(props: Props) {
   const [rollTables, setRollTables] = useState(props.initialRollTables);
   const [runtime, setRuntime] = useState(props.initialRuntime);
   const [diceHistory, setDiceHistory] = useState<DiceRoll[]>([]);
-  const [selectedActorId, setSelectedActorId] = useState(() => {
-    if (mode === 'player') return props.initialActors.find((actor) => actor.owner_user_id === currentUserId)?.id ?? '';
-    return props.initialActors.find((actor) => actor.type === 'player')?.id ?? props.initialActors[0]?.id ?? '';
-  });
   const [sidebarTab, setSidebarTab] = useState<GmSidebarTab>('party');
   const [workshopOpen, setWorkshopOpen] = useState(false);
   const [sceneToolsOpen, setSceneToolsOpen] = useState(false);
@@ -255,7 +253,7 @@ export function OnlineTable(props: Props) {
     if (mode === 'gm' && selectedActorId && !actors.some((actor) => actor.id === selectedActorId)) {
       setSelectedActorId(actors.find((actor) => actor.type === 'player')?.id ?? actors[0]?.id ?? '');
     }
-  }, [actors, mode, ownActor, selectedActorId]);
+  }, [actors, mode, ownActor, selectedActorId, setSelectedActorId]);
 
   const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
   const selectedInventory = inventoryForActor(sidebarActor?.id);

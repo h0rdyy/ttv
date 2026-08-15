@@ -6,6 +6,7 @@ import './player.css';
 import './player-switch.css';
 import './auth.css';
 import './online-table.css';
+import './online-table-contextual.css';
 import './scene-v04.css';
 import './sheet-v05.css';
 
