@@ -3,26 +3,32 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   actorMovementSpeed,
+  formatMovementDistance,
   gridMovementDistance,
   remainingMovement,
+  roundMovementDistance,
   shouldBlockCombatGridMove,
 } from '../src/features/campaign/movement.ts';
 
 // UX-lab regression coverage: movement, GM actor actions, health and hot-path refreshes must stay deterministic, stable, and fast.
-test('grid movement counts square distance in five-foot cells and charges intentional micro drags', () => {
+test('grid movement measures continuous square-grid distance to hundredths', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
-  assert.equal(gridMovementDistance(1, 0, 64), 5);
+  assert.equal(gridMovementDistance(1, 0, 64), 0.08);
+  assert.equal(gridMovementDistance(16, 0, 64), 1.25);
+  assert.equal(gridMovementDistance(32, 0, 64), 2.5);
   assert.equal(gridMovementDistance(64, 0, 64), 5);
   assert.equal(gridMovementDistance(64, 64, 64), 5);
   assert.equal(gridMovementDistance(128, 64, 64), 10);
-  assert.equal(gridMovementDistance(95, 20, 64), 5);
+  assert.equal(gridMovementDistance(95, 20, 64), 7.42);
+  assert.equal(roundMovementDistance(0.1 + 0.2), 0.3);
+  assert.equal(formatMovementDistance(2.5), '2.50');
 });
 
-test('combat grid movement allows clicks but blocks over-budget moves', () => {
+test('combat grid movement blocks only movement beyond the exact hundredth-foot budget', () => {
   assert.equal(shouldBlockCombatGridMove(0, 0, 30, true), false);
-  assert.equal(shouldBlockCombatGridMove(5, 25, 30, true), false);
-  assert.equal(shouldBlockCombatGridMove(5, 30, 30, true), true);
-  assert.equal(shouldBlockCombatGridMove(10, 25, 30, true), true);
+  assert.equal(shouldBlockCombatGridMove(2.37, 27.63, 30, true), false);
+  assert.equal(shouldBlockCombatGridMove(2.38, 27.63, 30, true), true);
+  assert.equal(shouldBlockCombatGridMove(0.01, 30, 30, true), true);
   assert.equal(shouldBlockCombatGridMove(0, 30, 30, false), false);
 });
 
@@ -31,8 +37,8 @@ test('actor movement speed supports generic and nested movement data', () => {
   assert.equal(actorMovementSpeed({ speed: 35 }), 35);
   assert.equal(actorMovementSpeed({ walk_speed: '40' }), 40);
   assert.equal(actorMovementSpeed({}), 30);
-  assert.equal(remainingMovement(30, 10, 5), 15);
-  assert.equal(remainingMovement(30, 25, 10), 0);
+  assert.equal(remainingMovement(30, 10.11, 5.22), 14.67);
+  assert.equal(remainingMovement(30, 27.63, 2.37), 0);
 });
 
 test('immersion lab enforces movement and uses one flexible character window', async () => {
@@ -85,10 +91,13 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(hpMigration, /health_key = 'hit_points'/);
   assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
-  assert.match(hud, /spent >= speed/);
+  assert.match(hud, /remainingMovement\(speed, spent\) <= 0/);
   assert.match(hud, /lastAllowedX/);
   assert.match(hud, /new PointerEvent\('pointermove'/);
   assert.match(hud, /target\.dispatchEvent\(clamped\)/);
+  assert.match(hud, /formatMovementDistance\(drag\.distance\)/);
+  assert.match(hud, /formatMovementDistance\(spent\)/);
+  assert.match(hud, /roundMovementDistance\(Math\.min\(speed, value \+ committedDistance\)\)/);
   assert.match(tokenRefreshMigration, /TG_TABLE_NAME = 'scene_tokens' and TG_OP = 'UPDATE'/);
   assert.match(tokenRefreshMigration, /to_jsonb\(NEW\) - array\['x', 'y', 'updated_at'\]/);
 
