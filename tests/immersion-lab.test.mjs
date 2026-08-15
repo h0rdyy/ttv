@@ -24,26 +24,33 @@ test('actor movement speed supports generic and nested movement data', () => {
   assert.equal(remainingMovement(30, 25, 10), 0);
 });
 
-test('player immersion lab keeps map primary and adds turn and movement HUD', async () => {
-  const [wrapper, hud, css] = await Promise.all([
+test('player immersion lab enforces combat movement and uses one character window', async () => {
+  const [wrapper, hud, css, overrides] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/online-table-immersion-v2.css', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
-  assert.match(wrapper, /player-immersion-details-open/);
+  assert.match(wrapper, /onOpenCharacter=\{openSelectedCharacter\}/);
+  assert.match(wrapper, /player-character-window/);
+  assert.doesNotMatch(wrapper, /player-immersion-details-open/);
   assert.doesNotMatch(wrapper, /sheet-dock \$\{props\.mode === 'player'/);
 
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
-  assert.match(hud, /pointerdown/);
-  assert.match(hud, /pointermove/);
-  assert.match(hud, /sessionStorage/);
-  assert.match(hud, /превышение/);
+  assert.match(hud, /stopImmediatePropagation/);
+  assert.match(hud, /runtime\.combat_active && !isOwnTurn/);
+  assert.match(hud, /spent \+ distance > speed/);
+  assert.match(hud, /последней допустимой клетке/);
+  assert.match(hud, />◇ Персонаж<\/button>/);
+  assert.doesNotMatch(hud, />◇ Лист<\/button>/);
+  assert.doesNotMatch(hud, />🎒 Герой<\/button>/);
 
   assert.match(css, /\.player-immersion \.player-mode \.online-table-workspace[\s\S]*grid-template-columns:\s*minmax\(0,1fr\)/);
-  assert.match(css, /\.player-immersion \.player-mode \.online-table-sidebar[\s\S]*position:\s*fixed/);
   assert.match(css, /\.player-immersion-dock/);
   assert.match(css, /\.player-movement-ruler/);
+  assert.match(overrides, /\.player-immersion \.player-mode \.online-table-sidebar\s*\{[\s\S]*display:\s*none\s*!important/);
+  assert.match(overrides, /\.player-character-window \.actor-sheet-overlay/);
 });
