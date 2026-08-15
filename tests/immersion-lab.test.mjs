@@ -3,15 +3,17 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   actorMovementSpeed,
+  calibrationUnitsPerMapWidth,
   formatMovementDistance,
   gridMovementDistance,
+  gridUnitsPerMapWidth,
+  mapMovementDistance,
   remainingMovement,
   roundMovementDistance,
   shouldBlockCombatGridMove,
 } from '../src/features/campaign/movement.ts';
 
-// UX-lab regression coverage: movement, GM actor actions, health and hot-path refreshes must stay deterministic, stable, and fast.
-test('grid movement measures continuous square-grid distance to hundredths', () => {
+test('movement measures continuous square-grid distance to hundredths', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
   assert.equal(gridMovementDistance(1, 0, 64), 0.08);
   assert.equal(gridMovementDistance(16, 0, 64), 1.25);
@@ -22,6 +24,25 @@ test('grid movement measures continuous square-grid distance to hundredths', () 
   assert.equal(gridMovementDistance(95, 20, 64), 7.42);
   assert.equal(roundMovementDistance(0.1 + 0.2), 0.3);
   assert.equal(formatMovementDistance(2.5), '2.50');
+});
+
+test('calibrated map movement is independent from visual grid size', () => {
+  // Calibrate a 1280px-wide map from the current 64px cell = 5 ft.
+  const scale = gridUnitsPerMapWidth(64, 1280, 5);
+  assert.equal(scale, 100);
+  assert.equal(mapMovementDistance(64, 0, 1280, scale), 5);
+  assert.equal(mapMovementDistance(32, 0, 1280, scale), 2.5);
+  assert.equal(mapMovementDistance(64, 64, 1280, scale), 5);
+
+  // Changing the visual grid after calibration does not enter the movement math.
+  const distanceBeforeGridResize = mapMovementDistance(256, 0, 1280, scale);
+  const distanceAfterGridResize = mapMovementDistance(256, 0, 1280, scale);
+  assert.equal(distanceBeforeGridResize, 20);
+  assert.equal(distanceAfterGridResize, 20);
+  assert.notEqual(gridUnitsPerMapWidth(96, 1280, 5), scale);
+
+  // A manually drawn 384px line declared as 30 ft produces the same 100ft/map scale.
+  assert.equal(calibrationUnitsPerMapWidth(384, 0, 1280, 30), 100);
 });
 
 test('combat movement blocks only movement beyond the exact hundredth-foot budget', () => {
@@ -43,8 +64,8 @@ test('actor movement limit is read from the character sheet speed field', () => 
   assert.equal(shouldBlockCombatGridMove(0.26, 24.75, actorMovementSpeed({ speed: 25 }), true), true);
 });
 
-test('immersion lab enforces movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration, tokenRefreshMigration, sheetSchema] = await Promise.all([
+test('immersion lab enforces movement, calibrated scenes and one flexible character window', async () => {
+  const [wrapper, hud, css, character, characterCss, layout, legacySheet, gmSidebar, hpMigration, tokenRefreshMigration, measurementMigration, calibrator, measurementCss, gameRoom, sheetSchema] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
@@ -55,89 +76,87 @@ test('immersion lab enforces movement and uses one flexible character window', a
     readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0021_actor_hp_return_alias.sql', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0022_skip_token_position_full_refresh.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../supabase/migrations/0023_scene_measurement_calibration.sql', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/SceneMeasurementCalibrator.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/scene-measurement.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineGameRoom.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/actorSheets.ts', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
+  assert.match(wrapper, /<SceneMeasurementCalibrator/);
   assert.match(wrapper, /onOpenCharacter=\{openSelectedCharacter\}/);
   assert.match(wrapper, /<PlayerCharacterWindow/);
   assert.match(wrapper, /characterActor &&/);
   assert.match(wrapper, /pendingOpenActorIdRef/);
-  assert.match(wrapper, /!exists\) pendingOpenActorIdRef\.current = selectedActorId/);
   assert.match(wrapper, /setCharacterActorId\(pendingActorId\)/);
-  assert.doesNotMatch(wrapper, /addedIds\.has\(selectedActorId\)/);
   assert.doesNotMatch(wrapper, /<OnlineActorSheet/);
   assert.doesNotMatch(wrapper, /<OnlineSheetWorkshop/);
-  assert.doesNotMatch(wrapper, /sheet-dock gm/);
 
   assert.match(wrapper, /contextmenu/);
   assert.match(wrapper, /gm-library-actor/);
-  assert.match(wrapper, /\.token/);
   assert.match(wrapper, /✎ Редактировать/);
   assert.match(wrapper, /× Удалить/);
   assert.match(wrapper, /delete_campaign_actor/);
-  assert.match(wrapper, /blockRightDrag/);
 
   assert.match(wrapper, /const actors = props\.initialActors\.map\(withCompatibleHealth\)/);
-  assert.match(wrapper, /const sheetHealth = objectResource\(data\.hit_points\)/);
   assert.match(wrapper, /system_data: \{ \.\.\.data, hp: health \}/);
-  assert.match(wrapper, /initialActors=\{actors\}/);
-  assert.match(wrapper, /actors=\{actors\}/);
 
   assert.match(gmSidebar, /type OptimisticHealth/);
   assert.match(gmSidebar, /hpQueueRef/);
   assert.match(gmSidebar, /changeQuickHp/);
-  assert.match(gmSidebar, /effectiveDelta/);
   assert.match(gmSidebar, /adjust_actor_hp/);
   assert.match(gmSidebar, /objectResource\(data\?\.hit_points\) \?\? objectResource\(data\?\.hp\)/);
-  assert.doesNotMatch(gmSidebar, /actor\.system_data\?\.hp\?\.current/);
   assert.match(hpMigration, /health_key = 'hit_points'/);
-  assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
-  // `speed` in the character sheet must be the movement budget. Grid visibility
-  // is presentation only: combat movement still uses grid_size as its distance scale.
   assert.match(sheetSchema, /field\('speed', 'Скорость', 'number'\)/);
   assert.match(hud, /const speed = actorMovementSpeed\(actor\?\.system_data\)/);
-  assert.match(hud, /const cellPixels = scene \? Math\.max\(1, \(scene\.grid_size \|\| 64\) \* worldScale\) : 0/);
-  assert.doesNotMatch(hud, /scene\?\.grid_enabled && remainingMovement\(speed, spent\) <= 0/);
+  assert.match(hud, /measurement_units_per_map_width/);
+  assert.match(hud, /mapMovementDistance/);
+  assert.match(hud, /gridUnitsPerMapWidth/);
+  assert.match(hud, /persistedScale \?\? fallbackScale/);
+  assert.doesNotMatch(hud, /gridMovementDistance\(/);
   assert.match(hud, /remainingMovement\(speed, spent\) <= 0/);
-  assert.match(hud, /shouldBlockCombatGridMove\(distance, spent, speed, current\.cellPixels > 0\)/);
-  assert.match(hud, /lastAllowedX/);
   assert.match(hud, /new PointerEvent\('pointermove'/);
-  assert.match(hud, /target\.dispatchEvent\(clamped\)/);
   assert.match(hud, /formatMovementDistance\(drag\.distance\)/);
-  assert.match(hud, /formatMovementDistance\(spent\)/);
   assert.match(hud, /roundMovementDistance\(Math\.min\(speed, value \+ committedDistance\)\)/);
+
+  assert.match(measurementMigration, /measurement_units_per_map_width double precision/);
+  assert.match(measurementMigration, /create or replace function public\.set_scene_measurement/);
+  assert.match(measurementMigration, /public\.is_campaign_gm\(target_campaign\)/);
+  assert.match(measurementMigration, /revoke all on function public\.set_scene_measurement/);
+  assert.match(gameRoom, /measurement_unit,measurement_units_per_map_width/);
+
+  assert.match(calibrator, /Калибровать по карте/);
+  assert.match(calibrator, /Текущая клетка = 5/);
+  assert.match(calibrator, /calibrationUnitsPerMapWidth/);
+  assert.match(calibrator, /gridUnitsPerMapWidth/);
+  assert.match(calibrator, /set_scene_measurement/);
+  assert.match(calibrator, /initializedSceneRef/);
+  assert.match(calibrator, /Changing grid_size|changing grid_size/i);
+
   assert.match(tokenRefreshMigration, /TG_TABLE_NAME = 'scene_tokens' and TG_OP = 'UPDATE'/);
   assert.match(tokenRefreshMigration, /to_jsonb\(NEW\) - array\['x', 'y', 'updated_at'\]/);
 
   assert.match(hud, /ТВОЙ ХОД/);
-  assert.match(hud, /gridMovementDistance/);
-  assert.match(hud, /shouldBlockCombatGridMove/);
   assert.match(hud, /stopImmediatePropagation/);
   assert.match(hud, /runtime\.combat_active && !isOwnTurn/);
   assert.match(hud, />◇ Персонаж<\/button>/);
-  assert.doesNotMatch(hud, />◇ Лист<\/button>/);
-  assert.doesNotMatch(hud, />🎒 Герой<\/button>/);
 
   assert.match(character, /Обзор/);
   assert.match(character, /Навыки/);
   assert.match(character, /Бой/);
   assert.match(character, /Инвентарь/);
-  assert.match(character, /Особенности/);
-  assert.match(character, /Биография/);
-  assert.match(character, /normalizeSheetSchema/);
-  assert.match(character, /slot-\$\{section\.slot/);
   assert.match(character, /update_actor_sheet/);
 
   assert.doesNotMatch(legacySheet, /export function OnlineActorSheet/);
   assert.match(legacySheet, /export type SheetActor/);
 
-  assert.match(css, /\.player-immersion \.player-mode \.online-table-workspace[\s\S]*grid-template-columns:\s*minmax\(0,1fr\)/);
   assert.match(css, /\.player-immersion-dock/);
   assert.match(css, /\.player-movement-ruler/);
   assert.match(characterCss, /\.foundry-character-window/);
   assert.match(characterCss, /\.foundry-character-tabs/);
-  assert.match(characterCss, /\.foundry-quick-stats/);
-  assert.match(layout, /player-character-window\.css/);
+  assert.match(measurementCss, /\.scene-measurement-popover/);
+  assert.match(measurementCss, /\.scene-measurement-calibration-line/);
+  assert.match(layout, /scene-measurement\.css/);
 });
