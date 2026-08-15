@@ -23,6 +23,7 @@ test('NPCs are created from Characters and use the shared Actor Sheet', async ()
   assert.doesNotMatch(workshop, /OnlineNpcWorkshop/);
   assert.doesNotMatch(workshop, /РЕДАКТОР NPC/);
   assert.doesNotMatch(workshop, /update_campaign_actor/);
+  assert.doesNotMatch(workshop, /actor_kind:\s*'npc'/);
   assert.doesNotMatch(css, /workshop-tabs > button:nth-child/);
 
   assert.match(migration, /update public\.actors[\s\S]*name=btrim\(actor_name\)[\s\S]*subtitle=coalesce\(actor_subtitle,''\)[\s\S]*avatar=coalesce\(actor_avatar,''\)/);
