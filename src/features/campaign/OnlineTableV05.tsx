@@ -73,8 +73,13 @@ type Props = {
 export function OnlineTableV05(props: Props) {
   const router = useRouter();
   const { initialSheetTemplates, ...tableProps } = props;
+  // Classic pre-v0.5 actors stored health in `hp`; the flexible sheet stores the
+  // resource in `hit_points`. Keep `hit_points` canonical, but expose an in-memory
+  // `hp` alias so legacy table/sidebar code renders the same value without writing
+  // duplicate health data back to Supabase.
+  const actors = props.initialActors.map(withCompatibleHealth);
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(props.role);
-  const ownActor = props.initialActors.find((actor) => actor.owner_user_id === props.currentUserId) ?? null;
+  const ownActor = actors.find((actor) => actor.owner_user_id === props.currentUserId) ?? null;
   const activeScene = props.initialScenes.find((scene) => scene.id === props.campaign.active_scene_id) ?? props.initialScenes[0] ?? null;
   const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [characterActorId, setCharacterActorId] = useState<string | null>(null);
@@ -91,13 +96,13 @@ export function OnlineTableV05(props: Props) {
   // request to open the freshly created character.
   useEffect(() => {
     if (props.mode !== 'gm' || !selectedActorId) return;
-    const exists = props.initialActors.some((actor) => actor.id === selectedActorId);
+    const exists = actors.some((actor) => actor.id === selectedActorId);
     if (!exists) pendingOpenActorIdRef.current = selectedActorId;
     else if (pendingOpenActorIdRef.current && pendingOpenActorIdRef.current !== selectedActorId) pendingOpenActorIdRef.current = null;
   }, [props.initialActors, props.mode, selectedActorId]);
 
   useEffect(() => {
-    const actorIds = new Set(props.initialActors.map((actor) => actor.id));
+    const actorIds = new Set(actors.map((actor) => actor.id));
 
     if (props.mode === 'player') {
       setSelectedActorId(ownActor?.id ?? '');
@@ -145,7 +150,7 @@ export function OnlineTableV05(props: Props) {
       const y = Math.max(8, Math.min(event.clientY, window.innerHeight - 126));
       window.setTimeout(() => {
         const actorId = selectedActorIdRef.current;
-        if (actorId && props.initialActors.some((actor) => actor.id === actorId)) setActorMenu({ actorId, x, y });
+        if (actorId && actors.some((actor) => actor.id === actorId)) setActorMenu({ actorId, x, y });
       }, 0);
     };
 
@@ -174,13 +179,13 @@ export function OnlineTableV05(props: Props) {
     };
   }, [actorMenu]);
 
-  const selectedActor = props.initialActors.find((actor) => actor.id === selectedActorId) ?? null;
-  const characterActor = props.initialActors.find((actor) => actor.id === characterActorId) ?? null;
+  const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? null;
+  const characterActor = actors.find((actor) => actor.id === characterActorId) ?? null;
   const template = characterActor ? initialSheetTemplates.find((value) => value.id === characterActor.sheet_template_id) ?? null : null;
   const characterInventory = characterActor
     ? props.initialInventories.find((inventory) => inventory.owner_actor_id === characterActor.id) ?? null
     : null;
-  const contextActor = actorMenu ? props.initialActors.find((actor) => actor.id === actorMenu.actorId) ?? null : null;
+  const contextActor = actorMenu ? actors.find((actor) => actor.id === actorMenu.actorId) ?? null : null;
 
   const refresh = () => router.refresh();
   const openSelectedCharacter = () => {
@@ -219,6 +224,7 @@ export function OnlineTableV05(props: Props) {
     <div className={`v05-table-layer${immersionClasses}`}>
       <OnlineTable
         {...tableProps}
+        initialActors={actors}
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
       />
@@ -227,7 +233,7 @@ export function OnlineTableV05(props: Props) {
         <PlayerImmersionHud
           campaignId={props.campaign.id}
           actor={ownActor}
-          actors={props.initialActors}
+          actors={actors}
           scene={activeScene}
           runtime={props.initialRuntime}
           onOpenCharacter={openSelectedCharacter}
@@ -269,4 +275,17 @@ export function OnlineTableV05(props: Props) {
       {message && <div className="auth-status online-table-message v05-sheet-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
   );
+}
+
+function withCompatibleHealth(actor: SheetActor): SheetActor {
+  const data = actor.system_data ?? {};
+  const sheetHealth = objectResource(data.hit_points);
+  const legacyHealth = objectResource(data.hp);
+  const health = sheetHealth ?? legacyHealth;
+  if (!health || data.hp === health) return actor;
+  return { ...actor, system_data: { ...data, hp: health } };
+}
+
+function objectResource(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
