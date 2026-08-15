@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 
@@ -22,6 +22,8 @@ type ItemInstance = { id: string; definition_id: string; container_id: string; q
 type ItemDefinition = { id: string; name: string; category: string; icon: string; weight: number | null };
 type Runtime = { combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[] };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
+type HealthValue = { current: number; max: number };
+type OptimisticHealth = HealthValue & { actorId: string };
 
 type Props = {
   campaignId: string;
@@ -139,13 +141,16 @@ function CharacterLibrary({ campaignId, actors, selectedActorId, onSelectActor, 
     setCreatingNpc(false);
   };
 
-  const actorRow = (actor: Actor) => (
-    <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
-      <span className="gm-library-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
-      <span><strong>{actor.name}</strong><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
-      <em>{actor.system_data?.hp?.current ?? '—'}</em>
-    </button>
-  );
+  const actorRow = (actor: Actor) => {
+    const health = actorHealth(actor.system_data);
+    return (
+      <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
+        <span className="gm-library-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+        <span><strong>{actor.name}</strong><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
+        <em>{health?.current ?? '—'}</em>
+      </button>
+    );
+  };
 
   return (
     <>
@@ -216,11 +221,14 @@ function SessionLibrary({ runtime, actors, busy, onCombat }: Props) {
           <>
             <div className="gm-combat-focus"><span>Сейчас ходит</span><strong>{current?.name ?? '—'}</strong></div>
             <div className="gm-combat-order">
-              {order.map((actor, index) => (
-                <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
-                  <span>{index + 1}</span><strong>{actor.name}</strong><small>{actor.system_data?.hp?.current ?? '—'} HP</small>
-                </div>
-              ))}
+              {order.map((actor, index) => {
+                const health = actorHealth(actor.system_data);
+                return (
+                  <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
+                    <span>{index + 1}</span><strong>{actor.name}</strong><small>{health?.current ?? '—'} HP</small>
+                  </div>
+                );
+              })}
             </div>
             <button className="button primary full" disabled={busy} onClick={() => onCombat('next')}>Следующий ход →</button>
             <button className="button full" disabled={busy} onClick={() => onCombat('stop')}>Закончить бой</button>
@@ -242,7 +250,6 @@ function ActorInspector(props: Props) {
     instances,
     items,
     runtime,
-    onHp,
     onOpenWorkshop,
     onChanged,
     onMessage,
@@ -250,10 +257,92 @@ function ActorInspector(props: Props) {
   const [view, setView] = useState<InspectorView>('sheet');
   const [deleting, setDeleting] = useState(false);
   const [dragged, setDragged] = useState<string | null>(null);
+  const [optimisticHealth, setOptimisticHealth] = useState<OptimisticHealth | null>(null);
+  const optimisticHealthRef = useRef<OptimisticHealth | null>(null);
+  const hpQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const hpSequenceRef = useRef(0);
   const actor = actors.find((value) => value.id === selectedActorId) ?? null;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const inventory = inventories.find((value) => value.owner_actor_id === actor?.id);
   const actorContainers = inventory ? containers.filter((value) => value.inventory_id === inventory.id) : [];
+  const serverHealth = actor ? actorHealth(actor.system_data) : null;
+  const visibleHealth = optimisticHealth?.actorId === actor?.id ? optimisticHealth : serverHealth;
+
+  useEffect(() => {
+    optimisticHealthRef.current = optimisticHealth;
+  }, [optimisticHealth]);
+
+  useEffect(() => {
+    if (!actor) {
+      optimisticHealthRef.current = null;
+      setOptimisticHealth(null);
+      return;
+    }
+    const optimistic = optimisticHealthRef.current;
+    if (optimistic && optimistic.actorId !== actor.id) {
+      optimisticHealthRef.current = null;
+      setOptimisticHealth(null);
+      return;
+    }
+    if (optimistic && serverHealth && optimistic.actorId === actor.id && optimistic.current === serverHealth.current && optimistic.max === serverHealth.max) {
+      optimisticHealthRef.current = null;
+      setOptimisticHealth(null);
+    }
+  }, [actor?.id, serverHealth?.current, serverHealth?.max]);
+
+  const changeQuickHp = (delta: number) => {
+    if (!actor) return;
+    const currentHealth = optimisticHealthRef.current?.actorId === actor.id
+      ? optimisticHealthRef.current
+      : actorHealth(actor.system_data);
+    if (!currentHealth || currentHealth.max <= 0) {
+      onMessage('Для персонажа не задан ресурс здоровья.');
+      return;
+    }
+
+    const nextCurrent = Math.max(0, Math.min(currentHealth.max, currentHealth.current + delta));
+    const effectiveDelta = nextCurrent - currentHealth.current;
+    if (effectiveDelta === 0) return;
+
+    const optimistic: OptimisticHealth = { actorId: actor.id, current: nextCurrent, max: currentHealth.max };
+    optimisticHealthRef.current = optimistic;
+    setOptimisticHealth(optimistic);
+    const sequence = ++hpSequenceRef.current;
+    const actorId = actor.id;
+
+    // Serialize quick-HP mutations so rapid clicks preserve their order, while the
+    // visible number updates immediately instead of waiting for a network roundtrip.
+    hpQueueRef.current = hpQueueRef.current.then(async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc('adjust_actor_hp', { target_actor: actorId, hp_delta: effectiveDelta });
+      if (error) {
+        if (sequence === hpSequenceRef.current && optimisticHealthRef.current?.actorId === actorId) {
+          optimisticHealthRef.current = null;
+          setOptimisticHealth(null);
+        }
+        onMessage(friendlyError(error, 'Не удалось изменить здоровье.'));
+        onChanged();
+        return;
+      }
+
+      if (sequence === hpSequenceRef.current && data && typeof data === 'object') {
+        const saved = actorHealth(data as Record<string, any>);
+        if (saved) {
+          const confirmed: OptimisticHealth = { actorId, ...saved };
+          optimisticHealthRef.current = confirmed;
+          setOptimisticHealth(confirmed);
+        }
+        onChanged();
+      }
+    }).catch(() => {
+      if (sequence === hpSequenceRef.current && optimisticHealthRef.current?.actorId === actorId) {
+        optimisticHealthRef.current = null;
+        setOptimisticHealth(null);
+      }
+      onMessage('Не удалось изменить здоровье.');
+      onChanged();
+    });
+  };
 
   const deleteHero = async () => {
     if (!actor || actor.type !== 'player' || !window.confirm(`Удалить героя «${actor.name}» из кампании? Вместе с ним удалятся его фишки, лист и инвентарь. Игрок останется участником кампании.`)) return;
@@ -320,14 +409,14 @@ function ActorInspector(props: Props) {
           <>
             <section className="gm-inspector-card">
               <div className="gm-inspector-card-title"><strong>Быстрые параметры</strong><span>Контекст персонажа</span></div>
-              {actor.system_data?.hp ? (
+              {visibleHealth ? (
                 <div className="gm-hp-control">
-                  <div><span>Здоровье</span><strong>{actor.system_data.hp.current} / {actor.system_data.hp.max}</strong></div>
+                  <div><span>Здоровье</span><strong>{visibleHealth.current} / {visibleHealth.max}</strong></div>
                   <div className="gm-hp-actions">
-                    <button onClick={() => onHp(actor, -5)}>−5</button>
-                    <button onClick={() => onHp(actor, -1)}>−1</button>
-                    <button onClick={() => onHp(actor, 1)}>＋1</button>
-                    <button onClick={() => onHp(actor, 5)}>＋5</button>
+                    <button onClick={() => changeQuickHp(-5)}>−5</button>
+                    <button onClick={() => changeQuickHp(-1)}>−1</button>
+                    <button onClick={() => changeQuickHp(1)}>＋1</button>
+                    <button onClick={() => changeQuickHp(5)}>＋5</button>
                   </div>
                 </div>
               ) : <div className="online-small-empty">Для персонажа не задан ресурс здоровья.</div>}
@@ -458,4 +547,17 @@ function NotesPanel({ campaignId, notes, onChanged, onMessage }: Props) {
       {!notes.length && <div className="online-small-empty">Заметок пока нет.</div>}
     </>
   );
+}
+
+function actorHealth(data: Record<string, any> | null | undefined): HealthValue | null {
+  const resource = objectResource(data?.hit_points) ?? objectResource(data?.hp);
+  if (!resource) return null;
+  const current = Number(resource.current);
+  const max = Number(resource.max);
+  if (!Number.isFinite(current) || !Number.isFinite(max)) return null;
+  return { current, max };
+}
+
+function objectResource(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
