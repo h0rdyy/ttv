@@ -97,6 +97,28 @@ export function OnlineSceneTools({
     setBusy(false);
   };
 
+  const setSnapImmediately = async (next: boolean) => {
+    setSnap(next);
+    const supabase = createClient();
+    const { error } = await supabase.rpc('update_campaign_scene', {
+      target_campaign: campaignId,
+      target_scene: scene.id,
+      scene_name: null,
+      scene_grid_enabled: null,
+      scene_fog_enabled: null,
+      scene_grid_size: null,
+      scene_grid_offset_x: null,
+      scene_grid_offset_y: null,
+      scene_grid_snap: next,
+    });
+    if (error) {
+      setSnap(scene.grid_snap);
+      onMessage(friendlyError(error, 'Не удалось изменить привязку к сетке.'));
+      return;
+    }
+    onChanged();
+  };
+
   const uploadMap = async (file: File) => {
     if (!MAP_TYPES.includes(file.type)) {
       onMessage('Поддерживаются PNG, JPG и WebP.');
@@ -303,7 +325,7 @@ export function OnlineSceneTools({
             <label><span>Смещение X</span><input className="control" type="number" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} /></label>
             <label><span>Смещение Y</span><input className="control" type="number" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} /></label>
           </div>
-          <label className="scene-check"><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> Притягивать фишки к сетке</label>
+          <label className="scene-check"><input type="checkbox" checked={snap} onChange={(event) => void setSnapImmediately(event.target.checked)} /> Притягивать фишки к сетке</label>
         </section>
 
         <section className="scene-tools-section">
