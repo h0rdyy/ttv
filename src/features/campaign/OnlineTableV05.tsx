@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { friendlyError } from '@/lib/friendlyError';
 import { OnlineTable } from './OnlineTable';
 import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
@@ -47,6 +49,7 @@ type ItemDefinition = {
 type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
+type ActorContextMenu = { actorId: string; x: number; y: number };
 
 type Props = {
   campaign: Campaign;
@@ -75,13 +78,26 @@ export function OnlineTableV05(props: Props) {
   const activeScene = props.initialScenes.find((scene) => scene.id === props.campaign.active_scene_id) ?? props.initialScenes[0] ?? null;
   const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [characterActorId, setCharacterActorId] = useState<string | null>(null);
+  const [actorMenu, setActorMenu] = useState<ActorContextMenu | null>(null);
+  const [deletingActorId, setDeletingActorId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const knownActorIdsRef = useRef(new Set(props.initialActors.map((actor) => actor.id)));
+  const pendingOpenActorIdRef = useRef<string | null>(null);
+  const selectedActorIdRef = useRef(selectedActorId);
+  selectedActorIdRef.current = selectedActorId;
+
+  // Creation happens inside OnlineTable/GM sidebar. Their RPC returns the new id
+  // before router.refresh() brings the Actor into this wrapper. Remember that
+  // temporary unknown selection so an inner reconciliation cannot lose the
+  // request to open the freshly created character.
+  useEffect(() => {
+    if (props.mode !== 'gm' || !selectedActorId) return;
+    const exists = props.initialActors.some((actor) => actor.id === selectedActorId);
+    if (!exists) pendingOpenActorIdRef.current = selectedActorId;
+    else if (pendingOpenActorIdRef.current && pendingOpenActorIdRef.current !== selectedActorId) pendingOpenActorIdRef.current = null;
+  }, [props.initialActors, props.mode, selectedActorId]);
 
   useEffect(() => {
-    const nextIds = new Set(props.initialActors.map((actor) => actor.id));
-    const addedIds = new Set(props.initialActors.filter((actor) => !knownActorIdsRef.current.has(actor.id)).map((actor) => actor.id));
-    knownActorIdsRef.current = nextIds;
+    const actorIds = new Set(props.initialActors.map((actor) => actor.id));
 
     if (props.mode === 'player') {
       setSelectedActorId(ownActor?.id ?? '');
@@ -89,16 +105,74 @@ export function OnlineTableV05(props: Props) {
       return;
     }
 
-    if (selectedActorId && addedIds.has(selectedActorId)) {
-      // Both +Hero and +NPC select the newly created actor before refresh.
-      // As soon as the refreshed actor arrives, open the unified character window.
-      setCharacterActorId(selectedActorId);
+    const pendingActorId = pendingOpenActorIdRef.current;
+    if (pendingActorId && actorIds.has(pendingActorId)) {
+      pendingOpenActorIdRef.current = null;
+      setSelectedActorId(pendingActorId);
+      setCharacterActorId(pendingActorId);
+      return;
     }
 
-    if (characterActorId && !nextIds.has(characterActorId)) setCharacterActorId(null);
-    if (!selectedActorId || nextIds.has(selectedActorId)) return;
-    setSelectedActorId('');
+    if (characterActorId && !actorIds.has(characterActorId)) setCharacterActorId(null);
+    if (selectedActorId && !actorIds.has(selectedActorId) && !pendingOpenActorIdRef.current) setSelectedActorId('');
   }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, characterActorId]);
+
+  useEffect(() => {
+    if (props.mode !== 'gm' || !gmAllowed) return;
+
+    // Token dragging currently begins on any pointer button. Intercept RMB before
+    // the map sees it so a context click never starts a token drag.
+    const blockRightDrag = (event: PointerEvent) => {
+      if (event.button !== 2) return;
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('.online-table-shell.gm-mode .token')) return;
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
+    const openContextMenu = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const actorTarget = target.closest<HTMLButtonElement>('.online-table-shell.gm-mode .token, .online-table-shell.gm-mode .gm-library-actor');
+      if (!actorTarget) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      // Both token and library row already know how to select their Actor. Reuse
+      // that source of truth, then open the menu after React flushes selection.
+      actorTarget.click();
+      const x = Math.max(8, Math.min(event.clientX, window.innerWidth - 238));
+      const y = Math.max(8, Math.min(event.clientY, window.innerHeight - 126));
+      window.setTimeout(() => {
+        const actorId = selectedActorIdRef.current;
+        if (actorId && props.initialActors.some((actor) => actor.id === actorId)) setActorMenu({ actorId, x, y });
+      }, 0);
+    };
+
+    document.addEventListener('pointerdown', blockRightDrag, true);
+    document.addEventListener('contextmenu', openContextMenu);
+    return () => {
+      document.removeEventListener('pointerdown', blockRightDrag, true);
+      document.removeEventListener('contextmenu', openContextMenu);
+    };
+  }, [gmAllowed, props.initialActors, props.mode]);
+
+  useEffect(() => {
+    if (!actorMenu) return;
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('[data-gm-actor-context-menu="true"]')) setActorMenu(null);
+    };
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActorMenu(null);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeEscape);
+    };
+  }, [actorMenu]);
 
   const selectedActor = props.initialActors.find((actor) => actor.id === selectedActorId) ?? null;
   const characterActor = props.initialActors.find((actor) => actor.id === characterActorId) ?? null;
@@ -106,11 +180,37 @@ export function OnlineTableV05(props: Props) {
   const characterInventory = characterActor
     ? props.initialInventories.find((inventory) => inventory.owner_actor_id === characterActor.id) ?? null
     : null;
+  const contextActor = actorMenu ? props.initialActors.find((actor) => actor.id === actorMenu.actorId) ?? null : null;
 
   const refresh = () => router.refresh();
   const openSelectedCharacter = () => {
     const actor = props.mode === 'player' ? ownActor : selectedActor;
     if (actor) setCharacterActorId(actor.id);
+  };
+  const editContextActor = () => {
+    if (!actorMenu) return;
+    setSelectedActorId(actorMenu.actorId);
+    setCharacterActorId(actorMenu.actorId);
+    setActorMenu(null);
+  };
+  const deleteContextActor = async () => {
+    if (!contextActor || !window.confirm(`Удалить персонажа «${contextActor.name}»? Вместе с ним будут удалены его фишки и инвентарь.`)) return;
+    setDeletingActorId(contextActor.id);
+    const supabase = createClient();
+    const { error } = await supabase.rpc('delete_campaign_actor', {
+      target_campaign: props.campaign.id,
+      target_actor: contextActor.id,
+    });
+    if (error) setMessage(friendlyError(error, 'Не удалось удалить персонажа.'));
+    else {
+      if (selectedActorIdRef.current === contextActor.id) setSelectedActorId('');
+      if (characterActorId === contextActor.id) setCharacterActorId(null);
+      pendingOpenActorIdRef.current = null;
+      setActorMenu(null);
+      setMessage(`Персонаж «${contextActor.name}» удалён.`);
+      refresh();
+    }
+    setDeletingActorId(null);
   };
 
   const immersionClasses = props.mode === 'player' ? ' player-immersion' : '';
@@ -147,6 +247,23 @@ export function OnlineTableV05(props: Props) {
           onChanged={refresh}
           onMessage={setMessage}
         />
+      )}
+
+      {actorMenu && contextActor && (
+        <div
+          className="online-menu-popover"
+          data-gm-actor-context-menu="true"
+          role="menu"
+          aria-label={`Действия с персонажем ${contextActor.name}`}
+          style={{ position: 'fixed', left: actorMenu.x, top: actorMenu.y, width: 230, zIndex: 12000 }}
+        >
+          <button type="button" role="menuitem" onClick={editContextActor}>
+            <span>✎ Редактировать</span><small>Открыть персонажа</small>
+          </button>
+          <button type="button" role="menuitem" disabled={deletingActorId === contextActor.id} onClick={() => void deleteContextActor()} style={{ color: 'var(--danger, #d96868)' }}>
+            <span>× Удалить</span><small>{deletingActorId === contextActor.id ? 'Удаление…' : 'Удалить персонажа'}</small>
+          </button>
+        </div>
       )}
 
       {message && <div className="auth-status online-table-message v05-sheet-message" onClick={() => setMessage('')}>{message}</div>}
