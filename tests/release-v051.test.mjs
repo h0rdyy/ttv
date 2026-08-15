@@ -133,7 +133,7 @@ test('responsive table keeps controls reachable and isolates nested wheel scroll
     'src/features/campaign/MapCropDialog.tsx',
     'src/features/campaign/DiceTray.tsx',
     'src/features/campaign/OnlineTableV05.tsx',
-    'src/features/campaign/OnlineActorSheet.tsx',
+    'src/features/campaign/PlayerCharacterWindow.tsx',
   ];
   const [table, ...isolatedPanels] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTable.tsx', import.meta.url), 'utf8'),
