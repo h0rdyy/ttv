@@ -8,7 +8,7 @@ import {
   shouldBlockCombatGridMove,
 } from '../src/features/campaign/movement.ts';
 
-// UX-lab regression coverage: movement, GM actor actions, health and hot-path refreshes must stay behavioral and fast.
+// UX-lab regression coverage: movement, GM actor actions, health and hot-path refreshes must stay behavioral, stable and fast.
 test('grid movement counts square distance in five-foot cells and charges intentional micro drags', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
   assert.equal(gridMovementDistance(1, 0, 64), 5);
