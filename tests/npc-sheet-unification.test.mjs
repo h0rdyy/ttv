@@ -3,8 +3,9 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 test('NPCs are created from Characters and use the shared Actor Sheet', async () => {
-  const [sidebar, css, migration] = await Promise.all([
+  const [sidebar, workshop, css, migration] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineGmWorkshop.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-contextual.css', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0019_npc_sheet_unification.sql', import.meta.url), 'utf8'),
   ]);
@@ -17,7 +18,11 @@ test('NPCs are created from Characters and use the shared Actor Sheet', async ()
   assert.doesNotMatch(sidebar, /Открыть NPC в мастерской/);
   assert.match(sidebar, /Предметы · Лут · Таблицы/);
 
-  assert.match(css, /\.workshop-tabs > button:nth-child\(2\) \{ display: none; \}/);
+  assert.doesNotMatch(workshop, /\['npc',\s*'NPC'\]/);
+  assert.doesNotMatch(workshop, /OnlineNpcWorkshop/);
+  assert.doesNotMatch(workshop, /РЕДАКТОР NPC/);
+  assert.doesNotMatch(workshop, /update_campaign_actor/);
+  assert.doesNotMatch(css, /workshop-tabs > button:nth-child/);
 
   assert.match(migration, /update public\.actors[\s\S]*name=btrim\(actor_name\)[\s\S]*subtitle=coalesce\(actor_subtitle,''\)[\s\S]*avatar=coalesce\(actor_avatar,''\)/);
   assert.doesNotMatch(migration, /system_data\s*=/);
