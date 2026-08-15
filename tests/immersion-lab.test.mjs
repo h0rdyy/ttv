@@ -69,17 +69,12 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(wrapper, /delete_campaign_actor/);
   assert.match(wrapper, /blockRightDrag/);
 
-  // The flexible character sheet writes `hit_points`, while older table widgets
-  // still consume `hp`. The wrapper exposes a read-only alias without persisting
-  // duplicate health data.
   assert.match(wrapper, /const actors = props\.initialActors\.map\(withCompatibleHealth\)/);
   assert.match(wrapper, /const sheetHealth = objectResource\(data\.hit_points\)/);
   assert.match(wrapper, /system_data: \{ \.\.\.data, hp: health \}/);
   assert.match(wrapper, /initialActors=\{actors\}/);
   assert.match(wrapper, /actors=\{actors\}/);
 
-  // GM quick HP must update immediately and serialize network mutations. All GM
-  // health displays read either the canonical key or the old compatibility key.
   assert.match(gmSidebar, /type OptimisticHealth/);
   assert.match(gmSidebar, /hpQueueRef/);
   assert.match(gmSidebar, /changeQuickHp/);
@@ -90,9 +85,6 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(hpMigration, /health_key = 'hit_points'/);
   assert.match(hpMigration, /return jsonb_set\(current_data, '\{hp\}', current_data->'hit_points', true\)/);
 
-  // Movement must clamp fast over-budget drags to a legal point instead of
-  // swallowing the whole drag, and position-only token DB writes must not force
-  // a full router refresh on every client.
   assert.match(hud, /spent >= speed/);
   assert.match(hud, /lastAllowedX/);
   assert.match(hud, /new PointerEvent\('pointermove'/);
