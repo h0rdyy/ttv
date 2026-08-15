@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { OnlineTable } from './OnlineTable';
 import { OnlineActorSheet, type SheetActor } from './OnlineActorSheet';
 import { OnlineSheetWorkshop } from './OnlineSheetWorkshop';
+import { PlayerImmersionHud } from './PlayerImmersionHud';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -71,9 +72,11 @@ export function OnlineTableV05(props: Props) {
   const { initialSheetTemplates, ...tableProps } = props;
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(props.role);
   const ownActor = props.initialActors.find((actor) => actor.owner_user_id === props.currentUserId) ?? null;
+  const activeScene = props.initialScenes.find((scene) => scene.id === props.campaign.active_scene_id) ?? props.initialScenes[0] ?? null;
   const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [sheetActorId, setSheetActorId] = useState<string | null>(null);
   const [managerOpen, setManagerOpen] = useState(false);
+  const [playerDetailsOpen, setPlayerDetailsOpen] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -82,6 +85,7 @@ export function OnlineTableV05(props: Props) {
       if (sheetActorId && sheetActorId !== ownActor?.id) setSheetActorId(null);
       return;
     }
+    setPlayerDetailsOpen(false);
     if (!selectedActorId || props.initialActors.some((actor) => actor.id === selectedActorId)) return;
     setSelectedActorId('');
   }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, sheetActorId]);
@@ -92,6 +96,7 @@ export function OnlineTableV05(props: Props) {
       // OnlineActorSheet owns its own Escape handling so dirty values cannot be
       // discarded by this outer layer before the sheet asks for confirmation.
       setManagerOpen(false);
+      setPlayerDetailsOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -104,27 +109,47 @@ export function OnlineTableV05(props: Props) {
   const refresh = () => router.refresh();
   const openSelectedSheet = () => {
     const actor = props.mode === 'player' ? ownActor : selectedActor;
-    if (actor) setSheetActorId(actor.id);
+    if (actor) {
+      setPlayerDetailsOpen(false);
+      setSheetActorId(actor.id);
+    }
   };
 
+  const immersionClasses = props.mode === 'player'
+    ? ` player-immersion${playerDetailsOpen ? ' player-immersion-details-open' : ''}`
+    : '';
+
   return (
-    <div className="v05-table-layer">
+    <div className={`v05-table-layer${immersionClasses}`}>
       <OnlineTable
         {...tableProps}
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
       />
 
-      <div className={`sheet-dock ${props.mode === 'player' ? 'player' : 'gm'}`}>
-        {props.mode === 'gm' && (
+      {props.mode === 'player' && (
+        <PlayerImmersionHud
+          campaignId={props.campaign.id}
+          actor={ownActor}
+          actors={props.initialActors}
+          scene={activeScene}
+          runtime={props.initialRuntime}
+          detailsOpen={playerDetailsOpen}
+          onToggleDetails={() => setPlayerDetailsOpen((value) => !value)}
+          onOpenSheet={openSelectedSheet}
+        />
+      )}
+
+      {props.mode === 'gm' && (
+        <div className="sheet-dock gm">
           <select value={selectedActor?.id ?? ''} onChange={(event) => setSelectedActorId(event.target.value)} aria-label="Персонаж для листа">
             <option value="">Выберите персонажа…</option>
             {props.initialActors.map((actor) => <option key={actor.id} value={actor.id}>{actor.name}</option>)}
           </select>
-        )}
-        <button className="button" disabled={!(props.mode === 'player' ? ownActor : selectedActor)} onClick={openSelectedSheet}>◇ {props.mode === 'player' ? 'Мой лист' : 'Лист'}</button>
-        {gmAllowed && props.mode === 'gm' && <button className={`button ${managerOpen ? 'active' : ''}`} onClick={() => { setManagerOpen((value) => !value); setSheetActorId(null); }}>⚒ Листы</button>}
-      </div>
+          <button className="button" disabled={!selectedActor} onClick={openSelectedSheet}>◇ Лист</button>
+          {gmAllowed && <button className={`button ${managerOpen ? 'active' : ''}`} onClick={() => { setManagerOpen((value) => !value); setSheetActorId(null); }}>⚒ Листы</button>}
+        </div>
+      )}
 
       {managerOpen && props.mode === 'gm' && (
         <section className="workshop-panel online-workshop-panel v05-sheet-workshop-overlay" data-wheel-isolation="true">
