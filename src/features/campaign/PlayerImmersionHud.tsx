@@ -5,8 +5,10 @@ import {
   DEFAULT_CELL_DISTANCE,
   DEFAULT_DISTANCE_UNIT,
   actorMovementSpeed,
+  formatMovementDistance,
   gridMovementDistance,
   remainingMovement,
+  roundMovementDistance,
   shouldBlockCombatGridMove,
 } from './movement';
 
@@ -90,12 +92,12 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       return;
     }
     const stored = Number(window.sessionStorage.getItem(storageKey) ?? 0);
-    setSpent(Number.isFinite(stored) && stored > 0 ? stored : 0);
+    setSpent(Number.isFinite(stored) && stored > 0 ? roundMovementDistance(stored) : 0);
   }, [storageKey, runtime.combat_active]);
 
   useEffect(() => {
     if (!storageKey || !runtime.combat_active) return;
-    window.sessionStorage.setItem(storageKey, String(spent));
+    window.sessionStorage.setItem(storageKey, String(roundMovementDistance(spent)));
   }, [spent, storageKey, runtime.combat_active]);
 
   useEffect(() => {
@@ -120,9 +122,9 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         setNotice(currentActor ? `Сейчас ходит ${currentActor.name}` : 'Сейчас не ваш ход');
         return;
       }
-      if (runtime.combat_active && isOwnTurn && scene?.grid_enabled && spent >= speed) {
+      if (runtime.combat_active && isOwnTurn && scene?.grid_enabled && remainingMovement(speed, spent) <= 0) {
         blockPointerEvent(event);
-        setNotice(`Лимит движения ${speed} ${distanceUnit} уже израсходован`);
+        setNotice(`Лимит движения ${formatMovementDistance(speed)} ${distanceUnit} уже израсходован`);
         return;
       }
 
@@ -171,7 +173,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         lastAllowedX = event.clientX;
         lastAllowedY = event.clientY;
       } else {
-        const available = Math.max(0, speed - spent);
+        const available = remainingMovement(speed, spent);
         if (available > 0 && distance > 0) {
           const ratio = Math.max(0, Math.min(1, available / distance));
           lastAllowedDistance = available;
@@ -194,8 +196,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
       if (blockGridMove) {
         // Instead of simply swallowing an over-budget move, send OnlineTable one
-        // synthetic move at the furthest legal point. Fast drags therefore clamp
-        // to the remaining movement instead of making the token appear broken.
+        // synthetic move at the furthest legal point. Precise fractional movement
+        // therefore clamps to the exact remaining hundredths of a foot.
         const target = event.target;
         if (availableDistance(next) > 0 && target instanceof Element) {
           const clamped = new PointerEvent('pointermove', {
@@ -222,11 +224,13 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
       setDrag(null);
       if (!runtime.combat_active || !isOwnTurn) return;
 
-      const committedDistance = current.lastAllowedDistance;
+      const committedDistance = roundMovementDistance(current.lastAllowedDistance);
       if (current.cellPixels > 0 && current.distance > committedDistance) {
-        setNotice(`Лимит движения ${speed} ${distanceUnit} — фишка остановлена на допустимой клетке`);
+        setNotice(`Лимит движения ${formatMovementDistance(speed)} ${distanceUnit} — фишка остановлена на точной допустимой позиции`);
       }
-      if (committedDistance > 0) setSpent((value) => Math.min(speed, value + committedDistance));
+      if (committedDistance > 0) {
+        setSpent((value) => roundMovementDistance(Math.min(speed, value + committedDistance)));
+      }
     };
 
     const cancel = (event: PointerEvent) => {
@@ -252,7 +256,7 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const hpCurrent = Number(hp?.current);
   const hpMax = Number(hp?.max);
   const preview = drag?.distance ?? 0;
-  const projected = spent + preview;
+  const projected = roundMovementDistance(spent + preview);
   const remaining = remainingMovement(speed, spent, preview);
   const overBudget = isOwnTurn && drag !== null && drag.cellPixels > 0 && projected > speed;
   const ruler = useMemo(() => {
@@ -290,8 +294,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
           <div className={`player-movement-bubble ${overBudget ? 'over' : ''}`} style={{ left: `${drag.x + 14}px`, top: `${drag.y + 14}px` }}>
             {scene?.grid_enabled ? (
               <>
-                <strong>{drag.distance} {distanceUnit}</strong>
-                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${speed} · фишка остановится раньше` : `осталось ${remaining}`} {distanceUnit}</small>}
+                <strong>{formatMovementDistance(drag.distance)} {distanceUnit}</strong>
+                {runtime.combat_active && isOwnTurn && <small>{overBudget ? `лимит ${formatMovementDistance(speed)} · фишка остановится раньше` : `осталось ${formatMovementDistance(remaining)}`} {distanceUnit}</small>}
               </>
             ) : (
               <><strong>Свободное движение</strong><small>На сцене выключена сетка</small></>
@@ -306,9 +310,9 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
           <span><strong>{actor.name}</strong><small>{runtime.combat_active ? (isOwnTurn ? 'Ваш ход' : `Ход: ${currentActor?.name ?? 'мастера'}`) : 'Свободная сцена'}</small></span>
         </div>
         <div className="player-vital-chip"><span>HP</span><strong>{Number.isFinite(hpCurrent) ? hpCurrent : '—'} / {Number.isFinite(hpMax) ? hpMax : '—'}</strong></div>
-        <div className={`player-movement-chip ${spent >= speed && isOwnTurn ? 'over' : ''}`}>
+        <div className={`player-movement-chip ${remainingMovement(speed, spent) <= 0 && isOwnTurn ? 'over' : ''}`}>
           <span>Движение</span>
-          <strong>{runtime.combat_active && isOwnTurn ? `${spent} / ${speed}` : `${speed}`} {distanceUnit}</strong>
+          <strong>{runtime.combat_active && isOwnTurn ? `${formatMovementDistance(spent)} / ${formatMovementDistance(speed)}` : `${formatMovementDistance(speed)}`} {distanceUnit}</strong>
           <i><b style={{ width: `${Math.min(100, speed > 0 ? (spent / speed) * 100 : 0)}%` }} /></i>
         </div>
         <button type="button" onClick={onOpenCharacter}>◇ Персонаж</button>
