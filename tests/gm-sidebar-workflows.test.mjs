@@ -2,19 +2,28 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('GM sidebar is organized around session workflows instead of entity tables', async () => {
-  const sidebar = await readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8');
-  const topTabs = sidebar.match(/const tabs:[\s\S]*?= \[([\s\S]*?)\];/)?.[1] ?? '';
+test('GM workspace uses a left library and right actor inspector around the map', async () => {
+  const [sidebar, css, layout] = await Promise.all([
+    readFile(new URL('../src/features/campaign/OnlineGmSidebar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/online-table-contextual.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/app/layout.tsx', import.meta.url), 'utf8'),
+  ]);
 
-  assert.match(topTabs, /\['session', 'СЕССИЯ'\]/);
-  assert.match(topTabs, /\['characters', 'ПЕРСОНАЖИ'\]/);
-  assert.match(topTabs, /\['content', 'КОНТЕНТ'\]/);
-  assert.match(topTabs, /\['notes', 'ЗАМЕТКИ'\]/);
-  assert.doesNotMatch(topTabs, /\['combat'|\['inventory'|\['npc'/);
+  assert.match(sidebar, /className={`gm-library \$\{libraryOpen \? 'expanded' : 'collapsed'\}`}/);
+  assert.match(sidebar, /className="gm-inspector"/);
+  assert.match(sidebar, /<CharacterLibrary \{\.\.\.props\} \/>/);
+  assert.match(sidebar, /<ContentLibrary \{\.\.\.props\} \/>/);
+  assert.match(sidebar, /<NotesPanel \{\.\.\.props\} \/>/);
+  assert.match(sidebar, /<SessionLibrary \{\.\.\.props\} \/>/);
+  assert.match(sidebar, /<ActorInspector \{\.\.\.props\} \/>/);
+  assert.match(sidebar, /type InspectorView = 'sheet' \| 'inventory' \| 'token'/);
+  assert.match(sidebar, />Лист<\/button>/);
+  assert.match(sidebar, />Инвентарь<\/button>/);
+  assert.match(sidebar, />Фишка<\/button>/);
 
-  assert.match(sidebar, /visibleTab === 'session' && <SessionPanel/);
-  assert.match(sidebar, /visibleTab === 'characters' && <CharactersPanel/);
-  assert.match(sidebar, /visibleTab === 'content' && <ContentPanel/);
-  assert.match(sidebar, /type CharacterView = 'overview' \| 'inventory'/);
-  assert.match(sidebar, /const characterKinds = \[[\s\S]*\['party', 'ГРУППА'\][\s\S]*\['npc', 'NPC'\]/);
+  assert.match(css, /grid-template-areas:\s*"library map inspector"/);
+  assert.match(css, /\.gm-library\s*\{[\s\S]*grid-area:\s*library/);
+  assert.match(css, /\.gm-inspector\s*\{[\s\S]*grid-area:\s*inspector/);
+  assert.match(css, /@media \(max-width: 1300px\)/);
+  assert.match(layout, /import '\.\/online-table-contextual\.css';/);
 });
