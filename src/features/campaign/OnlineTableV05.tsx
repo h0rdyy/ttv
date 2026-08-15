@@ -6,6 +6,7 @@ import { OnlineTable } from './OnlineTable';
 import { OnlineActorSheet, type SheetActor } from './OnlineActorSheet';
 import { OnlineSheetWorkshop } from './OnlineSheetWorkshop';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
+import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -91,8 +92,8 @@ export function OnlineTableV05(props: Props) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // OnlineActorSheet owns its own Escape handling so dirty values cannot be
-      // discarded by this outer layer before the character window asks first.
+      // Character windows own their Escape handling so dirty values cannot be
+      // discarded by this outer layer before the user confirms.
       setManagerOpen(false);
     };
     window.addEventListener('keydown', onKeyDown);
@@ -102,6 +103,7 @@ export function OnlineTableV05(props: Props) {
   const selectedActor = props.initialActors.find((actor) => actor.id === selectedActorId) ?? null;
   const sheetActor = props.initialActors.find((actor) => actor.id === sheetActorId) ?? null;
   const template = sheetActor ? initialSheetTemplates.find((value) => value.id === sheetActor.sheet_template_id) ?? null : null;
+  const sheetInventory = sheetActor ? props.initialInventories.find((inventory) => inventory.owner_actor_id === sheetActor.id) ?? null : null;
 
   const refresh = () => router.refresh();
   const openSelectedCharacter = () => {
@@ -159,17 +161,30 @@ export function OnlineTableV05(props: Props) {
         </section>
       )}
 
-      {sheetActor && (
-        <div className={props.mode === 'player' ? 'player-character-window' : undefined}>
-          <OnlineActorSheet
-            actor={sheetActor}
-            template={template}
-            canEdit={gmAllowed || sheetActor.owner_user_id === props.currentUserId}
-            onClose={() => setSheetActorId(null)}
-            onChanged={refresh}
-            onMessage={setMessage}
-          />
-        </div>
+      {sheetActor && props.mode === 'player' && (
+        <PlayerCharacterWindow
+          actor={sheetActor}
+          template={template}
+          inventory={sheetInventory}
+          containers={props.initialContainers}
+          instances={props.initialItemInstances}
+          items={props.initialItemDefinitions}
+          canEdit={sheetActor.owner_user_id === props.currentUserId}
+          onClose={() => setSheetActorId(null)}
+          onChanged={refresh}
+          onMessage={setMessage}
+        />
+      )}
+
+      {sheetActor && props.mode === 'gm' && (
+        <OnlineActorSheet
+          actor={sheetActor}
+          template={template}
+          canEdit={gmAllowed || sheetActor.owner_user_id === props.currentUserId}
+          onClose={() => setSheetActorId(null)}
+          onChanged={refresh}
+          onMessage={setMessage}
+        />
       )}
 
       {message && <div className="auth-status online-table-message v05-sheet-message" onClick={() => setMessage('')}>{message}</div>}
