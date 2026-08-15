@@ -35,22 +35,26 @@ test('actor movement speed supports generic and nested movement data', () => {
   assert.equal(remainingMovement(30, 25, 10), 0);
 });
 
-test('player immersion lab enforces combat movement and uses one flexible character window', async () => {
-  const [wrapper, hud, css, character, characterCss, layout] = await Promise.all([
+test('immersion lab enforces movement and uses one flexible character window', async () => {
+  const [wrapper, hud, css, character, characterCss, layout, legacySheet] = await Promise.all([
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerImmersionHud.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/online-table-immersion.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/PlayerCharacterWindow.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/player-character-window.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/app/layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/features/campaign/OnlineActorSheet.tsx', import.meta.url), 'utf8'),
   ]);
 
   assert.match(wrapper, /<PlayerImmersionHud/);
   assert.match(wrapper, /onOpenCharacter=\{openSelectedCharacter\}/);
   assert.match(wrapper, /<PlayerCharacterWindow/);
-  assert.match(wrapper, /sheetActor && props\.mode === 'player'/);
-  assert.doesNotMatch(wrapper, /player-immersion-details-open/);
-  assert.doesNotMatch(wrapper, /sheet-dock \$\{props\.mode === 'player'/);
+  assert.match(wrapper, /characterActor &&/);
+  assert.match(wrapper, /addedIds\.has\(selectedActorId\)/);
+  assert.match(wrapper, /setCharacterActorId\(selectedActorId\)/);
+  assert.doesNotMatch(wrapper, /<OnlineActorSheet/);
+  assert.doesNotMatch(wrapper, /<OnlineSheetWorkshop/);
+  assert.doesNotMatch(wrapper, /sheet-dock gm/);
 
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
@@ -71,6 +75,9 @@ test('player immersion lab enforces combat movement and uses one flexible charac
   assert.match(character, /normalizeSheetSchema/);
   assert.match(character, /slot-\$\{section\.slot/);
   assert.match(character, /update_actor_sheet/);
+
+  assert.doesNotMatch(legacySheet, /export function OnlineActorSheet/);
+  assert.match(legacySheet, /export type SheetActor/);
 
   assert.match(css, /\.player-immersion \.player-mode \.online-table-workspace[\s\S]*grid-template-columns:\s*minmax\(0,1fr\)/);
   assert.match(css, /\.player-immersion-dock/);
