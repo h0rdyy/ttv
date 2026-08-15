@@ -50,11 +50,21 @@ test('immersion lab enforces movement and uses one flexible character window', a
   assert.match(wrapper, /onOpenCharacter=\{openSelectedCharacter\}/);
   assert.match(wrapper, /<PlayerCharacterWindow/);
   assert.match(wrapper, /characterActor &&/);
-  assert.match(wrapper, /addedIds\.has\(selectedActorId\)/);
-  assert.match(wrapper, /setCharacterActorId\(selectedActorId\)/);
+  assert.match(wrapper, /pendingOpenActorIdRef/);
+  assert.match(wrapper, /!exists\) pendingOpenActorIdRef\.current = selectedActorId/);
+  assert.match(wrapper, /setCharacterActorId\(pendingActorId\)/);
+  assert.doesNotMatch(wrapper, /addedIds\.has\(selectedActorId\)/);
   assert.doesNotMatch(wrapper, /<OnlineActorSheet/);
   assert.doesNotMatch(wrapper, /<OnlineSheetWorkshop/);
   assert.doesNotMatch(wrapper, /sheet-dock gm/);
+
+  assert.match(wrapper, /contextmenu/);
+  assert.match(wrapper, /gm-library-actor/);
+  assert.match(wrapper, /\.token/);
+  assert.match(wrapper, /✎ Редактировать/);
+  assert.match(wrapper, /× Удалить/);
+  assert.match(wrapper, /delete_campaign_actor/);
+  assert.match(wrapper, /blockRightDrag/);
 
   assert.match(hud, /ТВОЙ ХОД/);
   assert.match(hud, /gridMovementDistance/);
