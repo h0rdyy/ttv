@@ -37,6 +37,7 @@ type RollTable = {
 
 type Props = {
   campaignId: string;
+  // Kept until the parent table call is cleaned up; workshop no longer uses scene context.
   activeSceneId: string | null;
   actors: Actor[];
   items: ItemDefinition[];
