@@ -14,6 +14,50 @@ export function formatMovementDistance(value: number) {
   return roundMovementDistance(value).toFixed(2);
 }
 
+export function mapMovementDistance(
+  deltaXpx: number,
+  deltaYpx: number,
+  mapWidthPx: number,
+  unitsPerMapWidth: number,
+) {
+  if (!Number.isFinite(mapWidthPx) || mapWidthPx <= 0) return 0;
+  if (!Number.isFinite(unitsPerMapWidth) || unitsPerMapWidth <= 0) return 0;
+  const displacement = Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx));
+  // A normal click stays free. Past the dead-zone, use a continuous square-grid
+  // metric in map space. The map width is the stable reference, so visual grid
+  // size, browser size and camera zoom cannot change the physical distance.
+  if (!Number.isFinite(displacement) || displacement < 0.75) return 0;
+  return roundMovementDistance((displacement / mapWidthPx) * unitsPerMapWidth);
+}
+
+export function calibrationUnitsPerMapWidth(
+  deltaXpx: number,
+  deltaYpx: number,
+  mapWidthPx: number,
+  knownDistance: number,
+) {
+  if (!Number.isFinite(mapWidthPx) || mapWidthPx <= 0) return 0;
+  if (!Number.isFinite(knownDistance) || knownDistance <= 0) return 0;
+  const linePixels = Math.hypot(deltaXpx, deltaYpx);
+  if (!Number.isFinite(linePixels) || linePixels < 1) return 0;
+  const mapFraction = linePixels / mapWidthPx;
+  if (!Number.isFinite(mapFraction) || mapFraction <= 0) return 0;
+  return roundMovementDistance(knownDistance / mapFraction);
+}
+
+export function gridUnitsPerMapWidth(
+  gridSizePx: number,
+  mapWidthPx: number,
+  distancePerCell = DEFAULT_CELL_DISTANCE,
+) {
+  if (!Number.isFinite(gridSizePx) || gridSizePx <= 0) return 0;
+  if (!Number.isFinite(mapWidthPx) || mapWidthPx <= 0) return 0;
+  if (!Number.isFinite(distancePerCell) || distancePerCell <= 0) return 0;
+  return roundMovementDistance((mapWidthPx / gridSizePx) * distancePerCell);
+}
+
+// Kept for compatibility with older tests/components. New movement code should
+// use mapMovementDistance() with a persisted scene calibration.
 export function gridMovementDistance(
   deltaXpx: number,
   deltaYpx: number,
@@ -22,8 +66,6 @@ export function gridMovementDistance(
 ) {
   if (!Number.isFinite(cellPixels) || cellPixels <= 0) return 0;
   const displacement = Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx));
-  // Keep a tiny dead-zone so a normal click remains free. After that, distance is
-  // continuous inside the square instead of jumping in whole 5-ft cells.
   if (!Number.isFinite(displacement) || displacement < 0.75) return 0;
   const cells = displacement / cellPixels;
   return roundMovementDistance(cells * Math.max(0, distancePerCell));
