@@ -126,6 +126,9 @@ test('immersion lab enforces movement, calibrated scenes and one flexible charac
   assert.match(measurementMigration, /public\.is_campaign_gm\(target_campaign\)/);
   assert.match(measurementMigration, /revoke all on function public\.set_scene_measurement/);
   assert.match(gameRoom, /measurement_unit,measurement_units_per_map_width/);
+  assert.match(gameRoom, /LEGACY_SCENE_SELECT/);
+  assert.match(gameRoom, /if \(sceneResult\.error\)/);
+  assert.match(gameRoom, /measurement_supported: measurementSupported/);
 
   assert.match(calibrator, /Калибровать по карте/);
   assert.match(calibrator, /Текущая клетка = 5/);
@@ -133,7 +136,9 @@ test('immersion lab enforces movement, calibrated scenes and one flexible charac
   assert.match(calibrator, /gridUnitsPerMapWidth/);
   assert.match(calibrator, /set_scene_measurement/);
   assert.match(calibrator, /initializedSceneRef/);
-  assert.match(calibrator, /Changing grid_size|changing grid_size/i);
+  assert.match(calibrator, /measurement_supported/);
+  assert.match(calibrator, /НУЖНО ОБНОВИТЬ СХЕМУ БД/);
+  assert.match(calibrator, /changing grid_size/i);
 
   assert.match(tokenRefreshMigration, /TG_TABLE_NAME = 'scene_tokens' and TG_OP = 'UPDATE'/);
   assert.match(tokenRefreshMigration, /to_jsonb\(NEW\) - array\['x', 'y', 'updated_at'\]/);
