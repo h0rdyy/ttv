@@ -11,6 +11,7 @@ import './online-table-immersion.css';
 import './scene-v04.css';
 import './sheet-v05.css';
 import './online-table-immersion-v2.css';
+import './player-character-window.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
