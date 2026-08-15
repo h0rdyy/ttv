@@ -54,6 +54,11 @@ const libraryTabs: [Exclude<GmSidebarTab, 'party'>, string, string][] = [
   ['session', 'СЕССИЯ', '⚔'],
 ];
 
+const actorLibraryGroups = [
+  ['party', 'ГРУППА'],
+  ['npc', 'NPC'],
+] as const;
+
 export function OnlineGmSidebar(props: Props) {
   const visibleTab = props.tab === 'party' ? 'characters' : props.tab;
   const [libraryOpen, setLibraryOpen] = useState(true);
@@ -132,13 +137,13 @@ function CharacterLibrary({ actors, selectedActorId, onSelectActor, busy, onCrea
       <input className="control full gm-library-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск персонажа…" />
 
       <section className="gm-library-section">
-        <div className="gm-library-section-title"><strong>ГРУППА</strong><span>{heroes.length}</span></div>
+        <div className="gm-library-section-title"><strong>{actorLibraryGroups[0][1]}</strong><span>{heroes.length}</span></div>
         <div className="gm-library-list">{heroes.map(actorRow)}</div>
         {!heroes.length && <div className="online-small-empty">Героев не найдено.</div>}
       </section>
 
       <section className="gm-library-section">
-        <div className="gm-library-section-title"><strong>NPC</strong><span>{npcs.length}</span></div>
+        <div className="gm-library-section-title"><strong>{actorLibraryGroups[1][1]}</strong><span>{npcs.length}</span></div>
         <div className="gm-library-list">{npcs.map(actorRow)}</div>
         {!npcs.length && <div className="online-small-empty">NPC не найдены.</div>}
         <button className="button full gm-library-secondary" onClick={onOpenWorkshop}>＋ Создать / редактировать NPC</button>
