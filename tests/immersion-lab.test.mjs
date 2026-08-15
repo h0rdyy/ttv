@@ -8,7 +8,7 @@ import {
   shouldBlockCombatGridMove,
 } from '../src/features/campaign/movement.ts';
 
-// UX-lab regression coverage: movement, GM actor actions and health compatibility must stay behavioral.
+// UX-lab regression coverage: movement, GM actor actions, optimistic HP and health compatibility must stay behavioral.
 test('grid movement counts square distance in five-foot cells', () => {
   assert.equal(gridMovementDistance(0, 0, 64), 0);
   assert.equal(gridMovementDistance(64, 0, 64), 5);
