@@ -2,20 +2,21 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-test('actor sheet preserves dirty fields across realtime refreshes and saves patches only', async () => {
-  const [sheet, layer, migration] = await Promise.all([
-    readFile(new URL('../src/features/campaign/OnlineActorSheet.tsx', import.meta.url), 'utf8'),
+test('character window preserves dirty fields across realtime refreshes and saves patches only', async () => {
+  const [character, layer, migration] = await Promise.all([
+    readFile(new URL('../src/features/campaign/PlayerCharacterWindow.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/features/campaign/OnlineTableV05.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../supabase/migrations/0018_actor_sheet_conflict_fix.sql', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(sheet, /const \[dirtyKeys, setDirtyKeys\] = useState<Set<string>>/);
-  assert.match(sheet, /pendingSavedRef/);
-  assert.match(sheet, /for \(const key of dirtyKeys\)/);
-  assert.match(sheet, /const patchData = keys\.reduce/);
-  assert.doesNotMatch(sheet, /useEffect\(\(\) => setData\(clone\(actor\.system_data\)\)/);
-  assert.match(sheet, /несохранённые изменения/);
-  assert.doesNotMatch(layer, /setSheetActorId\(null\);\s*setManagerOpen\(false\)/);
+  assert.match(character, /const \[dirtyKeys, setDirtyKeys\] = useState<Set<string>>/);
+  assert.match(character, /pendingSavedRef/);
+  assert.match(character, /for \(const key of dirtyKeys\)/);
+  assert.match(character, /const patchData = keys\.reduce/);
+  assert.doesNotMatch(character, /useEffect\(\(\) => setData\(clone\(actor\.system_data\)\)/);
+  assert.match(character, /несохранённые изменения/);
+  assert.doesNotMatch(layer, /<OnlineActorSheet/);
+  assert.doesNotMatch(layer, /<OnlineSheetWorkshop/);
 
   assert.match(migration, /where id=target_actor\s+for update;/);
   assert.match(migration, /current_data := coalesce\(current_data,'\{\}'::jsonb\)/);
