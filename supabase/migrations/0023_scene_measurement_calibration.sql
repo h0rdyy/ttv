@@ -2,6 +2,7 @@
 -- `measurement_units_per_map_width` stores how many scene units span the full
 -- map width. Token coordinates are percentage-based, so this scale survives
 -- viewport resize, zoom and later grid-size adjustments.
+-- CI regression coverage lives in tests/immersion-lab.test.mjs.
 
 alter table public.scenes
   add column if not exists measurement_unit text not null default 'ft',
