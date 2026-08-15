@@ -11,6 +11,8 @@ export function gridMovementDistance(
   distancePerCell = DEFAULT_CELL_DISTANCE,
 ) {
   if (!Number.isFinite(cellPixels) || cellPixels <= 0) return 0;
+  // Experimental Foundry-like square-grid rule: diagonal movement costs one cell
+  // per crossed square. This can later become a per-system diagonal policy.
   const cells = Math.round(Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx)) / cellPixels);
   return Math.max(0, cells * Math.max(0, distancePerCell));
 }
