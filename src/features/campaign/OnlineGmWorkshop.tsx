@@ -37,7 +37,6 @@ type RollTable = {
 
 type Props = {
   campaignId: string;
-  activeSceneId: string | null;
   actors: Actor[];
   items: ItemDefinition[];
   tables: RollTable[];
