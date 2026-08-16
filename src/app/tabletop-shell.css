@@ -1,5 +1,6 @@
 /* Tabletop shell safe zones.
-   Persistent UI owns layout space; only transient drawers/workspaces may float above the map. */
+   Persistent UI owns layout space; only transient drawers/workspaces may float above the map.
+   This is shared by GM and player modes so new chrome must claim a slot instead of adding another z-index layer. */
 
 .v05-table-layer {
   --ttv-gm-rail: 58px;
