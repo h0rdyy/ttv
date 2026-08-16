@@ -20,6 +20,7 @@ import './tabletop-shell.css';
 import './tabletop-shell-v2.css';
 import './tabletop-shell-v2-responsive.css';
 import './tabletop-shell-v2-dice.css';
+import './tabletop-context-ui.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
