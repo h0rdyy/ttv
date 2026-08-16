@@ -20,6 +20,7 @@ test('tabletop UI preferences expose a real settings button and persist per user
   assert.match(panel, /localStorage\.getItem\(storageKey\)/);
   assert.match(panel, /localStorage\.setItem\(storageKey/);
   assert.match(panel, /localStorage\.removeItem\(storageKey\)/);
+  assert.match(panel, /useExclusiveTabletopSurface\('ui-preferences'/);
   assert.match(panel, /label="Кубы"/);
   assert.match(panel, /label="Движение"/);
   assert.match(panel, /label="Название сцены"/);
