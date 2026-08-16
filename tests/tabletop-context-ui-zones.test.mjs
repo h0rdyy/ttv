@@ -11,10 +11,10 @@ test('contextual UI separates persistent controls into safe zones and exposes mo
 
   assert.match(layout, /import '\.\/tabletop-context-ui-zones\.css';/);
   assert.match(source, /context-ui-quick-actions/);
-  assert.match(source, /\['characters', 'dice', 'prepare'\]/);
-  assert.match(source, /\['combat', 'characters', 'dice'\]/);
-  assert.match(source, /\['scene', 'workshop', 'leave-prepare'\]/);
-  assert.match(source, /\['character', 'dice'\]/);
+  assert.match(source, /\['characters', 'map-tools', 'dice'\]/);
+  assert.match(source, /\['combat', 'map-tools', 'dice'\]/);
+  assert.match(source, /\['scene', 'map-tools', 'leave-prepare'\]/);
+  assert.match(source, /\['map-tools', 'dice'\]/);
   assert.match(source, /context-ui-command-shortcut/);
 
   assert.match(css, /\.map-zoom-controls\s*\{/);
