@@ -116,10 +116,7 @@ export function TabletopContextUi({
     const library = document.querySelector('.online-table-shell.gm-mode .gm-library');
     if (!button || !library) return;
 
-    const expanded = library.classList.contains('expanded');
-    const active = button.classList.contains('active');
-    if (expanded && active) button.click();
-    else button.click();
+    button.click();
     setSurface(null);
   };
 
@@ -239,7 +236,7 @@ export function TabletopContextUi({
         {
           id: 'scene',
           icon: '🗺',
-          label: 'Настройки сцены',
+          label: 'Сцена',
           hint: 'Карта, сетка, туман и токены',
           keywords: 'сцена карта сетка туман токены scene grid fog',
           run: openSceneWorkspace,
@@ -271,7 +268,7 @@ export function TabletopContextUi({
         {
           id: 'leave-prepare',
           icon: '▶',
-          label: 'Вернуться к игре',
+          label: 'К игре',
           hint: 'Закрыть инструменты подготовки',
           keywords: 'игра выйти подготовка play',
           run: leavePrepare,
@@ -311,7 +308,7 @@ export function TabletopContextUi({
       playActions.unshift({
         id: 'combat',
         icon: '⚔',
-        label: `Бой · раунд ${combatRound}`,
+        label: `Бой · ${combatRound}`,
         hint: 'Инициатива и текущий ход',
         keywords: 'бой раунд инициатива combat initiative',
         run: () => toggleLegacyDrawer('combat'),
@@ -321,7 +318,7 @@ export function TabletopContextUi({
     playActions.push({
       id: 'prepare',
       icon: '🛠',
-      label: 'Режим подготовки',
+      label: 'Подготовка',
       hint: 'Сцена, сетка, туман и контент',
       keywords: 'подготовка сцена сетка туман prepare',
       run: enterPrepare,
@@ -337,6 +334,17 @@ export function TabletopContextUi({
     if (!normalized) return actions;
     return actions.filter((action) => `${action.label} ${action.hint} ${action.keywords}`.toLocaleLowerCase('ru').includes(normalized));
   }, [actions, query]);
+
+  const quickActions = useMemo(() => {
+    const ids = mode === 'player'
+      ? ['character', 'dice']
+      : tableMode === 'combat'
+        ? ['combat', 'characters', 'dice']
+        : tableMode === 'prepare'
+          ? ['scene', 'workshop', 'leave-prepare']
+          : ['characters', 'dice', 'prepare'];
+    return ids.map((id) => actions.find((action) => action.id === id)).filter((action): action is Action => Boolean(action));
+  }, [actions, mode, tableMode]);
 
   useEffect(() => {
     if (mode !== 'gm') return;
@@ -415,12 +423,34 @@ export function TabletopContextUi({
           onClick={() => setSurface((current) => current === 'tools' ? null : 'tools')}
           aria-expanded={surface === 'tools'}
           aria-label="Открыть инструменты"
-          title="Инструменты · Ctrl+K для поиска"
+          title="Все инструменты · Ctrl+K для поиска"
         >
           <span>{modeIcon}</span>
           <small>{modeLabel}</small>
         </button>
       </div>
+
+      {surface === null && quickActions.length > 0 && (
+        <nav className={`context-ui-quick-actions ${mode}`} aria-label="Быстрые действия" data-wheel-isolation="true">
+          {quickActions.map((action) => (
+            <button key={action.id} type="button" onClick={action.run} title={action.hint} aria-label={action.label}>
+              <span aria-hidden="true">{action.icon}</span>
+              <strong>{action.label}</strong>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="context-ui-command-shortcut"
+            onClick={() => { setSurface('command'); setQuery(''); window.requestAnimationFrame(() => commandInputRef.current?.focus()); }}
+            title="Найти любое действие"
+            aria-label="Найти действие"
+          >
+            <span aria-hidden="true">⌕</span>
+            <strong>Поиск</strong>
+            <kbd>Ctrl K</kbd>
+          </button>
+        </nav>
+      )}
 
       {surface === 'tools' && (
         <section className={`context-tools-palette ${mode}`} aria-label="Контекстные инструменты" data-wheel-isolation="true">
