@@ -1,4 +1,5 @@
 // UI profile regression: the settings button must stay functional and persist per user.
+// Keep the settings flow covered whenever the tabletop shell changes.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
