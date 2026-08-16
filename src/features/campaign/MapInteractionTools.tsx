@@ -385,14 +385,14 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
           </header>
 
           <div className="map-tools-actions">
-            <button type="button" className={tool === 'ruler' ? 'active' : ''} onClick={() => toggleTool('ruler')}>
+            <button type="button" aria-pressed={tool === 'ruler'} className={tool === 'ruler' ? 'active' : ''} onClick={() => toggleTool('ruler')}>
               <span>⌁</span><strong>Линейка</strong><small>Потяните по карте</small>
             </button>
-            <button type="button" className={tool === 'ping' ? 'active' : ''} onClick={() => toggleTool('ping')}>
+            <button type="button" aria-pressed={tool === 'ping'} className={tool === 'ping' ? 'active' : ''} onClick={() => toggleTool('ping')}>
               <span>◎</span><strong>Пинг</strong><small>Показать точку всем</small>
             </button>
             {mode === 'gm' && (
-              <button type="button" className={tool === 'draw' ? 'active' : ''} onClick={() => toggleTool('draw')}>
+              <button type="button" aria-pressed={tool === 'draw'} className={tool === 'draw' ? 'active' : ''} onClick={() => toggleTool('draw')}>
                 <span>✎</span><strong>Рисовать</strong><small>Временные пометки</small>
               </button>
             )}
@@ -402,7 +402,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
             <div className="map-tools-draw-options" aria-label="Цвет рисунка">
               <span>Цвет</span>
               {(['accent', 'danger', 'cool'] as DrawTone[]).map((value) => (
-                <button key={value} type="button" className={`tone-${value} ${tone === value ? 'active' : ''}`} onClick={() => setTone(value)} aria-label={`Цвет ${value}`} />
+                <button key={value} type="button" aria-pressed={tone === value} className={`tone-${value} ${tone === value ? 'active' : ''}`} onClick={() => setTone(value)} aria-label={`Цвет ${value}`} />
               ))}
             </div>
           )}
