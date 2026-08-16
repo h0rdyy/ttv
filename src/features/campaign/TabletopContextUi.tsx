@@ -35,6 +35,9 @@ const LEGACY_DRAWERS = {
   notes: 'ЗАМЕТКИ',
 } as const;
 
+const MAP_TOOLS_TOGGLE_EVENT = 'ttv:map-tools:toggle';
+const MAP_TOOLS_CLOSE_EVENT = 'ttv:map-tools:close';
+
 function queryButton(selector: string) {
   return document.querySelector<HTMLButtonElement>(selector);
 }
@@ -95,6 +98,10 @@ export function TabletopContextUi({
     }
   };
 
+  const closeMapTools = () => {
+    window.dispatchEvent(new CustomEvent(MAP_TOOLS_CLOSE_EVENT));
+  };
+
   const closeAllTransient = () => {
     setSurface(null);
     setQuery('');
@@ -103,6 +110,7 @@ export function TabletopContextUi({
     closeDice();
     closeUiPreferences();
     closeMeasurement();
+    closeMapTools();
   };
 
   const toggleLegacyDrawer = (key: keyof typeof LEGACY_DRAWERS) => {
@@ -110,6 +118,7 @@ export function TabletopContextUi({
     closeDice();
     closeUiPreferences();
     closeMeasurement();
+    closeMapTools();
 
     const label = LEGACY_DRAWERS[key];
     const button = queryButton(`.online-table-shell.gm-mode .gm-library-rail button[aria-label="${label}"]`);
@@ -125,6 +134,7 @@ export function TabletopContextUi({
     closeDice();
     closeUiPreferences();
     closeMeasurement();
+    closeMapTools();
     queryButton('.online-table-shell.gm-mode .online-workshop-panel .close-button')?.click();
 
     const trigger = buttonWithText('.online-table-shell.gm-mode .online-menu-trigger', 'Сцена');
@@ -142,6 +152,7 @@ export function TabletopContextUi({
     closeDice();
     closeUiPreferences();
     closeMeasurement();
+    closeMapTools();
     queryButton('.online-table-shell.gm-mode .online-workshop-trigger')?.click();
     setSurface(null);
   };
@@ -151,6 +162,7 @@ export function TabletopContextUi({
     closeTransientWorkspace();
     closeUiPreferences();
     closeMeasurement();
+    closeMapTools();
     queryButton('.online-table-shell .dice-tray-toggle')?.click();
     setSurface(null);
   };
@@ -160,6 +172,7 @@ export function TabletopContextUi({
     closeTransientWorkspace();
     closeDice();
     closeMeasurement();
+    closeMapTools();
     queryButton('.tabletop-ui-preferences-trigger')?.click();
     setSurface(null);
   };
@@ -169,7 +182,18 @@ export function TabletopContextUi({
     closeTransientWorkspace();
     closeDice();
     closeUiPreferences();
+    closeMapTools();
     queryButton('.scene-measurement-trigger')?.click();
+    setSurface(null);
+  };
+
+  const openMapTools = () => {
+    closeLegacyDrawer();
+    closeTransientWorkspace();
+    closeDice();
+    closeUiPreferences();
+    closeMeasurement();
+    window.dispatchEvent(new CustomEvent(MAP_TOOLS_TOGGLE_EVENT));
     setSurface(null);
   };
 
@@ -191,6 +215,14 @@ export function TabletopContextUi({
 
   const actions = useMemo<Action[]>(() => {
     const common: Action[] = [
+      {
+        id: 'map-tools',
+        icon: '⌁',
+        label: 'Инструменты',
+        hint: mode === 'gm' ? 'Линейка, пинг и рисование' : 'Линейка и пинг',
+        keywords: 'линейка пинг рисовать рисунок карта ruler ping draw tools',
+        run: openMapTools,
+      },
       {
         id: 'dice',
         icon: '⚄',
@@ -250,6 +282,14 @@ export function TabletopContextUi({
           run: openMeasurement,
         }] : []),
         {
+          id: 'map-tools',
+          icon: '⌁',
+          label: 'Инструменты',
+          hint: 'Линейка, пинг и рисование',
+          keywords: 'линейка пинг рисовать рисунок карта ruler ping draw tools',
+          run: openMapTools,
+        },
+        {
           id: 'workshop',
           icon: '⚒',
           label: 'Мастерская',
@@ -273,7 +313,7 @@ export function TabletopContextUi({
           keywords: 'игра выйти подготовка play',
           run: leavePrepare,
         },
-        ...common,
+        ...common.filter((action) => action.id !== 'map-tools'),
       ];
     }
 
@@ -337,12 +377,12 @@ export function TabletopContextUi({
 
   const quickActions = useMemo(() => {
     const ids = mode === 'player'
-      ? ['character', 'dice']
+      ? ['map-tools', 'dice']
       : tableMode === 'combat'
-        ? ['combat', 'characters', 'dice']
+        ? ['combat', 'map-tools', 'dice']
         : tableMode === 'prepare'
-          ? ['scene', 'workshop', 'leave-prepare']
-          : ['characters', 'dice', 'prepare'];
+          ? ['scene', 'map-tools', 'leave-prepare']
+          : ['characters', 'map-tools', 'dice'];
     return ids.map((id) => actions.find((action) => action.id === id)).filter((action): action is Action => Boolean(action));
   }, [actions, mode, tableMode]);
 
@@ -355,6 +395,7 @@ export function TabletopContextUi({
   useEffect(() => {
     if (!focusActive) return;
     setSurface(null);
+    closeMapTools();
   }, [focusActive]);
 
   useEffect(() => {
@@ -363,6 +404,7 @@ export function TabletopContextUi({
         if (isTypingTarget(event.target) && surface !== 'command') return;
         event.preventDefault();
         if (uiHidden) onUiHiddenChange(false);
+        closeMapTools();
         setSurface((current) => current === 'command' ? null : 'command');
         setQuery('');
         window.requestAnimationFrame(() => commandInputRef.current?.focus());
@@ -374,6 +416,7 @@ export function TabletopContextUi({
           event.preventDefault();
           setSurface(null);
           setQuery('');
+          closeMapTools();
           return;
         }
         closeAllTransient();
@@ -420,7 +463,7 @@ export function TabletopContextUi({
         <button
           type="button"
           className={`context-ui-main-button mode-${tableMode}`}
-          onClick={() => setSurface((current) => current === 'tools' ? null : 'tools')}
+          onClick={() => { closeMapTools(); setSurface((current) => current === 'tools' ? null : 'tools'); }}
           aria-expanded={surface === 'tools'}
           aria-label="Открыть инструменты"
           title="Все инструменты · Ctrl+K для поиска"
@@ -441,7 +484,7 @@ export function TabletopContextUi({
           <button
             type="button"
             className="context-ui-command-shortcut"
-            onClick={() => { setSurface('command'); setQuery(''); window.requestAnimationFrame(() => commandInputRef.current?.focus()); }}
+            onClick={() => { closeMapTools(); setSurface('command'); setQuery(''); window.requestAnimationFrame(() => commandInputRef.current?.focus()); }}
             title="Найти любое действие"
             aria-label="Найти действие"
           >
