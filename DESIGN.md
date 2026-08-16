@@ -1,1275 +1,644 @@
-# TTV — Design Specification
+---
+name: ttv-heritage
+version: 0.1
+status: draft
+purpose: "Design system and interaction specification for the TTV tabletop UI"
 
-> **Статус:** рабочая дизайн-спецификация нового интерфейса игрового стола.
->
-> Этот документ является source of truth для дальнейшей переработки UI. Существующие `TabletopShell v2/v3` рассматриваются как прототипы и источник выводов, а не как окончательная архитектура.
+principles:
+  map_first: true
+  progressive_disclosure: true
+  contextual_actions: true
+  mode_driven_ui: true
+  keyboard_acceleration: true
+  no_overlapping_persistent_ui: true
+  responsive_by_layout: true
 
+modes:
+  - play
+  - combat
+  - prepare
+
+colors:
+  canvas: "#090806"
+  surface_1: "#0D0B08"
+  surface_2: "#15110C"
+  surface_3: "#20170F"
+  border_subtle: "#2F261A"
+  border: "#493822"
+  border_strong: "#6B4D2A"
+  text_primary: "#E8D1A7"
+  text_secondary: "#A99576"
+  text_muted: "#746855"
+  accent: "#C9924F"
+  accent_hover: "#E0B56F"
+  danger: "#A84F3A"
+  success: "#668653"
+  warning: "#B8863E"
+  backdrop: "rgba(0, 0, 0, 0.42)"
+
+typography:
+  display:
+    family: "Georgia, 'Times New Roman', serif"
+    weight: 700
+  ui:
+    family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    weight: 500
+  sizes:
+    xs: 8
+    sm: 10
+    md: 12
+    lg: 14
+    xl: 18
+    title: 22
+
+spacing:
+  1: 4
+  2: 8
+  3: 12
+  4: 16
+  5: 24
+  6: 32
+
+radii:
+  control: 6
+  panel: 10
+  floating: 14
+  round: 999
+
+sizes:
+  topbar_height: 44
+  action_dock_height: 48
+  compact_control_height: 36
+  comfortable_control_height: 42
+  drawer_width: 300
+  inspector_width: 280
+  player_hud_max_width: 340
+  compact_breakpoint: 1100
+  mobile_breakpoint: 760
+
+layers:
+  map: 0
+  map_overlay: 5
+  chrome: 10
+  drawer: 20
+  inspector: 22
+  popover: 30
+  context_menu: 32
+  workspace: 40
+  command_palette: 45
+  toast: 50
+
+motion:
+  fast_ms: 120
+  normal_ms: 180
+  slow_ms: 240
+  easing: "ease-out"
+
+safe_zones:
+  top: "campaign, scene, presence, session menu"
+  bottom_left: "mode and frequent contextual actions"
+  bottom_center: "camera controls"
+  bottom_right: "player character HUD"
+  left_context: "task drawer when explicitly opened"
+  right_context: "selection inspector when a context target exists"
 ---
 
-## 1. Зачем мы переделываем интерфейс
+# TTV Design System
 
-TTV должен ощущаться как **виртуальный игровой стол**, а не как админ-панель поверх карты.
+`DESIGN.md` is the source of truth for the tabletop interface. New UI should follow this document before adding floating controls, layout exceptions, or one-off visual rules.
 
-Главная проблема старого интерфейса — каждая новая функция добавляла собственную кнопку, панель, `position: fixed` или `z-index`. В итоге:
+The goal is not to make the interface empty. The goal is to keep the **map as the primary working surface** while making important actions obvious without requiring users to memorize hotkeys.
 
-- элементы UI перекрывают друг друга;
-- карта теряет полезную площадь;
-- на разных разрешениях часть функций становится недоступной;
-- мастер одновременно видит инструменты, которые относятся к разным сценариям;
-- минималистичный вариант, наоборот, становится слишком пустым и непонятным без знания хоткеев;
-- одни и те же функции доступны в нескольких местах и создают дублирование.
+## 1. Core rules
 
-Новая система должна решить это **архитектурно**, а не набором CSS-фиксов.
+### Map first
 
----
+The map is the default state of the tabletop. UI may reduce the map viewport when a task requires persistent information, but persistent chrome must never cover another persistent UI element.
 
-# 2. Главный принцип
+Do not solve layout conflicts with higher `z-index` values. Persistent UI receives real layout space or an exclusive safe zone.
 
-## Карта — рабочая поверхность. UI — её инструментарий.
+### Progressive disclosure
 
-Пользователь должен большую часть времени смотреть на карту и происходящее на ней.
+Show only the information needed for the current task.
 
-Интерфейс должен появляться тогда, когда он нужен, и исчезать, когда задача закончена.
+- No scene editing controls during ordinary play.
+- No initiative when combat is inactive.
+- No full character sheet when a compact HUD is enough.
+- No permanent dice panel after the roll is finished.
 
-Это означает:
+### Context before navigation
 
-1. **Progressive disclosure** — не показывать всё сразу.
-2. **Context first** — действия появляются рядом с объектом или сценарием, к которому относятся.
-3. **Mode aware** — Play / Combat / Prepare реально меняют доступные инструменты.
-4. **Safe zones** — постоянные элементы никогда физически не занимают одну область экрана.
-5. **No hidden knowledge** — хоткеи ускоряют работу, но основные функции должны быть понятны без них.
-6. **One source of truth** — один UI-controller знает, какая поверхность открыта.
+When an action belongs to an object on the map, expose it near that object or through a context menu.
 
----
+Examples:
 
-# 3. Пользователи
+- Token -> sheet, HP, visibility, remove from scene.
+- Empty map -> map/scene actions.
+- Selected area -> dimensions, occupants, fog/terrain actions in Prepare mode.
 
-## 3.1 Игрок
+### Modes represent scenarios
 
-Игрок приходит на стол ради игры, а не ради управления системой.
+The tabletop has three modes:
 
-Постоянно ему нужны:
+- `play` — ordinary session and exploration.
+- `combat` — active initiative/combat runtime.
+- `prepare` — GM-only scene and content preparation.
 
-- карта;
-- состояние собственного персонажа;
-- понимание текущего хода;
-- кубы;
-- быстрый доступ к полному листу.
+Modes promote the actions relevant to the current scenario. They do not create duplicate data models.
 
-Редко нужны:
+### Hotkeys accelerate; they do not replace discoverability
 
-- настройки интерфейса;
-- подробный журнал;
-- вторичные системные инструменты.
+Primary actions must remain discoverable without keyboard knowledge.
 
-Игрок **не должен видеть GM-инструменты**.
+| Shortcut | Action |
+| --- | --- |
+| `Ctrl/Cmd + K` | Command palette |
+| `Esc` | Close highest dismissible surface |
+| `H` | Hide/show tabletop chrome |
+| `Space + drag` | Pan map |
+| Mouse wheel | Zoom map |
 
----
-
-## 3.2 Мастер
-
-Мастер переключается между несколькими типами деятельности:
-
-- ведёт обычную игровую сцену;
-- проводит бой;
-- готовит сцену;
-- создаёт/редактирует контент;
-- работает с персонажами и NPC;
-- ведёт заметки.
-
-Ошибка — показывать инструменты всех этих сценариев одновременно.
-
----
-
-# 4. Режимы стола
-
-```ts
-type TableMode = 'play' | 'combat' | 'prepare';
-```
-
-## 4.1 Play Mode
-
-Обычное ведение игры.
-
-Приоритет:
-
-1. карта;
-2. персонажи;
-3. кубы;
-4. заметки;
-5. контекстные действия объектов.
-
-Не показывать постоянно:
-
-- сетку;
-- туман;
-- калибровку;
-- импорт;
-- редактор сцены;
-- инструменты подготовки.
-
----
-
-## 4.2 Combat Mode
-
-Включается автоматически при `runtime.combat_active === true`.
-
-Приоритет:
-
-1. текущий ход;
-2. инициатива;
-3. HP / состояния;
-4. движение;
-5. боевые действия;
-6. кубы.
-
-UI должен сам стать более информативным.
-
-После окончания боя combat chrome исчезает автоматически.
-
----
-
-## 4.3 Prepare Mode
-
-Включается мастером вручную.
-
-Это единственный режим, где допустим более насыщенный интерфейс.
-
-Приоритет:
-
-- сцена;
-- карта;
-- сетка;
-- туман;
-- токены;
-- освещение;
-- масштаб;
-- загрузка ассетов.
-
-Игрок никогда не видит Prepare Mode.
-
----
-
-# 5. Иерархия поверхностей
-
-Интерфейс разделяется не по фичам, а по **уровню взаимодействия**.
+## 2. Canonical shell
 
 ```text
-Tabletop
-│
-├── Persistent Chrome
-│   ├── TopBar
-│   ├── ModeDock
-│   ├── CameraControls
-│   └── PlayerHud
-│
-├── Context Layer
-│   ├── ContextMenu
-│   ├── Tooltip
-│   ├── TokenActions
-│   └── SelectionInfo
-│
-├── Task Layer
-│   ├── Drawer
-│   ├── Inspector
-│   └── Popover
-│
-├── Workspace Layer
-│   ├── CharacterSheet
-│   ├── ItemBuilder
-│   ├── SceneEditor
-│   └── LargeEditors
-│
-└── System Layer
-    ├── Toast
-    ├── ConfirmDialog
-    └── CommandPalette
+TabletopShell
+├── TopBar
+├── MapViewport
+│   ├── MapWorld
+│   ├── Tokens
+│   └── MapContextLayer
+├── TaskDrawer
+├── SelectionInspector
+├── ActionDock
+├── CameraControls
+├── PlayerCharacterHud
+├── Workspace
+├── CommandPalette
+└── ToastLayer
 ```
 
----
+Only a higher semantic layer may cover a lower one.
 
-# 6. Persistent Chrome
+## 3. Safe zones
 
-Постоянный UI должен быть минимальным, но **понятным**.
-
-## 6.1 TopBar
-
-Высота desktop: **44 px**.
-
-Показывает только глобальный контекст:
-
-```text
-TTV | Название кампании | Текущая сцена               Online | Меню
-```
-
-TopBar НЕ должен содержать:
-
-- zoom;
-- мастерскую;
-- отдельную кнопку масштаба;
-- combat controls;
-- большой набор инструментов.
-
-### Назначение зон TopBar
-
-| Зона | Содержимое |
-|---|---|
-| Left | TTV / название кампании |
-| Center-left | текущая сцена |
-| Right | online/status + session menu |
-
-Правый верхний угол принадлежит только status/session.
-
----
-
-## 6.2 ModeDock — GM
-
-Нижняя левая область.
-
-В обычной игре:
-
-```text
-[ Игра ] [ Персонажи ] [ Кубы ] [ Ещё… ]
-```
-
-В бою:
-
-```text
-[ ⚔ Бой · Раунд 4 ] [ Ход: Настя ] [ Персонажи ] [ Кубы ]
-```
-
-В подготовке:
-
-```text
-[ 🛠 Подготовка ] [ Сцена ] [ Ассеты ] [ Готово ]
-```
-
-### Важное правило
-
-ModeDock — это **один компонент**, а не несколько floating-кнопок.
-
-Он сам управляет:
-
-- шириной;
-- responsive;
-- количеством видимых действий;
-- overflow в `Ещё…`.
-
----
-
-## 6.3 CameraControls
-
-Отдельная safe-zone.
-
-Desktop:
-
-```text
-                 [ − ] [ 100% ] [ + ] [ Вписать ]
-```
-
-Рекомендуемое положение: **bottom-center**.
-
-CameraControls не должен делить координаты с:
-
-- online status;
-- player HUD;
-- ModeDock.
-
-Основные жесты:
-
-- колесо — zoom;
-- Space + drag / средняя кнопка — pan;
-- кнопки остаются как discoverable fallback.
-
----
-
-## 6.4 PlayerHud
-
-Только для игрока.
-
-Desktop — компактная карточка снизу справа.
-
-```text
-┌──────────────────┐
-│ 🧙 Настя         │
-│ ♥ 24 / 30        │
-│ 🛡 16            │
-│ [Лист]    [🎲]   │
-└──────────────────┘
-```
-
-Во время боя:
-
-```text
-┌──────────────────┐
-│ ТВОЙ ХОД         │
-│ ♥ 24 / 30        │
-│ ↗ 18 / 30 ft     │
-│ эффекты: 2       │
-│ [Лист]    [🎲]   │
-└──────────────────┘
-```
-
-Вне боя movement не обязан постоянно занимать место — расстояние показывается контекстно при движении.
-
----
-
-# 7. Safe Zones
-
-Это жёсткое правило дизайна.
+Persistent UI must occupy a known zone. Two persistent components must never share a zone.
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│ TOP BAR                                                  │
+│ TOP: campaign · scene                         online · ☰ │
 ├──────────────────────────────────────────────────────────┤
-│                                                          │
 │                                                          │
 │                         MAP                              │
 │                                                          │
-│                                                          │
-│                                                          │
 ├──────────────────────────────────────────────────────────┤
-│ MODE DOCK          CAMERA CONTROLS          PLAYER HUD    │
+│ MODE/ACTIONS          CAMERA              PLAYER HUD     │
 └──────────────────────────────────────────────────────────┘
 ```
 
-### Никогда не допускается
+### Top
+
+Reserved for:
+
+- campaign name;
+- active scene;
+- presence/connectivity;
+- global/session menu.
+
+Do not place zoom, dice, character actions, workshop, measurement, or combat tools here.
+
+### Bottom-left
+
+Reserved for:
+
+- current mode;
+- 2-3 most likely actions;
+- entry point to all actions/search.
+
+### Bottom-center
+
+Reserved for camera controls:
 
 ```text
-online + zoom в одной точке
-ModeDock + CameraControls друг поверх друга
-CameraControls + PlayerHud друг поверх друга
-popover + modal без координации
+[-] [100% / Fit] [+]
 ```
 
-Safe-zone layout должен рассчитываться компонентом оболочки, а не независимыми `position: fixed`.
+### Bottom-right
 
----
+Reserved for the player's compact character HUD.
 
-# 8. Drawers
+### Left contextual area
 
-Drawer используется для задачи, которая нужна дольше одного действия, но не требует полного Workspace.
+Used by one task drawer at a time: Characters, Combat, Library, Notes, Prepare tools.
 
-Примеры:
+Opening a drawer reduces map width. It never overlays the map.
 
-- персонажи;
+### Right contextual area
+
+Used by the selection inspector only when a meaningful context target exists.
+
+No selection -> no inspector -> the map receives the space back.
+
+## 4. GM layouts
+
+### Play mode
+
+Default state is calm but not empty.
+
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│ Campaign                 Scene                         ● Online ☰ │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│                              MAP                                 │
+│                                                                  │
+│                                                                  │
+│ [Play] [Characters] [Dice] [Prepare]     [-] [100%] [+]         │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Visible priorities:
+
+1. Characters
+2. Dice
+3. Prepare
+4. All actions/search
+
+### Characters drawer
+
+```text
+┌──────────────────┬───────────────────────────────────────────────┐
+│ CHARACTERS       │                                               │
+│ Search           │                                               │
+│ Nastya           │                    MAP                        │
+│ Danila           │                                               │
+│ Ilyas            │                                               │
+│ NPCs             │                                               │
+│ + Create         │                                               │
+└──────────────────┴───────────────────────────────────────────────┘
+```
+
+Drawer width target: `300px` desktop.
+
+### Selection inspector
+
+```text
+┌───────────────┬────────────────────────────┬────────────────────┐
+│ CHARACTERS    │                            │ NASTYA             │
+│               │                            │ HP 23 / 30         │
+│ Nastya        │            MAP             │ Defense 16         │
+│ Danila        │                            │ Speed 30 ft        │
+│ Ilyas         │                            │ Effects: 2         │
+│               │                            │ [Open sheet]       │
+└───────────────┴────────────────────────────┴────────────────────┘
+```
+
+Inspector rules:
+
+- appears only from current context;
+- closes when context is cleared;
+- contains compact, reversible actions;
+- never contains the full character sheet.
+
+### Combat mode
+
+Combat mode activates automatically from campaign runtime.
+
+Promote:
+
+- round;
+- current actor/turn;
 - combat tracker;
-- библиотека;
-- заметки;
-- scene tools.
-
-## Поведение
-
-При открытии drawer карта **уменьшается**, а не остаётся под панелью.
+- player movement budget;
+- combat-relevant quick actions.
 
 ```text
-┌────────────────┬────────────────────────────────────────┐
-│ DRAWER         │                                        │
-│                │                                        │
-│                │                 MAP                    │
-│                │                                        │
-└────────────────┴────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Campaign        Scene        ⚔ Round 4                ● Online ☰ │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│                              MAP                                 │
+│                                                                  │
+│ [⚔ Combat] [Turn: Nastya] [Characters] [Dice]   [-] [100%] [+] │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-Desktop width: **280–320 px**.
+Opening Combat creates a task drawer, not a floating overlay.
 
-Открыт одновременно максимум **один основной drawer**.
+### Prepare mode
 
-Нажатие текущей кнопки повторно закрывает drawer.
-
-`Esc` закрывает drawer.
-
----
-
-# 9. Inspector
-
-Inspector появляется только при выбранном объекте.
-
-Например выбран Actor:
+Prepare mode is GM-only and may expose more controls because the user explicitly entered an editing workflow.
 
 ```text
-┌─────────────────┐
-│ НАСТЯ           │
-│                 │
-│ HP 23 / 30      │
-│ AC 16           │
-│ Speed 30 ft     │
-│                 │
-│ Эффекты         │
-│                 │
-│ [Открыть лист]  │
-└─────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│ Prepare · Scene name                                      Done  │
+├──────────────────┬───────────────────────────────────────────────┤
+│ SCENE            │                                               │
+│ Map              │                                               │
+│ Grid             │                                               │
+│ Fog              │                    MAP                        │
+│ Tokens           │                                               │
+│ Lighting         │                                               │
+│ Measurement      │                                               │
+└──────────────────┴───────────────────────────────────────────────┘
 ```
 
-### Правила
+Measurement/calibration belongs under `Scene -> Measurement`. It is not a permanent Play-mode control.
 
-- нет selection → нет inspector;
-- клик по пустой карте закрывает inspector;
-- inspector не должен существовать постоянно;
-- полный лист не помещается в inspector.
+## 5. Player layout
 
-Desktop width: **260–300 px**.
-
-При одновременном drawer + inspector карта занимает оставшееся пространство.
-
----
-
-# 10. Context Menu
-
-Контекстные действия должны находиться **рядом с объектом**, а не в другом углу экрана.
-
-## 10.1 GM — токен
-
-ПКМ по токену:
+Player UI is intentionally simpler.
 
 ```text
-Гоблин
+┌──────────────────────────────────────────────────────────────────┐
+│ Campaign                    Scene                       ● Online │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│                              MAP                                 │
+│                                                                  │
+│                                                ┌──────────────┐  │
+│                                                │ Avatar Name  │  │
+│                                                │ ♥ 23 / 30    │  │
+│                                                │ Stat 16      │  │
+│                                                │ [Sheet] [🎲] │  │
+│                                                └──────────────┘  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Always-visible Player HUD information should be limited to high-session-value data:
+
+- actor identity;
+- HP;
+- optional promoted stat supplied by the game system/schema;
+- active effects indicator;
+- open sheet;
+- dice.
+
+Movement is promoted when relevant, normally during the player's combat turn.
+
+The platform shell must not hardcode D&D-specific stats such as AC.
+
+## 6. Context menus
+
+Context menus expose object-specific actions without filling the screen with buttons.
+
+### GM token context
+
+Recommended first level:
+
+```text
+Actor name
+HP 7 / 12
 ────────────
-Открыть лист
-HP
-Скрыть / показать
-Дублировать
-Убрать со сцены
-────────────
-Ещё…
+Open sheet
+Adjust HP
+Hide / Show
+Remove from scene
+More…
 ```
 
-В `Ещё…`:
+Destructive operations such as deleting the Actor from the campaign belong under `More…` and require confirmation.
 
-- размер;
-- принадлежность;
-- enemy/ally;
-- удалить Actor;
-- advanced properties.
+### Player token context
 
-Удаление Actor — только GM.
+Only actions permitted by ownership and game rules are shown. Do not show disabled GM actions merely to advertise their existence.
 
----
+### Empty-map context
 
-## 10.2 Игрок — собственный токен
+Useful GM actions may include:
 
-```text
-Персонаж
-Инвентарь
-Эффекты
-Кубы
-```
+- add token;
+- add note;
+- measure;
+- enter Prepare mode.
 
-Игрок не получает GM-actions.
+## 7. Surface selection
 
----
+Use the smallest appropriate surface.
 
-## 10.3 Map Context
+### Popover
 
-ПКМ по пустой карте у GM может давать:
+Short temporary choice or parameter adjustment.
 
-```text
-Добавить токен
-Добавить заметку
-Измерить
-Перейти в подготовку
-```
+Examples: dice palette, compact scene selector, token quick menu.
 
----
+### Drawer
 
-# 11. Progressive Disclosure
+Task requiring scanning or repeated interactions while watching the map.
 
-Пользователь всегда должен видеть только следующий полезный уровень.
+Examples: Characters, Combat, Notes, Library, Prepare Scene tools.
 
-Пример инструмента измерения:
+### Inspector
 
-```text
-1. Нажал "Инструменты"
-2. Выбрал "Линейка"
-3. Палитра закрылась
-4. Появилась маленькая строка настроек линейки
-5. Закончил измерение
-6. Строка исчезла
-```
+Compact details/actions for the current selected object.
 
-Нельзя оставлять весь toolbar на экране после выбора инструмента.
+### Workspace
 
----
+Focused editor for dense creation/editing tasks.
 
-# 12. Workspace
+Examples:
 
-Workspace — полноэкранный режим для сложной задачи.
+- full character sheet;
+- item builder;
+- future book/journal authoring;
+- complex scene editor.
 
-Примеры:
+When a Workspace is open, ordinary tabletop chrome is hidden. The workspace owns navigation back to the table.
 
-- Character Sheet;
-- Item Builder;
-- редактор большой книги/хроники;
-- сложный редактор сцены;
-- будущий bestiary editor.
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ ← Назад       НАЗВАНИЕ                         Сохранено ✓ │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│                    WORKSPACE                                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Workspace rules
-
-Когда Workspace открыт:
-
-- TopBar стола скрыт;
-- ModeDock скрыт;
-- CameraControls скрыты;
-- PlayerHud скрыт;
-- floating dice trigger скрыт;
-- UI preferences скрыты;
-- drawers/inspector закрываются.
-
-Только Workspace и system toast/dialog имеют право быть поверх.
-
----
-
-# 13. Combat UX
-
-Combat Mode должен усиливать информацию, но не превращать экран в dashboard.
-
-## GM
-
-Постоянно видно:
-
-- `⚔ Бой · Раунд N`;
-- текущий Actor.
-
-Инициатива открывается по кнопке Combat и занимает drawer.
-
-```text
-┌──────────────────┬──────────────────────────────────────┐
-│ БОЙ · РАУНД 4    │                                      │
-│                  │                                      │
-│ → Настя          │                MAP                   │
-│ 2 Данила         │                                      │
-│ 3 Гоблин         │                                      │
-│ 4 Ильяс          │                                      │
-│                  │                                      │
-│ [Следующий ход]  │                                      │
-└──────────────────┴──────────────────────────────────────┘
-```
-
-## Player
-
-Когда не его ход — компактный HUD.
-
-Когда его ход — HUD расширяется и показывает:
-
-- `ТВОЙ ХОД`;
-- остаток движения;
-- важные активные состояния;
-- быстрый доступ к листу/кубам.
-
----
-
-# 14. Prepare UX
-
-Prepare Mode должен визуально отличаться от игры.
-
-Не обязательно другим цветом всего приложения — достаточно режима и набора инструментов.
-
-```text
-┌──────────────────────────────────────────────────────────┐
-│ Подготовка · Лесок                              Готово   │
-├────────────────┬─────────────────────────────────────────┤
-│ СЦЕНА          │                                         │
-│                │                                         │
-│ Карта          │                                         │
-│ Сетка          │                  MAP                    │
-│ Туман          │                                         │
-│ Токены         │                                         │
-│ Освещение      │                                         │
-│ Масштаб        │                                         │
-└────────────────┴─────────────────────────────────────────┘
-```
-
-Калибровка расстояния относится к **Scene / Scale**, а не существует отдельной постоянной кнопкой.
-
----
-
-# 15. Command Palette
-
-`Ctrl+K` / `Cmd+K` открывает глобальный поиск действий.
-
-Это инструмент для опытных пользователей, но не замена нормальной навигации.
-
-Пример:
-
-```text
-> Что сделать?
-
-Персонажи
-Начать бой
-Следующий ход
-Кубы
-Создать NPC
-Создать предмет
-Настроить сцену
-Калибровать масштаб
-Открыть заметки
-Скрыть интерфейс
-```
-
-Поиск должен учитывать:
-
-- название;
-- синонимы;
-- текущий режим;
-- роль пользователя.
-
-Не показывать действия, на которые нет прав.
-
----
-
-# 16. Hotkeys
-
-Хоткеи — дополнительный слой скорости.
-
-Минимальный набор:
-
-| Hotkey | Action |
-|---|---|
-| `Esc` | закрыть верхнюю активную поверхность |
-| `Ctrl/Cmd + K` | command palette |
-| `H` | hide/show chrome |
-| `Space + drag` | pan карты |
-| `Wheel` | zoom |
-| `Shift + drag` | измерение расстояния |
-| `F` | fit map |
-| `C` | character sheet |
-| `R` | dice tray |
-
-Хоткеи не должны срабатывать при вводе текста в:
-
-- input;
-- textarea;
-- select;
-- contenteditable.
-
----
-
-# 17. Surface Controller
-
-Новая архитектура не должна управлять UI через `document.querySelector(...).click()`.
-
-Нужен центральный React controller.
-
-Пример:
-
-```ts
-type TabletopUiState = {
-  mode: 'play' | 'combat' | 'prepare';
-  drawer: 'characters' | 'combat' | 'library' | 'notes' | 'scene' | null;
-  inspector: { type: 'actor' | 'token'; id: string } | null;
-  popover: 'dice' | 'camera' | 'interface' | null;
-  workspace: 'character' | 'item' | 'scene' | null;
-  contextMenu: ContextMenuState | null;
-  chromeHidden: boolean;
-};
-```
-
-API уровня UI:
-
-```ts
-openDrawer('characters');
-openInspector({ type: 'actor', id });
-openWorkspace('character');
-openPopover('dice');
-closeTopSurface();
-closeAllTransient();
-setMode('prepare');
-```
-
-Controller отвечает за collision policy.
-
----
-
-# 18. Collision Policy
-
-Система сама закрывает несовместимые поверхности.
-
-Примеры:
-
-```text
-openWorkspace(character)
-→ close(drawer)
-→ close(inspector)
-→ close(popover)
-→ close(contextMenu)
-→ hide(table chrome)
-```
-
-```text
-openPopover(dice)
-→ close(otherPopover)
-→ close(contextMenu)
-```
-
-```text
-openDrawer(combat)
-→ close(otherDrawer)
-```
-
-Не допускается открывать несколько competing surfaces через `z-index`.
-
----
-
-# 19. Z-index policy
-
-Запрещены случайные значения вроде `11800`, `14000`, `99999`.
-
-Используем фиксированную шкалу:
-
-```css
---z-map: 0;
---z-map-overlay: 5;
---z-chrome: 10;
---z-drawer: 20;
---z-popover: 30;
---z-workspace: 40;
---z-dialog: 50;
---z-toast: 60;
-```
-
-Если новый элемент требует `z-index: 1000+`, значит архитектура поверхности неправильная.
-
----
-
-# 20. UI Kit
-
-Минимальный набор общих компонентов:
+## 8. Canonical UI components
 
 ```text
 Button
 IconButton
-SegmentedButton
+SegmentedControl
 TopBar
-ModeDock
+ModeControl
+ActionDock
 CameraControls
-PlayerHud
 Drawer
 Inspector
 Popover
 ContextMenu
 Workspace
+CharacterHud
+CombatTracker
 CommandPalette
 Toast
-ConfirmDialog
-Tooltip
-Badge
-Tabs
-Field
 ```
 
-Каждый функциональный модуль использует эти компоненты вместо создания собственного chrome.
+Do not create a new visual primitive if an existing component expresses the same interaction.
 
----
+### Button rules
 
-# 21. Design Tokens
+- Text buttons for actions whose meaning is not obvious from an icon.
+- Icon-only controls require `aria-label` and tooltip.
+- Normally one primary action per panel/workspace.
+- Danger styling appears only at the final destructive step.
 
-## Spacing
+### Icon rules
+
+Icons support meaning; they do not replace labels for primary navigation on desktop.
+
+At compact widths, secondary labels may collapse while tooltips remain available.
+
+## 9. Layering policy
+
+Do not use arbitrary z-index escalation.
+
+Semantic layers are defined in the frontmatter:
 
 ```text
-4 / 8 / 12 / 16 / 24 / 32 px
+map            0
+map overlay    5
+chrome        10
+drawer        20
+inspector     22
+popover       30
+context menu  32
+workspace     40
+command       45
+toast         50
 ```
 
-## Radius
+If two components on the same layer overlap, that is a layout/state bug. Do not fix it with `z-index: 9999`.
+
+## 10. Collision policy
+
+Transient surfaces are exclusive by group.
+
+Examples:
 
 ```text
-6 px  — small controls
-10 px — buttons/cards
-14 px — large panels
+Dice -> UI Preferences       => close Dice
+UI Preferences -> Popover    => close UI Preferences
+Workspace -> normal chrome   => Workspace wins
+Command Palette -> Popover   => Command Palette wins
 ```
 
-## Dimensions
+Drawer + Inspector may coexist because they own different layout zones.
+
+## 11. Responsive behavior
+
+### Desktop > 1100px
+
+- labels visible;
+- drawer `300px`;
+- inspector about `280px`;
+- camera controls bottom-center;
+- persistent chrome never overlaps.
+
+### Compact 760-1100px
+
+- secondary labels may collapse;
+- drawer may reduce to about `260px`;
+- avoid Drawer + Inspector simultaneously if map space becomes unusable;
+- lower-priority surface yields to higher-priority task context.
+
+### Mobile < 760px
+
+Do not shrink desktop layout mechanically.
+
+- map remains primary;
+- only one bottom task surface at a time;
+- drawers become bottom/full-height sheets;
+- command palette remains searchable;
+- touch targets stay at least `42px` where practical.
+
+## 12. Accessibility
+
+- Minimum target: `36px` desktop, `42px` preferred touch.
+- Every icon-only control has `aria-label`.
+- Keyboard focus is visible.
+- `Esc` closes the highest dismissible surface deterministically.
+- Hotkeys never fire while typing in an editor/input.
+- Critical meaning cannot depend on color alone.
+
+## 13. Universal tabletop requirement
+
+Core UI belongs to the platform, not to one game system.
+
+Avoid mandatory platform concepts such as:
 
 ```text
-TopBar:        44 px
-ModeDock:      44–48 px
-Drawer:        280–320 px
-Inspector:     260–300 px
-PlayerHud:     240–320 px max
-Touch target:  40 px minimum
+AC
+Spell Slots
+5 ft
+D20 Attack
 ```
 
-## Typography hierarchy
+Prefer system-provided metadata:
 
 ```text
-Caption      10–11 px
-Control      12–13 px
-Body         13–14 px
-Panel title  15–16 px
-Workspace    18–24 px
+promoted defensive stat from Game System
+movement unit from Scene/Game System
+resource chips from Character Schema
+roll actions from Game System
 ```
 
-Декоративный fantasy serif можно использовать для заголовков и атмосферы.
+D&D-like behavior belongs in a game-system/campaign preset rather than the platform shell.
 
-Функциональный текст должен оставаться легко читаемым.
+## 14. Target UI state model
 
----
-
-# 22. Visual Style
-
-TTV должен выглядеть как современный fantasy tabletop, а не как браузерная админка.
-
-Рекомендуемые качества:
-
-- тёмная нейтральная основа;
-- тёплые латунные/золотые акценты;
-- минимальные границы;
-- лёгкая прозрачность только там, где она не ухудшает читаемость;
-- умеренный blur;
-- карты/арт должны визуально доминировать над chrome;
-- опасные действия отделены цветом и положением.
-
-Не использовать декоративность ценой читаемости.
-
----
-
-# 23. Responsive
-
-UI проектируется минимум под три диапазона.
-
-## Desktop Large — `>= 1440px`
-
-Можно одновременно показывать:
-
-- Drawer;
-- Map;
-- Inspector.
-
-## Desktop Compact — `900–1439px`
-
-Главное целевое разрешение для проверки — **около 1300 px**.
-
-Правила:
-
-- текст вторичных quick actions может сокращаться;
-- drawer остаётся;
-- inspector при нехватке ширины заменяется popover/drawer;
-- карта никогда не должна становиться недоступной;
-- ни одна кнопка не выходит за viewport.
-
-## Mobile / Narrow — `< 900px`
-
-- один task-surface одновременно;
-- Drawer становится bottom sheet / full-height overlay;
-- подписи secondary actions скрываются;
-- PlayerHud компактен;
-- CameraControls упрощаются;
-- Map остаётся touch-first.
-
----
-
-# 24. Scroll Policy
-
-Не должно быть ситуации, где часть интерфейса просто уходит за нижнюю границу экрана.
-
-Правила:
-
-- viewport shell не скроллится;
-- карта управляет камерой независимо;
-- drawer имеет собственный `overflow-y: auto`;
-- workspace имеет собственный scroll container;
-- popover ограничивается `max-height` и скроллится внутри;
-- wheel внутри scrollable UI не должен zoom'ить карту.
-
-Использовать `data-wheel-isolation` или общий equivalent на интерактивных scroll surfaces.
-
----
-
-# 25. Character Sheet
-
-Полный лист персонажа — Workspace.
-
-Он не должен быть маленьким floating-окном, окружённым остальным UI стола.
-
-Структура:
-
-```text
-← Стол      НАСТЯ                           Сохранено ✓
-──────────────────────────────────────────────────────
-Обзор | Бой | Навыки | Инвентарь | Заметки
-
-[ content ]
-```
-
-GM может редактировать структуру/поля там, где это разрешено системой кампании.
-
-Игрок видит только разрешённые действия.
-
----
-
-# 26. Item / Content Builder
-
-Создание предмета, таблицы или другого крупного контента открывает Workspace.
-
-Никаких постоянных bottom docks поверх формы.
-
-При входе в builder:
-
-```text
-Tabletop chrome → hidden
-Workspace chrome → active
-```
-
-После закрытия пользователь возвращается на тот же стол и в тот же контекст.
-
----
-
-# 27. Scene Scale and Grid
-
-Визуальная сетка и физический масштаб мира независимы.
-
-Scene tools показывают:
-
-```text
-Сетка
-Размер клетки: 64 px
-Offset X / Y
-Snap
-
-Расстояния
-Unit: ft
-Scale: 5 ft = 64 map px
-[Калибровать]
-```
-
-Изменение `grid_size` не должно менять физическую математику движения после калибровки.
-
-Scale tools существуют внутри Scene/Prepare UI, а не как постоянная кнопка на игровом экране.
-
----
-
-# 28. Empty States
-
-Минимализм не должен создавать ощущение, что функционала нет.
-
-Если данных нет, показываем ясное следующее действие.
-
-Пример GM без сцены:
-
-```text
-🗺 Сцена ещё не создана
-
-Создайте первую карту для этой кампании.
-
-[Создать сцену]
-```
-
-Пример игрок без назначенного Actor:
-
-```text
-🧙 Персонаж ещё не назначен
-Мастер назначит вам героя.
-```
-
----
-
-# 29. Discoverability
-
-Функция не считается доступной только потому, что для неё существует hotkey.
-
-Правило:
-
-> **Каждое основное действие должно иметь хотя бы один очевидный визуальный путь.**
-
-Хоткеи, command palette и context menu — дополнительные ускорители.
-
-Новый пользователь без инструкции должен суметь найти:
-
-- персонажей;
-- кубы;
-- бой;
-- подготовку сцены;
-- полный лист;
-- главное меню.
-
----
-
-# 30. Что НЕ делать
-
-Не возвращаемся к следующим паттернам:
-
-### ❌ Floating button per feature
-
-```text
-Кубы отдельно
-Масштаб отдельно
-Интерфейс отдельно
-Combat отдельно
-```
-
-### ❌ Несвязанные fixed-панели
-
-Каждый новый fixed-элемент повышает вероятность collision.
-
-### ❌ CSS как state manager
-
-Не использовать `:has()` как основной механизм определения того, какая поверхность открыта.
-
-### ❌ DOM click bridge как финальная архитектура
+The final shell should use explicit React state instead of DOM-query adapters.
 
 ```ts
-document.querySelector(...).click();
+type TabletopUiState = {
+  mode: 'play' | 'combat' | 'prepare';
+  drawer: 'characters' | 'combat' | 'library' | 'notes' | 'scene' | null;
+  contextTarget: { type: 'actor' | 'token' | 'map' | 'area'; id?: string } | null;
+  inspector: 'actor' | 'token' | null;
+  popover: 'dice' | 'ui-preferences' | 'scene-selector' | null;
+  workspace: 'character' | 'item' | 'book' | null;
+  commandPaletteOpen: boolean;
+  chromeHidden: boolean;
+};
 ```
 
-Допустим только временно при миграции.
-
-### ❌ Permanent inspector
-
-Пустая правая колонка не должна существовать без selection.
-
-### ❌ Full feature toolbar
-
-Не показывать десятки инструментов постоянно.
-
-### ❌ Hotkey-only UX
-
-Нельзя требовать от пользователя помнить клавиши для базовой навигации.
-
----
-
-# 31. Целевой GM layout
-
-## Idle / Play
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ TTV  Campaign      Scene                         Online   ☰   │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│                                                              │
-│                            MAP                               │
-│                                                              │
-│                                                              │
-│                                                              │
-│ [Игра] [Персонажи] [Кубы] [Ещё]     [− 100% +]              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-## Characters Drawer
-
-```text
-┌────────────────┬─────────────────────────────────────────────┐
-│ ПЕРСОНАЖИ      │                                             │
-│                │                                             │
-│ Настя          │                    MAP                      │
-│ Данила         │                                             │
-│ Ильяс          │                                             │
-│ NPC            │                                             │
-│                │                                             │
-│ + Создать      │                                             │
-└────────────────┴─────────────────────────────────────────────┘
-```
-
-## Drawer + Inspector
-
-```text
-┌──────────────┬─────────────────────────────┬─────────────────┐
-│ ПЕРСОНАЖИ    │                             │ НАСТЯ           │
-│              │                             │ HP 23/30        │
-│ Настя        │             MAP             │ AC 16           │
-│ Данила       │                             │ Speed 30 ft     │
-│ Ильяс        │                             │                 │
-│              │                             │ [Открыть лист]  │
-└──────────────┴─────────────────────────────┴─────────────────┘
-```
-
----
-
-# 32. Целевой Player layout
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Campaign             Scene                        Online     │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│                                                              │
-│                            MAP                               │
-│                                                              │
-│                                                              │
-│                                             ┌─────────────┐  │
-│                                             │ 🧙 Настя    │  │
-│                                             │ ♥ 24/30     │  │
-│                                             │ 🛡 16       │  │
-│                                             │ [Лист] [🎲] │  │
-│                                             └─────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-```
-
----
-
-# 33. Accessibility and Interaction
-
-Минимальные требования:
-
-- все icon buttons имеют `aria-label`;
-- focus state видим;
-- `Esc` работает предсказуемо;
-- tab order соответствует визуальному порядку;
-- контекстные меню доступны не только ПКМ, но и keyboard-trigger;
-- цвет не является единственным индикатором состояния;
-- touch targets минимум около 40 px;
-- critical text сохраняет достаточный contrast.
-
----
-
-# 34. Implementation Plan
-
-Новый UI внедряется поэтапно.
-
-## Phase 1 — Controller
-
-- `TabletopUiProvider` / `useTabletopUi`;
-- единое surface state;
-- collision policy;
-- `Esc`;
-- mode state.
-
-## Phase 2 — Shell
-
-- новый `TopBar`;
-- `ModeDock`;
-- `CameraControls`;
-- реальные safe zones;
-- удалить необходимость позиционировать chrome друг поверх друга.
-
-## Phase 3 — GM Drawers
-
-Перенести по очереди:
-
-1. Combat;
-2. Characters;
-3. Scene;
-4. Library;
-5. Notes.
-
-## Phase 4 — Context UI
-
-- token context menu;
-- map context menu;
-- contextual inspector;
-- selection policy.
-
-## Phase 5 — Player
-
-- компактный PlayerHud;
-- combat expansion;
-- dice access;
-- character workspace.
-
-## Phase 6 — Workspaces
-
-- Character Sheet;
-- Item Builder;
-- другие dense editors.
-
-## Phase 7 — Cleanup
-
-Удалить:
-
-- old rail;
-- transitional DOM bridges;
-- redundant floating triggers;
-- obsolete CSS layers;
-- high random z-index values;
-- дублированную навигацию.
-
----
-
-# 35. Definition of Done — UI
-
-Новый UI **не считается готовым**, пока не выполнены все пункты.
-
-### Layout
-
-- [ ] Ни один постоянный UI-элемент не перекрывает другой.
-- [ ] Zoom не пересекается с status/menu.
-- [ ] PlayerHud не пересекается с camera controls.
-- [ ] ModeDock не пересекается с camera controls.
-- [ ] Drawer уменьшает доступный map viewport вместо наложения.
-- [ ] Inspector существует только при selection.
-- [ ] Dense editor полностью владеет workspace.
-
-### Responsive
-
-- [ ] Полный функционал доступен на ширине ~1300 px.
-- [ ] Нет элементов за границами viewport.
-- [ ] Scrollable панели можно прокрутить до конца.
-- [ ] Wheel внутри панели не zoom'ит карту.
-- [ ] Narrow layout не создаёт overlapping surfaces.
-
-### Discoverability
-
-- [ ] Новый пользователь визуально найдёт персонажей.
-- [ ] Новый пользователь визуально найдёт кубы.
-- [ ] GM визуально найдёт Combat.
-- [ ] GM визуально найдёт Prepare/Scene tools.
-- [ ] Игрок визуально найдёт Character Sheet.
-- [ ] Ни одно основное действие не существует только как hotkey.
-
-### Context
-
-- [ ] Combat UI появляется только в бою.
-- [ ] Prepare UI появляется только в Prepare Mode.
-- [ ] GM-only actions не видны игроку.
-- [ ] Context actions относятся к выбранному объекту.
-
-### Architecture
-
-- [ ] UI state управляется React controller, не CSS selector hacks.
-- [ ] Нет DOM `.click()` bridge в финальном shell.
-- [ ] Нет случайных `z-index: 9999+`.
-- [ ] Общие surfaces используют UI kit.
-- [ ] Одновременно открыт максимум один competing drawer/popover/workspace.
-
-### Quality
-
-- [ ] Typecheck проходит.
-- [ ] Production build проходит.
-- [ ] Есть interaction/regression tests на surface behavior.
-- [ ] Выполнена ручная проверка GM + player.
-- [ ] Выполнена ручная проверка desktop ~1300 px.
-
----
-
-# 36. Design Decision Summary
-
-Если возникает спор о том, куда добавить новую функцию, использовать следующий порядок:
-
-```text
-1. Это действие относится к объекту на карте?
-   → Context Menu / Inspector
-
-2. Это частое действие текущего режима?
-   → ModeDock
-
-3. Это задача на несколько минут рядом с картой?
-   → Drawer
-
-4. Это маленькая временная настройка?
-   → Popover
-
-5. Это сложный редактор?
-   → Workspace
-
-6. Это редкая глобальная функция?
-   → Menu / Command Palette
-```
-
-Если ответ — «добавить ещё одну fixed-кнопку поверх карты», почти наверняка выбран неправильный уровень UI.
-
----
-
-# 37. Главный критерий
-
-> В любой момент пользователь должен понимать **что происходит**, **что он может сделать следующим** и **куда исчезнет интерфейс после завершения задачи**.
-
-UI TTV должен быть достаточно тихим, чтобы не мешать погружению, и достаточно явным, чтобы им можно было пользоваться без инструкции.
+UI transitions go through one controller so collision behavior is deterministic.
+
+## 15. Implementation plan
+
+The current contextual UI experiments are prototypes, not the final architecture.
+
+Recommended migration:
+
+1. Introduce canonical CSS design tokens from this file.
+2. Introduce `TabletopUiController` with explicit state.
+3. Build final `TopBar`, `ActionDock`, and `CameraControls`.
+4. Implement one canonical `Drawer`.
+5. Move Characters into Drawer.
+6. Move Combat into Drawer.
+7. Move Scene/Measurement into Prepare Drawer.
+8. Add token/map context menus.
+9. Introduce canonical `Inspector`.
+10. Move character/item editors to `Workspace` behavior.
+11. Replace DOM `querySelector().click()` adapters with direct state/callbacks.
+12. Remove legacy floating triggers and obsolete CSS layers.
+13. Add interaction-level browser tests for collision and responsive behavior.
+
+## 16. Definition of done
+
+A tabletop UI change is not complete unless all relevant statements are true:
+
+- [ ] No persistent UI overlaps another persistent UI at supported viewport sizes.
+- [ ] The primary action is discoverable without knowing a hotkey.
+- [ ] The map receives space back when contextual panels close.
+- [ ] Dense editors activate Workspace/focus behavior.
+- [ ] Rare actions are not permanently visible without a strong reason.
+- [ ] The same action is not duplicated in multiple permanent locations.
+- [ ] `Esc` behavior is deterministic.
+- [ ] The UI remains usable around 1300px desktop width.
+- [ ] Compact/mobile behavior is intentionally defined.
+- [ ] Core components do not hardcode one tabletop game system.
+- [ ] New z-index values use the semantic layer scale.
+- [ ] New controls reuse canonical tokens/components.
+
+## 17. Design review checklist
+
+Before implementing a major tabletop feature, answer:
+
+1. In which mode is this feature relevant?
+2. Is it persistent, contextual, drawer-level, popover-level, inspector-level, or workspace-level?
+3. What existing UI disappears or yields space when it opens?
+4. Can the user discover it without documentation or a memorized shortcut?
+
+If these questions do not have clear answers, the feature is not ready to enter the tabletop shell.
