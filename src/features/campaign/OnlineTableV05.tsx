@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { MapInteractionTools } from './MapInteractionTools';
 import { OnlineTable } from './OnlineTable';
 import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
@@ -255,6 +256,14 @@ export function OnlineTableV05(props: Props) {
         preferences={preferences}
         onChange={updatePreferences}
         onReset={resetPreferences}
+      />
+
+      <MapInteractionTools
+        campaignId={props.campaign.id}
+        mode={props.mode}
+        currentUserId={props.currentUserId}
+        displayName={props.displayName}
+        scene={activeScene}
       />
 
       {props.mode === 'gm' && gmAllowed && (
