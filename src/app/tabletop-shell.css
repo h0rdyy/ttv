@@ -7,6 +7,7 @@
   --ttv-gm-inspector: 330px;
   --ttv-player-topbar: 50px;
   --ttv-player-bottom-safe: 86px;
+  --ttv-player-drawer: min(410px, 38vw);
 }
 
 /* GM desktop: library + map + inspector are real columns, not stacked overlays. */
@@ -76,6 +77,25 @@
   max-width: calc(100vw - 300px);
 }
 
+/* On desktop the opened player dice tray becomes a real right drawer.
+   The map gives up the same width, so the drawer never hides map controls/tokens. */
+@media (min-width: 901px) {
+  .v05-table-layer.player-immersion:has(.dice-tray-anchor.open) .player-mode .online-map-stage {
+    margin-right: var(--ttv-player-drawer);
+  }
+
+  .v05-table-layer.player-immersion .dice-tray-anchor.open .dice-tray {
+    position: fixed;
+    top: 60px;
+    right: 10px;
+    bottom: calc(var(--ttv-player-bottom-safe) + 8px);
+    left: auto;
+    width: var(--ttv-player-drawer);
+    max-height: none;
+    overflow: auto;
+  }
+}
+
 /* UI settings are part of top chrome, and disappear when a focus workspace owns the screen. */
 .v05-table-layer:has(.foundry-character-window) .tabletop-ui-preferences,
 .v05-table-layer:has(.online-workshop-panel .builder-view) .tabletop-ui-preferences {
@@ -98,7 +118,6 @@
 @media (max-width: 860px) {
   .v05-table-layer {
     --ttv-gm-library: min(220px, 42vw);
-    --ttv-gm-inspector: minmax(190px, 34vh);
   }
 
   .v05-table-layer .gm-mode .online-table-workspace {
