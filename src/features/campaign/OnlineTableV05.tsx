@@ -9,6 +9,7 @@ import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
 import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
+import { TabletopShellV2 } from './TabletopShellV2';
 import { TabletopUiPreferencesPanel, useTabletopUiPreferences } from './TabletopUiPreferences';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
@@ -233,12 +234,21 @@ export function OnlineTableV05(props: Props) {
   ].join('');
 
   return (
-    <div className={`v05-table-layer${immersionClasses}${uiClasses}`}>
+    <div className={`v05-table-layer tabletop-shell-v2${immersionClasses}${uiClasses}`}>
       <OnlineTable
         {...tableProps}
         initialActors={actors}
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
+      />
+
+      <TabletopShellV2
+        mode={props.mode}
+        campaignName={props.campaign.name}
+        activeSceneName={activeScene?.name ?? null}
+        combatActive={props.initialRuntime.combat_active}
+        combatRound={props.initialRuntime.combat_round}
+        focusActive={Boolean(characterActor)}
       />
 
       <TabletopUiPreferencesPanel
