@@ -2,6 +2,7 @@
 // Keep the settings flow covered whenever the tabletop shell changes.
 // CI synchronization marker for the UI-profile rollout.
 // Main-target CI marker.
+// Pull-request synchronization after retargeting to main.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
