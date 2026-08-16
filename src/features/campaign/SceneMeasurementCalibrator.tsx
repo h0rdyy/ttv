@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { useExclusiveTabletopSurface } from './useExclusiveTabletopSurface';
 import {
   DEFAULT_CELL_DISTANCE,
   DEFAULT_DISTANCE_UNIT,
@@ -65,6 +66,13 @@ export function SceneMeasurementCalibrator({ campaignId, scene, onChanged, onMes
   const [draft, setDraft] = useState<CalibrationDraft | null>(null);
   const draftRef = useRef<CalibrationDraft | null>(null);
   const initializedSceneRef = useRef(new Set<string>());
+
+  useExclusiveTabletopSurface('scene-measurement', open || calibrating, () => {
+    setOpen(false);
+    setCalibrating(false);
+    setDraft(null);
+    draftRef.current = null;
+  });
 
   const measurementSupported = scene?.measurement_supported !== false;
   const sceneScale = validScale(scene?.measurement_units_per_map_width);
