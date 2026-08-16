@@ -1,8 +1,39 @@
 ---
-name: ttv-heritage
-version: 0.1
+name: meridian
+version: 0.2
 status: draft
-purpose: "Design system and interaction specification for the TTV tabletop UI"
+purpose: "Brand, design-system and interaction specification for the Meridian tabletop platform"
+
+tagline: "Where worlds align."
+
+brand:
+  name: "Meridian"
+  concept: "A common axis connecting worlds, stories, systems and players."
+  archetypes:
+    - explorer
+    - creator
+  personality:
+    - calm
+    - precise
+    - atmospheric
+    - intelligent
+    - universal
+  visual_language:
+    - cartography
+    - coordinates
+    - meridian_lines
+    - horizons
+    - intersections
+    - portals
+    - subtle_constellations
+  avoid:
+    - d20_as_primary_brand_symbol
+    - dragons_as_brand_identity
+    - runes_as_default_brand_language
+    - permanent_fantasy_styling
+    - excessive_neon
+    - gamer_cliches
+    - genre_specific_core_ui
 
 principles:
   map_first: true
@@ -10,8 +41,11 @@ principles:
   contextual_actions: true
   mode_driven_ui: true
   keyboard_acceleration: true
+  discoverable_without_hotkeys: true
   no_overlapping_persistent_ui: true
   responsive_by_layout: true
+  one_ui_state_controller: true
+  core_ux_is_theme_independent: true
 
 modes:
   - play
@@ -19,24 +53,29 @@ modes:
   - prepare
 
 colors:
-  canvas: "#090806"
-  surface_1: "#0D0B08"
-  surface_2: "#15110C"
-  surface_3: "#20170F"
-  border_subtle: "#2F261A"
-  border: "#493822"
-  border_strong: "#6B4D2A"
-  text_primary: "#E8D1A7"
-  text_secondary: "#A99576"
-  text_muted: "#746855"
-  accent: "#C9924F"
-  accent_hover: "#E0B56F"
-  danger: "#A84F3A"
+  canvas: "#090B0E"
+  surface_1: "#11151A"
+  surface_2: "#171C22"
+  surface_3: "#20262D"
+  border_subtle: "#29313A"
+  border: "#3A4652"
+  border_strong: "#5E6B77"
+  text_primary: "#E8E4DA"
+  text_secondary: "#AAB0B7"
+  text_muted: "#747D86"
+  accent: "#C5A46D"
+  accent_hover: "#D8B982"
+  accent_secondary: "#6E8DA4"
+  danger: "#A9504A"
   success: "#668653"
   warning: "#B8863E"
   backdrop: "rgba(0, 0, 0, 0.42)"
 
 typography:
+  brand:
+    family: "Georgia, 'Times New Roman', serif"
+    weight: 700
+    tracking: "0.12em"
   display:
     family: "Georgia, 'Times New Roman', serif"
     weight: 700
@@ -93,6 +132,15 @@ motion:
   normal_ms: 180
   slow_ms: 240
   easing: "ease-out"
+  language:
+    - navigation
+    - alignment
+    - lines_connecting_points
+    - subtle_coordinate_shift
+  avoid:
+    - gratuitous_glitch
+    - excessive_particles
+    - arcade_bounce
 
 safe_zones:
   top: "campaign, scene, presence, session menu"
@@ -101,54 +149,340 @@ safe_zones:
   bottom_right: "player character HUD"
   left_context: "task drawer when explicitly opened"
   right_context: "selection inspector when a context target exists"
+
+theming:
+  architecture:
+    core_layout: immutable
+    interaction_patterns: immutable
+    accessibility: immutable
+    keyboard_model: immutable
+    semantic_tokens: themeable
+    decorative_assets: themeable
+    motion_flavor: themeable_within_limits
+  theme_controls:
+    colors: true
+    typography_display: true
+    borders: true
+    textures: true
+    icons: true
+    token_frames: true
+    dice_skin: true
+    decorative_motion: true
+  theme_must_not_change:
+    - navigation_logic
+    - drawer_behavior
+    - inspector_behavior
+    - context_menu_behavior
+    - keyboard_shortcuts
+    - workspace_hierarchy
+    - safe_zones
+    - accessibility
+    - touch_target_rules
+    - semantic_layer_order
 ---
 
-# TTV Design System
+# Meridian Design System
 
-`DESIGN.md` is the source of truth for the tabletop interface. New UI should follow this document before adding floating controls, layout exceptions, or one-off visual rules.
+> **Agent contract:** this document is the source of truth for all new tabletop UI work. Before creating or changing UI, read this file first. Do not invent a new layout pattern, permanent floating control, arbitrary z-index, genre-specific core behavior, or duplicate navigation path when an existing rule here applies.
 
-The goal is not to make the interface empty. The goal is to keep the **map as the primary working surface** while making important actions obvious without requiring users to memorize hotkeys.
+Meridian is a universal tabletop platform for different game systems, genres and campaign settings. The platform itself must remain recognizable and usable whether a campaign is dark fantasy, cyberpunk, cosmic horror, western, sci-fi or something custom.
 
-## 1. Core rules
+The core idea of the brand is simple:
 
-### Map first
+> **MERIDIAN — Where worlds align.**
 
-The map is the default state of the tabletop. UI may reduce the map viewport when a task requires persistent information, but persistent chrome must never cover another persistent UI element.
+A meridian is a line that connects distant points within one coordinate system. Meridian plays the same role for campaigns: it connects worlds, players, rules, scenes and stories without forcing them into one genre.
+
+---
+
+## 1. Agent rules: immutable vs themeable
+
+### Immutable core
+
+An agent MUST preserve these across every campaign theme:
+
+- information architecture;
+- navigation logic;
+- placement and meaning of safe zones;
+- Drawer / Inspector / Popover / Workspace behavior;
+- context-menu behavior;
+- keyboard shortcuts;
+- focus and accessibility behavior;
+- semantic layer order;
+- responsive intent;
+- game-system neutrality of platform components.
+
+A campaign theme may make a Drawer look like parchment, glass, brushed metal or paper. It may **not** move the Drawer somewhere else or change how it opens.
+
+### Themeable layer
+
+A setting/theme MAY change:
+
+- semantic color values;
+- display typography;
+- borders and corner treatment;
+- surface textures;
+- decorative icons;
+- token frames;
+- dice appearance;
+- loading art;
+- subtle animation flavor;
+- ambient effects.
+
+### Forbidden agent shortcuts
+
+Do NOT:
+
+- solve collisions with `z-index: 9999`;
+- add an independent `position: fixed` button without assigning it a safe zone;
+- put a permanent tool on screen because it is difficult to expose contextually;
+- hardcode D&D-specific concepts into platform chrome;
+- make hotkeys the only discoverable access path;
+- duplicate the same primary action in several persistent locations;
+- create a new primitive when a canonical component already expresses the interaction;
+- change core layout just to make one campaign theme look more dramatic.
+
+---
+
+# 2. Brand identity
+
+## 2.1 Brand meaning
+
+Meridian should feel like a **platform between worlds**, not like a fantasy product.
+
+The visual identity is based on:
+
+- cartography;
+- coordinates;
+- map lines;
+- horizons;
+- intersection points;
+- orbital/portal geometry;
+- subtle constellation-like structures.
+
+The brand should avoid using a d20, dragon, rune, sword or spellbook as its primary symbol. Those belong to specific games/settings, not to Meridian itself.
+
+## 2.2 Brand mark direction
+
+Preferred logo geometry:
+
+```text
+        │
+     ╭──┼──╮
+     │  ◇  │
+     ╰──┼──╯
+        │
+```
+
+Interpretation:
+
+- vertical line = meridian / axis;
+- center point = current world / campaign / table;
+- arcs = horizon / globe / portal;
+- intersections = people, systems and stories meeting in one place.
+
+The actual logo may evolve, but it should retain this geometric language rather than becoming genre art.
+
+## 2.3 Wordmark
+
+Preferred public wordmark:
+
+```text
+M E R I D I A N
+```
+
+Uppercase with restrained tracking. The wordmark should feel editorial/cartographic rather than esports-like.
+
+## 2.4 Core palette
+
+Meridian Core is deliberately neutral:
+
+```text
+Meridian Black       #090B0E
+Deep Graphite        #11151A
+Meridian Ivory       #E8E4DA
+Cartographic Grey    #AAB0B7
+Meridian Gold        #C5A46D
+Meridian Blue        #6E8DA4
+Signal Red           #A9504A
+```
+
+Gold is muted and cartographic, not medieval treasure gold. Blue prevents the product from drifting into permanent dark-fantasy brown.
+
+## 2.5 Typography
+
+Brand/display typography may use an elegant serif. Functional UI remains a highly readable sans-serif.
+
+Conceptually:
+
+```text
+MERIDIAN              <- brand / display
+Campaign / Character  <- functional UI
+```
+
+Do not use ornate fantasy fonts for normal controls.
+
+## 2.6 Motion language
+
+Core Meridian motion should communicate **navigation and alignment**.
+
+Good:
+
+- a line connecting two points;
+- a subtle coordinate grid shift;
+- surfaces aligning into position;
+- a marker appearing at an intersection;
+- restrained fade/slide transitions.
+
+Avoid as global brand behavior:
+
+- constant glitch;
+- particle explosions;
+- elastic arcade motion;
+- excessive holographic effects.
+
+A cyberpunk campaign theme may add restrained glitch flavor inside the theme layer, but Meridian Core does not become cyberpunk.
+
+## 2.7 Tone of voice
+
+Voice is:
+
+- calm;
+- concise;
+- human;
+- confident;
+- non-theatrical;
+- free of unnecessary technical jargon.
+
+Good:
+
+```text
+Создать сцену
+Не удалось загрузить карту.
+Этим персонажем управляет другой игрок.
+```
+
+Avoid:
+
+```text
+Создать новую сущность сцены
+Background asset upload failed
+Приготовьтесь, герои! Великое приключение ждёт!
+```
+
+The campaign may be theatrical. Meridian itself should not force a tone onto the campaign.
+
+---
+
+# 3. Product and theme architecture
+
+Meridian separates three concerns:
+
+```text
+Meridian Platform Core
+        ↓
+Game System
+        ↓
+Setting / Theme
+```
+
+Example:
+
+```text
+Meridian Core
++ universal/d20-like system
++ dark fantasy theme
+
+Meridian Core
++ another game system
++ cyberpunk theme
+```
+
+The same user should immediately understand how to navigate both.
+
+A campaign may conceptually store:
+
+```ts
+type CampaignPresentation = {
+  systemId: string;
+  settingPackId?: string;
+  themeId: string;
+};
+```
+
+A Setting Pack may recommend a theme, but system mechanics and visual theme are separate concerns.
+
+### Theme token rule
+
+Components consume semantic tokens:
+
+```css
+background: var(--surface-primary);
+color: var(--text-primary);
+border-color: var(--border-primary);
+```
+
+Do not embed genre colors directly into reusable components.
+
+Possible themes:
+
+```text
+Meridian Core / Neutral
+Dark Fantasy
+High Fantasy
+Cosmic Horror
+Cyberpunk
+Sci-Fi
+Western
+Post-Apocalypse
+Minimal
+Custom
+```
+
+---
+
+# 4. Core interaction principles
+
+## Map first
+
+The map is the default working surface. UI may reduce map viewport size when a task requires persistent information, but persistent chrome must never cover another persistent UI element.
 
 Do not solve layout conflicts with higher `z-index` values. Persistent UI receives real layout space or an exclusive safe zone.
 
-### Progressive disclosure
+## Progressive disclosure
 
-Show only the information needed for the current task.
+Show only information needed for the current task.
 
 - No scene editing controls during ordinary play.
 - No initiative when combat is inactive.
 - No full character sheet when a compact HUD is enough.
 - No permanent dice panel after the roll is finished.
 
-### Context before navigation
+## Context before navigation
 
 When an action belongs to an object on the map, expose it near that object or through a context menu.
 
 Examples:
 
-- Token -> sheet, HP, visibility, remove from scene.
+- Token -> sheet, health/resources, visibility, remove from scene.
 - Empty map -> map/scene actions.
 - Selected area -> dimensions, occupants, fog/terrain actions in Prepare mode.
 
-### Modes represent scenarios
+## Modes represent scenarios
 
-The tabletop has three modes:
+```ts
+type TableMode = 'play' | 'combat' | 'prepare';
+```
 
-- `play` — ordinary session and exploration.
-- `combat` — active initiative/combat runtime.
-- `prepare` — GM-only scene and content preparation.
+- `play` — ordinary session and exploration;
+- `combat` — active initiative/combat runtime;
+- `prepare` — GM-only scene/content preparation.
 
-Modes promote the actions relevant to the current scenario. They do not create duplicate data models.
+Modes promote relevant actions. They do not create duplicate data models.
 
-### Hotkeys accelerate; they do not replace discoverability
+## Hotkeys accelerate; they do not replace discoverability
 
-Primary actions must remain discoverable without keyboard knowledge.
+Primary actions remain visible/discoverable without keyboard knowledge.
 
 | Shortcut | Action |
 | --- | --- |
@@ -158,7 +492,9 @@ Primary actions must remain discoverable without keyboard knowledge.
 | `Space + drag` | Pan map |
 | Mouse wheel | Zoom map |
 
-## 2. Canonical shell
+---
+
+# 5. Canonical shell
 
 ```text
 TabletopShell
@@ -179,7 +515,9 @@ TabletopShell
 
 Only a higher semantic layer may cover a lower one.
 
-## 3. Safe zones
+---
+
+# 6. Safe zones
 
 Persistent UI must occupy a known zone. Two persistent components must never share a zone.
 
@@ -204,15 +542,11 @@ Reserved for:
 - presence/connectivity;
 - global/session menu.
 
-Do not place zoom, dice, character actions, workshop, measurement, or combat tools here.
+Do not place zoom, dice, character actions, workshop, measurement or combat tools here.
 
 ### Bottom-left
 
-Reserved for:
-
-- current mode;
-- 2-3 most likely actions;
-- entry point to all actions/search.
+Reserved for current mode, 2–3 frequent contextual actions and access to all actions/search.
 
 ### Bottom-center
 
@@ -228,21 +562,23 @@ Reserved for the player's compact character HUD.
 
 ### Left contextual area
 
-Used by one task drawer at a time: Characters, Combat, Library, Notes, Prepare tools.
+Used by one Task Drawer at a time: Characters, Combat, Library, Notes, Prepare tools.
 
-Opening a drawer reduces map width. It never overlays the map.
+Opening a Drawer reduces map width. It never overlays the map.
 
 ### Right contextual area
 
-Used by the selection inspector only when a meaningful context target exists.
+Used by Selection Inspector only when a meaningful context target exists.
 
-No selection -> no inspector -> the map receives the space back.
+No selection -> no inspector -> map receives the space back.
 
-## 4. GM layouts
+---
 
-### Play mode
+# 7. GM layouts
 
-Default state is calm but not empty.
+## Play mode
+
+Default state should be calm but not empty.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -250,7 +586,6 @@ Default state is calm but not empty.
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │                              MAP                                 │
-│                                                                  │
 │                                                                  │
 │ [Play] [Characters] [Dice] [Prepare]     [-] [100%] [+]         │
 └──────────────────────────────────────────────────────────────────┘
@@ -263,7 +598,7 @@ Visible priorities:
 3. Prepare
 4. All actions/search
 
-### Characters drawer
+## Characters Drawer
 
 ```text
 ┌──────────────────┬───────────────────────────────────────────────┐
@@ -277,9 +612,9 @@ Visible priorities:
 └──────────────────┴───────────────────────────────────────────────┘
 ```
 
-Drawer width target: `300px` desktop.
+Target desktop width: `300px`.
 
-### Selection inspector
+## Selection Inspector
 
 ```text
 ┌───────────────┬────────────────────────────┬────────────────────┐
@@ -292,14 +627,14 @@ Drawer width target: `300px` desktop.
 └───────────────┴────────────────────────────┴────────────────────┘
 ```
 
-Inspector rules:
+Rules:
 
 - appears only from current context;
 - closes when context is cleared;
 - contains compact, reversible actions;
 - never contains the full character sheet.
 
-### Combat mode
+## Combat mode
 
 Combat mode activates automatically from campaign runtime.
 
@@ -308,7 +643,7 @@ Promote:
 - round;
 - current actor/turn;
 - combat tracker;
-- player movement budget;
+- movement/resource budget when relevant;
 - combat-relevant quick actions.
 
 ```text
@@ -322,9 +657,9 @@ Promote:
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Opening Combat creates a task drawer, not a floating overlay.
+Opening Combat creates a Task Drawer, not a floating overlay.
 
-### Prepare mode
+## Prepare mode
 
 Prepare mode is GM-only and may expose more controls because the user explicitly entered an editing workflow.
 
@@ -344,7 +679,9 @@ Prepare mode is GM-only and may expose more controls because the user explicitly
 
 Measurement/calibration belongs under `Scene -> Measurement`. It is not a permanent Play-mode control.
 
-## 5. Player layout
+---
+
+# 8. Player layout
 
 Player UI is intentionally simpler.
 
@@ -364,33 +701,35 @@ Player UI is intentionally simpler.
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Always-visible Player HUD information should be limited to high-session-value data:
+Always-visible HUD information should be limited to high-session-value data:
 
 - actor identity;
-- HP;
-- optional promoted stat supplied by the game system/schema;
+- primary health/resource supplied by the game system;
+- optional promoted stat supplied by schema/system;
 - active effects indicator;
 - open sheet;
 - dice.
 
-Movement is promoted when relevant, normally during the player's combat turn.
+Movement is promoted only when relevant, normally during the player's combat turn.
 
-The platform shell must not hardcode D&D-specific stats such as AC.
+Platform shell must not hardcode D&D-specific stats such as AC.
 
-## 6. Context menus
+---
+
+# 9. Context menus
 
 Context menus expose object-specific actions without filling the screen with buttons.
 
-### GM token context
+## GM token context
 
 Recommended first level:
 
 ```text
 Actor name
-HP 7 / 12
+HP / Resource
 ────────────
 Open sheet
-Adjust HP
+Adjust resource
 Hide / Show
 Remove from scene
 More…
@@ -398,11 +737,11 @@ More…
 
 Destructive operations such as deleting the Actor from the campaign belong under `More…` and require confirmation.
 
-### Player token context
+## Player token context
 
 Only actions permitted by ownership and game rules are shown. Do not show disabled GM actions merely to advertise their existence.
 
-### Empty-map context
+## Empty-map context
 
 Useful GM actions may include:
 
@@ -411,7 +750,9 @@ Useful GM actions may include:
 - measure;
 - enter Prepare mode.
 
-## 7. Surface selection
+---
+
+# 10. Surface selection
 
 Use the smallest appropriate surface.
 
@@ -429,7 +770,7 @@ Examples: Characters, Combat, Notes, Library, Prepare Scene tools.
 
 ### Inspector
 
-Compact details/actions for the current selected object.
+Compact details/actions for current selected object.
 
 ### Workspace
 
@@ -439,12 +780,14 @@ Examples:
 
 - full character sheet;
 - item builder;
-- future book/journal authoring;
+- book/journal authoring;
 - complex scene editor.
 
-When a Workspace is open, ordinary tabletop chrome is hidden. The workspace owns navigation back to the table.
+When Workspace is open, ordinary tabletop chrome is hidden. Workspace owns navigation back to the table.
 
-## 8. Canonical UI components
+---
+
+# 11. Canonical components
 
 ```text
 Button
@@ -472,19 +815,19 @@ Do not create a new visual primitive if an existing component expresses the same
 - Text buttons for actions whose meaning is not obvious from an icon.
 - Icon-only controls require `aria-label` and tooltip.
 - Normally one primary action per panel/workspace.
-- Danger styling appears only at the final destructive step.
+- Danger styling appears only at final destructive step.
 
 ### Icon rules
 
 Icons support meaning; they do not replace labels for primary navigation on desktop.
 
-At compact widths, secondary labels may collapse while tooltips remain available.
+At compact widths secondary labels may collapse while tooltips remain available.
 
-## 9. Layering policy
+---
 
-Do not use arbitrary z-index escalation.
+# 12. Layering and collision policy
 
-Semantic layers are defined in the frontmatter:
+Never use arbitrary z-index escalation.
 
 ```text
 map            0
@@ -499,9 +842,7 @@ command       45
 toast         50
 ```
 
-If two components on the same layer overlap, that is a layout/state bug. Do not fix it with `z-index: 9999`.
-
-## 10. Collision policy
+If two components on the same semantic layer overlap, that is a layout/state bug.
 
 Transient surfaces are exclusive by group.
 
@@ -516,9 +857,11 @@ Command Palette -> Popover   => Command Palette wins
 
 Drawer + Inspector may coexist because they own different layout zones.
 
-## 11. Responsive behavior
+---
 
-### Desktop > 1100px
+# 13. Responsive behavior
+
+## Desktop > 1100px
 
 - labels visible;
 - drawer `300px`;
@@ -526,14 +869,14 @@ Drawer + Inspector may coexist because they own different layout zones.
 - camera controls bottom-center;
 - persistent chrome never overlaps.
 
-### Compact 760-1100px
+## Compact 760–1100px
 
 - secondary labels may collapse;
 - drawer may reduce to about `260px`;
-- avoid Drawer + Inspector simultaneously if map space becomes unusable;
+- avoid Drawer + Inspector simultaneously if map becomes unusable;
 - lower-priority surface yields to higher-priority task context.
 
-### Mobile < 760px
+## Mobile < 760px
 
 Do not shrink desktop layout mechanically.
 
@@ -543,18 +886,25 @@ Do not shrink desktop layout mechanically.
 - command palette remains searchable;
 - touch targets stay at least `42px` where practical.
 
-## 12. Accessibility
+The UI must remain intentionally usable around **1300px desktop width** without clipped or inaccessible controls.
+
+---
+
+# 14. Accessibility
 
 - Minimum target: `36px` desktop, `42px` preferred touch.
 - Every icon-only control has `aria-label`.
 - Keyboard focus is visible.
-- `Esc` closes the highest dismissible surface deterministically.
-- Hotkeys never fire while typing in an editor/input.
+- `Esc` closes highest dismissible surface deterministically.
+- Hotkeys never fire while typing in editor/input.
 - Critical meaning cannot depend on color alone.
+- Campaign themes must preserve contrast and focus visibility.
 
-## 13. Universal tabletop requirement
+---
 
-Core UI belongs to the platform, not to one game system.
+# 15. Universal tabletop requirement
+
+Core UI belongs to Meridian, not to one game system.
 
 Avoid mandatory platform concepts such as:
 
@@ -574,11 +924,13 @@ resource chips from Character Schema
 roll actions from Game System
 ```
 
-D&D-like behavior belongs in a game-system/campaign preset rather than the platform shell.
+Genre/system-specific behavior belongs in game-system or campaign presets rather than the platform shell.
 
-## 14. Target UI state model
+---
 
-The final shell should use explicit React state instead of DOM-query adapters.
+# 16. Target UI state model
+
+Final shell should use explicit React state instead of DOM-query adapters.
 
 ```ts
 type TabletopUiState = {
@@ -595,13 +947,15 @@ type TabletopUiState = {
 
 UI transitions go through one controller so collision behavior is deterministic.
 
-## 15. Implementation plan
+---
 
-The current contextual UI experiments are prototypes, not the final architecture.
+# 17. Implementation plan
+
+Current contextual UI experiments are prototypes, not final architecture.
 
 Recommended migration:
 
-1. Introduce canonical CSS design tokens from this file.
+1. Introduce canonical Meridian CSS semantic tokens from this file.
 2. Introduce `TabletopUiController` with explicit state.
 3. Build final `TopBar`, `ActionDock`, and `CameraControls`.
 4. Implement one canonical `Drawer`.
@@ -610,35 +964,47 @@ Recommended migration:
 7. Move Scene/Measurement into Prepare Drawer.
 8. Add token/map context menus.
 9. Introduce canonical `Inspector`.
-10. Move character/item editors to `Workspace` behavior.
+10. Move character/item/book editors to `Workspace` behavior.
 11. Replace DOM `querySelector().click()` adapters with direct state/callbacks.
 12. Remove legacy floating triggers and obsolete CSS layers.
 13. Add interaction-level browser tests for collision and responsive behavior.
+14. Add theme provider consuming semantic Meridian tokens.
+15. Add campaign theme selection only after core UX is stable.
 
-## 16. Definition of done
+---
+
+# 18. Definition of done
 
 A tabletop UI change is not complete unless all relevant statements are true:
 
 - [ ] No persistent UI overlaps another persistent UI at supported viewport sizes.
-- [ ] The primary action is discoverable without knowing a hotkey.
-- [ ] The map receives space back when contextual panels close.
+- [ ] Primary action is discoverable without knowing a hotkey.
+- [ ] Map receives space back when contextual panels close.
 - [ ] Dense editors activate Workspace/focus behavior.
 - [ ] Rare actions are not permanently visible without a strong reason.
-- [ ] The same action is not duplicated in multiple permanent locations.
+- [ ] Same action is not duplicated in multiple permanent locations.
 - [ ] `Esc` behavior is deterministic.
-- [ ] The UI remains usable around 1300px desktop width.
+- [ ] UI remains usable around 1300px desktop width.
 - [ ] Compact/mobile behavior is intentionally defined.
-- [ ] Core components do not hardcode one tabletop game system.
-- [ ] New z-index values use the semantic layer scale.
+- [ ] Core components do not hardcode one tabletop game system or setting.
+- [ ] New z-index values use semantic layer scale.
 - [ ] New controls reuse canonical tokens/components.
+- [ ] Theme changes atmosphere, not interaction architecture.
+- [ ] Meridian remains visually recognizable across campaign themes.
 
-## 17. Design review checklist
+---
+
+# 19. Design review checklist for agents
 
 Before implementing a major tabletop feature, answer:
 
 1. In which mode is this feature relevant?
-2. Is it persistent, contextual, drawer-level, popover-level, inspector-level, or workspace-level?
-3. What existing UI disappears or yields space when it opens?
-4. Can the user discover it without documentation or a memorized shortcut?
+2. Is it persistent, contextual, Drawer-level, Popover-level, Inspector-level or Workspace-level?
+3. Which safe zone does it own?
+4. What existing UI disappears or yields space when it opens?
+5. Can the user discover it without documentation or memorized shortcut?
+6. Is any part of the proposal game-system-specific? If yes, can it be supplied by Game System metadata instead?
+7. Is any part only decorative? If yes, should it live in the campaign Theme rather than Meridian Core?
+8. Does it introduce a new primitive or duplicate an existing canonical component?
 
-If these questions do not have clear answers, the feature is not ready to enter the tabletop shell.
+If these questions do not have clear answers, the feature is not ready to enter the Meridian tabletop shell.
