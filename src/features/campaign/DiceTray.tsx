@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { useExclusiveTabletopSurface } from './useExclusiveTabletopSurface';
 import {
   buildDiceFormula,
   DICE_SIDES,
@@ -31,6 +32,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
   const [rollingSides, setRollingSides] = useState<number[]>([]);
   const [lastRoll, setLastRoll] = useState<DiceRoll | null>(null);
   const rollingRef = useRef(false);
+  useExclusiveTabletopSurface('dice-tray', open, () => setOpen(false));
 
   const formula = useMemo(() => buildDiceFormula(pool, modifier), [modifier, pool]);
   const shownSides = rolling ? rollingSides : lastRoll?.sides ?? [];
