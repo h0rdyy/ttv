@@ -1,4 +1,5 @@
 // Focus-mode regression: editor footers must never be covered by persistent tabletop controls.
+// This file intentionally stays tiny so focus chrome rules remain easy to review.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
