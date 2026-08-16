@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useExclusiveTabletopSurface } from './useExclusiveTabletopSurface';
 
 export type TabletopUiDensity = 'normal' | 'compact';
 
@@ -67,6 +68,7 @@ export function TabletopUiPreferencesPanel({
   onReset: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  useExclusiveTabletopSurface('ui-preferences', open, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;
