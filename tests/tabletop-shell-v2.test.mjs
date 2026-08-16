@@ -20,14 +20,16 @@ test('tabletop shell progressively discloses contextual UI instead of a permanen
   assert.match(adapter, /classList\.toggle\('table-context-combat', combatActive\)/);
   assert.match(layout, /import '\.\/tabletop-context-ui\.css';/);
 
-  // Default UI is one contextual launcher, not a permanent GM rail.
+  // Default UI is one contextual launcher plus a tiny mode-aware discovery row,
+  // not a permanent GM rail.
   assert.match(contextUi, /context-ui-launcher/);
   assert.match(contextUi, /context-ui-main-button/);
+  assert.match(contextUi, /context-ui-quick-actions/);
   assert.doesNotMatch(contextUi, /tabletop-shell-v2-rail/);
   assert.match(contextUi, /const tableMode: TableMode = combatActive \? 'combat' : preferredMode/);
-  assert.match(contextUi, /label: `Бой · раунд \$\{combatRound\}`/);
-  assert.match(contextUi, /label: 'Режим подготовки'/);
-  assert.match(contextUi, /label: 'Вернуться к игре'/);
+  assert.match(contextUi, /label: `Бой · \$\{combatRound\}`/);
+  assert.match(contextUi, /label: 'Подготовка'/);
+  assert.match(contextUi, /label: 'К игре'/);
 
   // Progressive disclosure and keyboard-first navigation are real behavior.
   assert.match(contextUi, /context-tools-palette/);
