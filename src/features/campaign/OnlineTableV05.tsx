@@ -9,6 +9,7 @@ import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
 import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
+import { TabletopUiPreferencesPanel, useTabletopUiPreferences } from './TabletopUiPreferences';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -89,6 +90,7 @@ export function OnlineTableV05(props: Props) {
   const [actorMenu, setActorMenu] = useState<ActorContextMenu | null>(null);
   const [deletingActorId, setDeletingActorId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const { preferences, updatePreferences, resetPreferences } = useTabletopUiPreferences(props.currentUserId);
   const pendingOpenActorIdRef = useRef<string | null>(null);
   const selectedActorIdRef = useRef(selectedActorId);
   selectedActorIdRef.current = selectedActorId;
@@ -222,14 +224,27 @@ export function OnlineTableV05(props: Props) {
   };
 
   const immersionClasses = props.mode === 'player' ? ' player-immersion' : '';
+  const uiClasses = [
+    preferences.dice ? '' : ' ui-hide-dice',
+    preferences.movement ? '' : ' ui-hide-movement',
+    preferences.sceneInfo ? '' : ' ui-hide-scene-info',
+    preferences.presence ? '' : ' ui-hide-presence',
+    preferences.density === 'compact' ? ' ui-density-compact' : '',
+  ].join('');
 
   return (
-    <div className={`v05-table-layer${immersionClasses}`}>
+    <div className={`v05-table-layer${immersionClasses}${uiClasses}`}>
       <OnlineTable
         {...tableProps}
         initialActors={actors}
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
+      />
+
+      <TabletopUiPreferencesPanel
+        preferences={preferences}
+        onChange={updatePreferences}
+        onReset={resetPreferences}
       />
 
       {props.mode === 'gm' && gmAllowed && (
