@@ -1,0 +1,170 @@
+/* Contextual UI safe zones.
+   Each persistent control owns one edge of the viewport so controls never fight
+   for the same corner: status/topbar = top, mode/actions = bottom-left,
+   camera = bottom-center, player card = bottom-right. */
+
+/* Camera controls used to live in the topbar beside presence and could overlap
+   it on narrower desktop widths. Keep them visible, but give them a dedicated
+   bottom-center safe zone. */
+.v05-table-layer.tabletop-shell-v3 .map-zoom-controls {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: 14px !important;
+  left: 50% !important;
+  z-index: 102 !important;
+  display: flex !important;
+  align-items: center;
+  gap: 2px;
+  margin: 0 !important;
+  padding: 3px !important;
+  border: 1px solid #453621 !important;
+  border-radius: 10px !important;
+  background: rgba(13,11,8,.9) !important;
+  box-shadow: 0 12px 36px rgba(0,0,0,.42) !important;
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+
+.v05-table-layer.tabletop-shell-v3 .map-zoom-controls .button {
+  min-width: 30px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.v05-table-layer.tabletop-shell-v3 .map-zoom-controls .zoom-label {
+  min-width: 52px;
+  color: #aa9675;
+  font-size: 9px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .map-zoom-controls .button:hover {
+  border-color: #60482b;
+  background: #1d160f;
+  color: #efd09a;
+}
+
+/* A small discovery ribbon keeps the clean-map principle while making the
+   common actions visible without requiring the user to know any hotkeys. */
+.context-ui-quick-actions {
+  position: fixed;
+  left: 98px;
+  bottom: 14px;
+  z-index: 103;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(50vw - 130px);
+}
+
+.context-ui-quick-actions > button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #403320;
+  border-radius: 10px;
+  background: rgba(14,12,9,.88);
+  color: #a99576;
+  box-shadow: 0 10px 30px rgba(0,0,0,.34);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.context-ui-quick-actions > button:hover {
+  border-color: #74542e;
+  background: #20170f;
+  color: #efd09a;
+}
+
+.context-ui-quick-actions > button > span {
+  min-width: 18px;
+  font-size: 15px;
+  text-align: center;
+}
+
+.context-ui-quick-actions > button > strong {
+  color: inherit;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.context-ui-command-shortcut kbd {
+  margin-left: 2px;
+  padding: 2px 4px;
+  border: 1px solid #3d3121;
+  border-radius: 4px;
+  background: #11100d;
+  color: #706453;
+  font: 7px system-ui, sans-serif;
+}
+
+/* The top-right corner now belongs only to connection/session state. */
+.v05-table-layer.tabletop-shell-v3 .online-presence {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Clean-map mode must remove every persistent zone, including the moved camera
+   controls and the discovery ribbon. */
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .map-zoom-controls,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .context-ui-quick-actions {
+  display: none !important;
+}
+
+/* When the player card grows during combat it owns bottom-right only; camera
+   remains centered and the discovery strip remains on the left. */
+.v05-table-layer.tabletop-shell-v3.player-immersion .player-immersion-dock {
+  right: 14px;
+  left: auto;
+}
+
+@media (max-width: 1100px) {
+  .context-ui-quick-actions {
+    max-width: calc(50vw - 108px);
+  }
+
+  .context-ui-quick-actions > button {
+    width: 42px;
+    min-width: 42px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .context-ui-quick-actions > button > strong,
+  .context-ui-command-shortcut kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .v05-table-layer.tabletop-shell-v3 .map-zoom-controls {
+    bottom: 8px !important;
+  }
+
+  .context-ui-quick-actions {
+    left: 62px;
+    bottom: 8px;
+    gap: 3px;
+    max-width: calc(50vw - 74px);
+  }
+
+  .context-ui-quick-actions > button {
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    border-radius: 9px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* On a phone, three separate bottom zones cannot all stay useful. Hide the
+     secondary quick ribbon; the mode launcher and command palette remain. */
+  .context-ui-quick-actions { display: none; }
+  .v05-table-layer.tabletop-shell-v3 .map-zoom-controls .zoom-label { min-width: 42px; }
+}
