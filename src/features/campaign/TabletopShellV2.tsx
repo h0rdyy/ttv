@@ -112,7 +112,10 @@ export function TabletopShellV2({ mode, campaignName, activeSceneName, combatAct
           <ShellButton icon="⚙" label="Интерфейс" onClick={openUiPreferences} compact />
         </nav>
       ) : (
-        <button type="button" className="tabletop-shell-v2-player-settings" onClick={openUiPreferences} aria-label="Настроить интерфейс" title="Интерфейс">⚙</button>
+        <div className="tabletop-shell-v2-player-actions" data-wheel-isolation="true">
+          <button type="button" className="tabletop-shell-v2-player-dice" onClick={openDice} aria-label="Открыть кубы" title="Кубы">⚄</button>
+          <button type="button" className="tabletop-shell-v2-player-settings" onClick={openUiPreferences} aria-label="Настроить интерфейс" title="Интерфейс">⚙</button>
+        </div>
       )}
     </>
   );
