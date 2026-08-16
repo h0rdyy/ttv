@@ -1,0 +1,144 @@
+/* Tabletop shell safe zones.
+   Persistent UI owns layout space; only transient drawers/workspaces may float above the map. */
+
+.v05-table-layer {
+  --ttv-gm-rail: 58px;
+  --ttv-gm-library: 328px;
+  --ttv-gm-inspector: 330px;
+  --ttv-player-topbar: 50px;
+  --ttv-player-bottom-safe: 86px;
+}
+
+/* GM desktop: library + map + inspector are real columns, not stacked overlays. */
+.v05-table-layer .gm-mode .online-table-workspace {
+  grid-template-columns: var(--ttv-gm-library) minmax(0, 1fr) var(--ttv-gm-inspector) !important;
+  grid-template-areas: "library map inspector" !important;
+  gap: 0;
+}
+
+.v05-table-layer .gm-mode .online-table-workspace:has(.gm-library.collapsed) {
+  --ttv-gm-library: var(--ttv-gm-rail);
+}
+
+.v05-table-layer .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
+  --ttv-gm-inspector: 0px;
+}
+
+.v05-table-layer .gm-mode .online-map-stage {
+  grid-area: map;
+  min-width: 0;
+  min-height: 0;
+}
+
+.v05-table-layer .gm-mode .gm-library {
+  grid-area: library;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.v05-table-layer .gm-mode .gm-library-drawer {
+  left: var(--ttv-gm-rail);
+  right: 0;
+  width: auto;
+  box-shadow: none;
+}
+
+.v05-table-layer .gm-mode .gm-inspector {
+  grid-area: inspector;
+  position: relative;
+  inset: auto;
+  width: auto;
+  min-width: 0;
+  height: calc(100% - 16px);
+  margin: 8px 8px 8px 0;
+  z-index: 24;
+}
+
+/* Player mode reserves actual viewport height for the permanent bottom HUD. */
+.v05-table-layer.player-immersion .player-mode .online-table-workspace {
+  height: calc(100dvh - var(--ttv-player-topbar) - var(--ttv-player-bottom-safe)) !important;
+}
+
+.v05-table-layer.player-immersion .player-immersion-dock,
+.v05-table-layer.player-immersion .dice-tray-anchor {
+  bottom: 12px;
+}
+
+/* Keep the dice trigger in its own bottom-left slot and leave enough room for the main player dock. */
+.v05-table-layer.player-immersion .dice-tray-anchor {
+  left: 12px;
+}
+
+.v05-table-layer.player-immersion .player-immersion-dock {
+  left: calc(50% + 58px);
+  max-width: calc(100vw - 300px);
+}
+
+/* UI settings are part of top chrome, and disappear when a focus workspace owns the screen. */
+.v05-table-layer:has(.foundry-character-window) .tabletop-ui-preferences,
+.v05-table-layer:has(.online-workshop-panel .builder-view) .tabletop-ui-preferences {
+  display: none !important;
+}
+
+/* Medium desktop: keep all three GM zones, just make them denser. */
+@media (max-width: 1300px) {
+  .v05-table-layer {
+    --ttv-gm-library: 278px;
+    --ttv-gm-inspector: 286px;
+  }
+
+  .v05-table-layer .gm-mode .gm-library-drawer {
+    padding-inline: 10px;
+  }
+}
+
+/* Narrow GM screens: inspector becomes a bottom safe zone instead of covering the map. */
+@media (max-width: 860px) {
+  .v05-table-layer {
+    --ttv-gm-library: min(220px, 42vw);
+    --ttv-gm-inspector: minmax(190px, 34vh);
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace {
+    grid-template-columns: var(--ttv-gm-library) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) minmax(190px, 34vh);
+    grid-template-areas:
+      "library map"
+      "library inspector" !important;
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace:has(.gm-library.collapsed) {
+    --ttv-gm-library: var(--ttv-gm-rail);
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
+    grid-template-rows: minmax(0, 1fr) 0;
+  }
+
+  .v05-table-layer .gm-mode .gm-inspector {
+    height: calc(100% - 8px);
+    margin: 0 6px 8px;
+  }
+}
+
+/* Player compact screens use the whole bottom strip and move dice above it, never on top of it. */
+@media (max-width: 760px) {
+  .v05-table-layer {
+    --ttv-player-bottom-safe: 82px;
+  }
+
+  .v05-table-layer.player-immersion .player-immersion-dock {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-width: none;
+    transform: none;
+  }
+
+  .v05-table-layer.player-immersion .dice-tray-anchor {
+    left: 8px;
+    bottom: 90px;
+  }
+}
