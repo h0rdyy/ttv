@@ -1,0 +1,376 @@
+/* Contextual tabletop UI: the map is the default state. Persistent chrome is
+   deliberately tiny; tools disclose themselves only for the current task. */
+.v05-table-layer.tabletop-shell-v3 {
+  --v2-topbar: 44px;
+  --v2-rail: 0px;
+  --context-accent: #c9924f;
+}
+
+/* ---------- quieter persistent chrome ---------- */
+.v05-table-layer.tabletop-shell-v3 .online-table-topbar {
+  min-height: var(--v2-topbar);
+  height: var(--v2-topbar);
+  padding: 0 10px 0 12px;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(9,8,6,.94), rgba(9,8,6,.82));
+  border-bottom-color: rgba(194,147,79,.14);
+  backdrop-filter: blur(12px);
+}
+
+.v05-table-layer.tabletop-shell-v3 .online-table-brand { display: none; }
+.v05-table-layer.tabletop-shell-v3 .online-table-campaign { max-width: min(420px, 38vw); }
+.v05-table-layer.tabletop-shell-v3 .online-table-campaign strong { font-size: 12px; opacity: .9; }
+.v05-table-layer.tabletop-shell-v3 .online-table-campaign small { display: none; }
+.v05-table-layer.tabletop-shell-v3 .map-zoom-controls { display: none !important; }
+.v05-table-layer.tabletop-shell-v3 .scene-chip,
+.v05-table-layer.tabletop-shell-v3 .map-view-hint { display: none !important; }
+
+.v05-table-layer.tabletop-shell-v3 .gm-mode .online-table-workspace {
+  height: calc(100dvh - var(--v2-topbar)) !important;
+  grid-template-columns: 0 minmax(0, 1fr) !important;
+  grid-template-areas: "library map" !important;
+}
+
+.v05-table-layer.tabletop-shell-v3 .gm-mode .online-table-workspace:has(.gm-library.expanded) {
+  grid-template-columns: var(--v2-drawer) minmax(0, 1fr) !important;
+}
+
+.v05-table-layer.tabletop-shell-v3 .gm-mode .gm-library-drawer { left: 0; }
+
+/* Actor details are contextual now: RMB actions / full sheet instead of a
+   permanent inspector consuming a third of the map. */
+.v05-table-layer.tabletop-shell-v3 .gm-mode .gm-inspector { display: none !important; }
+.v05-table-layer.tabletop-shell-v3 .gm-mode .online-table-workspace:has(.gm-inspector-head) .online-map-stage {
+  margin-right: 0 !important;
+}
+
+/* ---------- one launcher ---------- */
+.context-ui-launcher {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 104;
+}
+
+.context-ui-main-button {
+  min-width: 54px;
+  height: 48px;
+  display: grid;
+  grid-template-columns: 22px auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid #554026;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(25,19,13,.96), rgba(12,10,8,.97));
+  color: #c7ad83;
+  box-shadow: 0 14px 42px rgba(0,0,0,.48);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+}
+
+.context-ui-main-button > span { font-size: 18px; }
+.context-ui-main-button > small {
+  color: #9e8968;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.context-ui-main-button:hover,
+.context-ui-main-button[aria-expanded="true"] {
+  border-color: #8b6335;
+  color: #f0d19b;
+  background: #21170f;
+}
+
+.context-ui-main-button.mode-combat {
+  border-color: #7d4c32;
+  box-shadow: 0 14px 42px rgba(0,0,0,.48), 0 0 28px rgba(151,75,48,.12);
+}
+
+.context-ui-main-button.mode-prepare { border-color: #766037; }
+
+/* ---------- progressive tools palette ---------- */
+.context-tools-palette {
+  position: fixed;
+  left: 14px;
+  bottom: 70px;
+  z-index: 108;
+  width: min(310px, calc(100vw - 28px));
+  overflow: hidden;
+  border: 1px solid #544027;
+  border-radius: 13px;
+  background: linear-gradient(180deg, rgba(20,16,11,.99), rgba(10,9,7,.995));
+  box-shadow: 0 24px 70px rgba(0,0,0,.62);
+  backdrop-filter: blur(18px);
+  animation: context-palette-in .14s ease-out both;
+}
+
+.context-tools-palette > header {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 9px 8px 12px;
+  border-bottom: 1px solid rgba(194,147,79,.13);
+}
+
+.context-tools-palette > header > div { display: grid; gap: 1px; }
+.context-tools-palette > header small {
+  color: #786951;
+  font-size: 7px;
+  letter-spacing: .13em;
+}
+.context-tools-palette > header strong { color: #dfc497; font: 14px Georgia, serif; }
+.context-tools-palette > header > button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8a7658;
+  font-size: 18px;
+  cursor: pointer;
+}
+.context-tools-palette > header > button:hover { background: #20170f; color: #e4c58d; }
+
+.context-tools-actions { display: grid; padding: 6px; }
+.context-tools-actions > button,
+.context-command-results > button {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #c8b18c;
+  text-align: left;
+  cursor: pointer;
+}
+.context-tools-actions > button:hover,
+.context-command-results > button:hover {
+  border-color: #4d3922;
+  background: #19120c;
+}
+.context-tools-actions > button > span:first-child,
+.context-command-results > button > span:first-child {
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+}
+.context-tools-actions > button > span:last-child,
+.context-command-results > button > span:last-child { min-width: 0; display: grid; gap: 2px; }
+.context-tools-actions strong,
+.context-command-results strong { color: #d8c19a; font-size: 11px; }
+.context-tools-actions small,
+.context-command-results small {
+  overflow: hidden;
+  color: #746855;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-tools-search {
+  width: calc(100% - 12px);
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 6px 6px;
+  padding: 0 10px;
+  border: 1px solid #3c3021;
+  border-radius: 8px;
+  background: #0d0b08;
+  color: #8f7d61;
+  cursor: pointer;
+}
+.context-tools-search kbd,
+.context-command-palette kbd {
+  padding: 2px 5px;
+  border: 1px solid #433624;
+  border-radius: 5px;
+  background: #15110c;
+  color: #776b59;
+  font: 8px system-ui, sans-serif;
+}
+
+/* ---------- Ctrl+K command palette ---------- */
+.context-command-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 14000;
+  display: grid;
+  place-items: start center;
+  padding-top: min(14vh, 120px);
+  background: rgba(0,0,0,.34);
+  backdrop-filter: blur(3px);
+}
+
+.context-command-palette {
+  width: min(590px, calc(100vw - 24px));
+  max-height: min(620px, 72dvh);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #624a2d;
+  border-radius: 14px;
+  background: #0d0b08;
+  box-shadow: 0 34px 110px rgba(0,0,0,.78);
+  animation: context-command-in .14s ease-out both;
+}
+
+.context-command-palette > header {
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border-bottom: 1px solid #2f261a;
+}
+.context-command-palette > header > span { color: #bb8b4b; font-size: 20px; }
+.context-command-palette input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #ead3aa;
+  font: 15px system-ui, sans-serif;
+}
+.context-command-palette input::placeholder { color: #655b4d; }
+.context-command-results { overflow: auto; padding: 7px; }
+.context-command-results > button { width: 100%; min-height: 52px; }
+.context-command-results > p { margin: 22px; color: #716552; text-align: center; font-size: 11px; }
+.context-command-palette > footer {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border-top: 1px solid #2b2318;
+  color: #6e6251;
+  font-size: 8px;
+}
+
+/* ---------- compact player character HUD ---------- */
+.v05-table-layer.tabletop-shell-v3.player-immersion .player-mode .online-table-workspace {
+  height: calc(100dvh - var(--v2-topbar)) !important;
+}
+
+.v05-table-layer.tabletop-shell-v3 .player-immersion-dock {
+  left: auto;
+  right: 14px;
+  bottom: 14px;
+  min-height: 52px;
+  max-width: min(340px, calc(100vw - 92px));
+  gap: 5px;
+  padding: 6px;
+  border-radius: 12px;
+  transform: none;
+}
+
+.v05-table-layer.tabletop-shell-v3 .player-identity {
+  min-width: 0;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px;
+  padding: 0 4px 0 0;
+}
+.v05-table-layer.tabletop-shell-v3 .player-identity-avatar { width: 34px; height: 34px; font-size: 19px; }
+.v05-table-layer.tabletop-shell-v3 .player-identity strong { max-width: 94px; font-size: 11px; }
+.v05-table-layer.tabletop-shell-v3 .player-identity small { display: none; }
+
+.v05-table-layer.tabletop-shell-v3 .player-vital-chip,
+.v05-table-layer.tabletop-shell-v3 .player-movement-chip {
+  min-height: 36px;
+  padding: 4px 7px;
+}
+.v05-table-layer.tabletop-shell-v3 .player-vital-chip span,
+.v05-table-layer.tabletop-shell-v3 .player-movement-chip span { font-size: 6px; }
+.v05-table-layer.tabletop-shell-v3 .player-vital-chip strong,
+.v05-table-layer.tabletop-shell-v3 .player-movement-chip strong { font-size: 9px; }
+
+/* Movement becomes persistent only when it matters. During exploration it is
+   still shown contextually by the ruler while dragging. */
+.v05-table-layer.tabletop-shell-v3 .player-movement-chip { display: none; }
+.v05-table-layer.tabletop-shell-v3.table-context-combat .player-movement-chip { display: grid; min-width: 94px; }
+
+.v05-table-layer.tabletop-shell-v3 .player-immersion-dock > button {
+  width: 36px;
+  min-height: 36px;
+  overflow: hidden;
+  padding: 0;
+  font-size: 0;
+}
+.v05-table-layer.tabletop-shell-v3 .player-immersion-dock > button::before {
+  content: "◇";
+  font-size: 17px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .player-turn-banner {
+  top: calc(var(--v2-topbar) + 10px);
+  min-width: 150px;
+  padding: 6px 16px 7px;
+  opacity: .92;
+}
+.v05-table-layer.tabletop-shell-v3 .player-turn-banner strong { font-size: 13px; }
+
+/* ---------- H: clean map ---------- */
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .online-table-topbar,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .player-immersion-dock,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .player-turn-banner,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .gm-library,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .gm-inspector,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .dice-tray-anchor,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .scene-measurement-anchor,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .tabletop-ui-preferences,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .online-global-message {
+  display: none !important;
+}
+
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .online-table-workspace,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden.player-immersion .player-mode .online-table-workspace,
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .gm-mode .online-table-workspace {
+  height: 100dvh !important;
+}
+
+.context-ui-reveal {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  z-index: 15000;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(121,96,62,.42);
+  border-radius: 50%;
+  background: rgba(12,10,8,.55);
+  color: rgba(206,177,128,.58);
+  cursor: pointer;
+  opacity: .42;
+}
+.context-ui-reveal:hover { opacity: 1; }
+
+@keyframes context-palette-in {
+  from { opacity: 0; transform: translateY(7px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes context-command-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 760px) {
+  .v05-table-layer.tabletop-shell-v3 .online-table-campaign { max-width: 50vw; }
+  .v05-table-layer.tabletop-shell-v3 .online-presence { display: none; }
+  .context-ui-main-button { width: 46px; min-width: 46px; padding: 0; grid-template-columns: 1fr; }
+  .context-ui-main-button > small { display: none; }
+  .v05-table-layer.tabletop-shell-v3 .player-immersion-dock { right: 8px; bottom: 8px; max-width: calc(100vw - 70px); }
+  .v05-table-layer.tabletop-shell-v3 .player-identity strong { max-width: 72px; }
+  .v05-table-layer.tabletop-shell-v3 .player-vital-chip { display: grid; }
+}
