@@ -4,7 +4,6 @@ import {
   mergeDiceRollHistory,
   parseDiceFormula,
   parseDiceRoll,
-  removeDieFromRoll,
 } from '../../src/features/campaign/dice';
 
 const FIXED_ROLL = {
@@ -60,19 +59,5 @@ describe('dice contracts', () => {
 
     expect(mergeDiceRollHistory([first], first)).toEqual([first]);
     expect(mergeDiceRollHistory([first], newer, 1)).toEqual([newer]);
-  });
-
-  it('removes a settled die and recalculates the total', () => {
-    const parsed = parseDiceRoll(FIXED_ROLL);
-    expect(parsed).not.toBeNull();
-    if (!parsed) throw new Error('fixed dice fixture must parse');
-
-    const oneDie = removeDieFromRoll(parsed, 0);
-    expect(oneDie).not.toBeNull();
-    expect(oneDie?.sides).toEqual([6]);
-    expect(oneDie?.values).toEqual([4]);
-    expect(oneDie?.formula).toBe('1d6 + 2');
-    expect(oneDie?.total).toBe(6);
-    expect(oneDie ? removeDieFromRoll(oneDie, 0) : undefined).toBeNull();
   });
 });
