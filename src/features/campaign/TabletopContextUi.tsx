@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { TabletopIcon, type TabletopIconName } from './TabletopIcon';
 
 type Mode = 'gm' | 'player';
 type TableMode = 'play' | 'combat' | 'prepare';
-type Surface = 'tools' | 'command' | null;
+type Surface = 'command' | null;
 
 type Props = {
   mode: Mode;
@@ -21,7 +22,7 @@ type Props = {
 
 type Action = {
   id: string;
-  icon: string;
+  icon: TabletopIconName;
   label: string;
   hint: string;
   keywords: string;
@@ -86,12 +87,6 @@ export function TabletopContextUi({
     }
   };
 
-  const closeUiPreferences = () => {
-    if (document.querySelector('.tabletop-ui-preferences-panel')) {
-      queryButton('.tabletop-ui-preferences-trigger')?.click();
-    }
-  };
-
   const closeMeasurement = () => {
     if (document.querySelector('.scene-measurement-popover')) {
       queryButton('.scene-measurement-trigger')?.click();
@@ -108,7 +103,6 @@ export function TabletopContextUi({
     closeLegacyDrawer();
     closeTransientWorkspace();
     closeDice();
-    closeUiPreferences();
     closeMeasurement();
     closeMapTools();
   };
@@ -116,15 +110,12 @@ export function TabletopContextUi({
   const toggleLegacyDrawer = (key: keyof typeof LEGACY_DRAWERS) => {
     closeTransientWorkspace();
     closeDice();
-    closeUiPreferences();
     closeMeasurement();
     closeMapTools();
 
     const label = LEGACY_DRAWERS[key];
     const button = queryButton(`.online-table-shell.gm-mode .gm-library-rail button[aria-label="${label}"]`);
-    const library = document.querySelector('.online-table-shell.gm-mode .gm-library');
-    if (!button || !library) return;
-
+    if (!button) return;
     button.click();
     setSurface(null);
   };
@@ -132,7 +123,6 @@ export function TabletopContextUi({
   const openSceneWorkspace = () => {
     closeLegacyDrawer();
     closeDice();
-    closeUiPreferences();
     closeMeasurement();
     closeMapTools();
     queryButton('.online-table-shell.gm-mode .online-workshop-panel .close-button')?.click();
@@ -150,7 +140,6 @@ export function TabletopContextUi({
     closeLegacyDrawer();
     closeTransientWorkspace();
     closeDice();
-    closeUiPreferences();
     closeMeasurement();
     closeMapTools();
     queryButton('.online-table-shell.gm-mode .online-workshop-trigger')?.click();
@@ -160,20 +149,9 @@ export function TabletopContextUi({
   const openDice = () => {
     closeLegacyDrawer();
     closeTransientWorkspace();
-    closeUiPreferences();
     closeMeasurement();
     closeMapTools();
     queryButton('.online-table-shell .dice-tray-toggle')?.click();
-    setSurface(null);
-  };
-
-  const openUiPreferences = () => {
-    closeLegacyDrawer();
-    closeTransientWorkspace();
-    closeDice();
-    closeMeasurement();
-    closeMapTools();
-    queryButton('.tabletop-ui-preferences-trigger')?.click();
     setSurface(null);
   };
 
@@ -181,7 +159,6 @@ export function TabletopContextUi({
     closeLegacyDrawer();
     closeTransientWorkspace();
     closeDice();
-    closeUiPreferences();
     closeMapTools();
     queryButton('.scene-measurement-trigger')?.click();
     setSurface(null);
@@ -191,7 +168,6 @@ export function TabletopContextUi({
     closeLegacyDrawer();
     closeTransientWorkspace();
     closeDice();
-    closeUiPreferences();
     closeMeasurement();
     window.dispatchEvent(new CustomEvent(MAP_TOOLS_TOGGLE_EVENT));
     setSurface(null);
@@ -200,7 +176,6 @@ export function TabletopContextUi({
   const enterPrepare = () => {
     closeAllTransient();
     setPreferredMode('prepare');
-    window.requestAnimationFrame(() => setSurface('tools'));
   };
 
   const leavePrepare = () => {
@@ -217,7 +192,7 @@ export function TabletopContextUi({
     const common: Action[] = [
       {
         id: 'map-tools',
-        icon: '⌁',
+        icon: 'tools',
         label: 'Инструменты',
         hint: mode === 'gm' ? 'Линейка, пинг и рисование' : 'Линейка и пинг',
         keywords: 'линейка пинг рисовать рисунок карта ruler ping draw tools',
@@ -225,24 +200,16 @@ export function TabletopContextUi({
       },
       {
         id: 'dice',
-        icon: '⚄',
+        icon: 'dice',
         label: 'Кубы',
         hint: 'Открыть лоток бросков',
         keywords: 'кубы бросок roll dice',
         run: openDice,
       },
       {
-        id: 'interface',
-        icon: '⚙',
-        label: 'Интерфейс',
-        hint: 'Видимость и плотность UI',
-        keywords: 'интерфейс настройки ui',
-        run: openUiPreferences,
-      },
-      {
         id: 'hide-ui',
-        icon: '◌',
-        label: 'Скрыть весь UI',
+        icon: 'eye',
+        label: 'Скрыть UI',
         hint: 'Чистая карта · H вернёт интерфейс',
         keywords: 'скрыть ui карта immersion h',
         run: hideChrome,
@@ -253,7 +220,7 @@ export function TabletopContextUi({
       return [
         ...(canOpenCharacter ? [{
           id: 'character',
-          icon: '◇',
+          icon: 'sheet' as const,
           label: 'Персонаж',
           hint: 'Открыть полный лист',
           keywords: 'персонаж лист character sheet',
@@ -267,7 +234,7 @@ export function TabletopContextUi({
       return [
         {
           id: 'scene',
-          icon: '🗺',
+          icon: 'scene',
           label: 'Сцена',
           hint: 'Карта, сетка, туман и токены',
           keywords: 'сцена карта сетка туман токены scene grid fog',
@@ -275,23 +242,15 @@ export function TabletopContextUi({
         },
         ...(activeSceneName ? [{
           id: 'measurement',
-          icon: '📏',
+          icon: 'ruler' as const,
           label: 'Масштаб карты',
           hint: `Калибровка · ${activeSceneName}`,
           keywords: 'масштаб расстояние калибровка measurement',
           run: openMeasurement,
         }] : []),
         {
-          id: 'map-tools',
-          icon: '⌁',
-          label: 'Инструменты',
-          hint: 'Линейка, пинг и рисование',
-          keywords: 'линейка пинг рисовать рисунок карта ruler ping draw tools',
-          run: openMapTools,
-        },
-        {
           id: 'workshop',
-          icon: '⚒',
+          icon: 'workshop',
           label: 'Мастерская',
           hint: 'Предметы, таблицы и контент',
           keywords: 'мастерская предметы таблицы контент workshop items',
@@ -299,7 +258,7 @@ export function TabletopContextUi({
         },
         {
           id: 'characters',
-          icon: '♟',
+          icon: 'characters',
           label: 'Персонажи',
           hint: 'Герои и NPC',
           keywords: 'персонажи герои npc actors',
@@ -307,20 +266,20 @@ export function TabletopContextUi({
         },
         {
           id: 'leave-prepare',
-          icon: '▶',
+          icon: 'game',
           label: 'К игре',
-          hint: 'Закрыть инструменты подготовки',
+          hint: 'Закрыть подготовку',
           keywords: 'игра выйти подготовка play',
           run: leavePrepare,
         },
-        ...common.filter((action) => action.id !== 'map-tools'),
+        ...common,
       ];
     }
 
-    const playActions: Action[] = [
+    const gmActions: Action[] = [
       {
         id: 'characters',
-        icon: '♟',
+        icon: 'characters',
         label: 'Персонажи',
         hint: 'Герои и NPC',
         keywords: 'персонажи герои npc actors',
@@ -328,7 +287,7 @@ export function TabletopContextUi({
       },
       {
         id: 'notes',
-        icon: '✎',
+        icon: 'notes',
         label: 'Заметки',
         hint: 'Заметки мастера',
         keywords: 'заметки notes journal',
@@ -336,18 +295,27 @@ export function TabletopContextUi({
       },
       {
         id: 'library',
-        icon: '◆',
+        icon: 'library',
         label: 'Библиотека',
         hint: 'Контент кампании',
         keywords: 'библиотека контент library',
         run: () => toggleLegacyDrawer('library'),
       },
+      {
+        id: 'prepare',
+        icon: 'prepare',
+        label: 'Подготовка',
+        hint: 'Сцена, сетка, туман и контент',
+        keywords: 'подготовка сцена сетка туман prepare',
+        run: enterPrepare,
+      },
+      ...common,
     ];
 
     if (tableMode === 'combat') {
-      playActions.unshift({
+      gmActions.unshift({
         id: 'combat',
-        icon: '⚔',
+        icon: 'combat',
         label: `Бой · ${combatRound}`,
         hint: 'Инициатива и текущий ход',
         keywords: 'бой раунд инициатива combat initiative',
@@ -355,16 +323,7 @@ export function TabletopContextUi({
       });
     }
 
-    playActions.push({
-      id: 'prepare',
-      icon: '🛠',
-      label: 'Подготовка',
-      hint: 'Сцена, сетка, туман и контент',
-      keywords: 'подготовка сцена сетка туман prepare',
-      run: enterPrepare,
-    });
-
-    return [...playActions, ...common];
+    return gmActions;
   // Adapter callbacks intentionally use current DOM state rather than React state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSceneName, canOpenCharacter, combatRound, mode, onOpenCharacter, tableMode]);
@@ -375,16 +334,16 @@ export function TabletopContextUi({
     return actions.filter((action) => `${action.label} ${action.hint} ${action.keywords}`.toLocaleLowerCase('ru').includes(normalized));
   }, [actions, query]);
 
-  const quickActions = useMemo(() => {
-    const ids = mode === 'player'
-      ? ['map-tools', 'dice']
-      : tableMode === 'combat'
-        ? ['combat', 'map-tools', 'dice']
-        : tableMode === 'prepare'
-          ? ['scene', 'map-tools', 'leave-prepare']
-          : ['characters', 'map-tools', 'dice'];
-    return ids.map((id) => actions.find((action) => action.id === id)).filter((action): action is Action => Boolean(action));
-  }, [actions, mode, tableMode]);
+  const quickActionIds = mode === 'player'
+    ? ['map-tools', 'dice']
+    : tableMode === 'combat'
+      ? ['combat', 'map-tools', 'dice']
+      : tableMode === 'prepare'
+        ? ['scene', 'map-tools', 'dice']
+        : ['characters', 'map-tools', 'dice'];
+  const quickActions = quickActionIds
+    .map((id) => actions.find((action) => action.id === id))
+    .filter((action): action is Action => Boolean(action));
 
   useEffect(() => {
     if (mode !== 'gm') return;
@@ -416,7 +375,6 @@ export function TabletopContextUi({
           event.preventDefault();
           setSurface(null);
           setQuery('');
-          closeMapTools();
           return;
         }
         closeAllTransient();
@@ -441,7 +399,7 @@ export function TabletopContextUi({
     : tableMode === 'prepare'
       ? 'Подготовка'
       : 'Игра';
-  const modeIcon = tableMode === 'combat' ? '⚔' : tableMode === 'prepare' ? '🛠' : '⌘';
+  const modeIcon: TabletopIconName = tableMode === 'combat' ? 'combat' : tableMode === 'prepare' ? 'prepare' : 'game';
 
   if (uiHidden) {
     return (
@@ -452,77 +410,55 @@ export function TabletopContextUi({
         aria-label="Показать интерфейс"
         title="Показать интерфейс · H"
       >
-        ◌
+        <TabletopIcon name="eye" />
       </button>
     );
   }
 
   return (
     <>
-      <div className={`context-ui-launcher ${mode}`} data-wheel-isolation="true">
+      <nav className={`context-ui-actionbar ${mode}`} aria-label="Действия на столе" data-wheel-isolation="true">
         <button
           type="button"
-          className={`context-ui-main-button mode-${tableMode}`}
-          onClick={() => { closeMapTools(); setSurface((current) => current === 'tools' ? null : 'tools'); }}
-          aria-expanded={surface === 'tools'}
-          aria-label="Открыть инструменты"
-          title="Все инструменты · Ctrl+K для поиска"
+          className={`context-ui-mode-chip mode-${tableMode}`}
+          onClick={tableMode === 'prepare' ? leavePrepare : undefined}
+          aria-label={tableMode === 'prepare' ? 'Вернуться к игре' : `Режим: ${modeLabel}`}
+          title={tableMode === 'prepare' ? 'Вернуться к игре' : modeLabel}
         >
-          <span>{modeIcon}</span>
-          <small>{modeLabel}</small>
+          <TabletopIcon name={modeIcon} />
+          <strong>{modeLabel}</strong>
         </button>
-      </div>
 
-      {surface === null && quickActions.length > 0 && (
-        <nav className={`context-ui-quick-actions ${mode}`} aria-label="Быстрые действия" data-wheel-isolation="true">
-          {quickActions.map((action) => (
-            <button key={action.id} type="button" onClick={action.run} title={action.hint} aria-label={action.label}>
-              <span aria-hidden="true">{action.icon}</span>
-              <strong>{action.label}</strong>
-            </button>
-          ))}
-          <button
-            type="button"
-            className="context-ui-command-shortcut"
-            onClick={() => { closeMapTools(); setSurface('command'); setQuery(''); window.requestAnimationFrame(() => commandInputRef.current?.focus()); }}
-            title="Найти любое действие"
-            aria-label="Найти действие"
-          >
-            <span aria-hidden="true">⌕</span>
-            <strong>Поиск</strong>
-            <kbd>Ctrl K</kbd>
+        {quickActions.map((action) => (
+          <button key={action.id} type="button" onClick={action.run} title={action.hint} aria-label={action.label}>
+            <TabletopIcon name={action.icon} />
+            <strong>{action.label}</strong>
           </button>
-        </nav>
-      )}
+        ))}
 
-      {surface === 'tools' && (
-        <section className={`context-tools-palette ${mode}`} aria-label="Контекстные инструменты" data-wheel-isolation="true">
-          <header>
-            <div>
-              <small>{mode === 'gm' ? 'МАСТЕР' : 'ИГРОК'}</small>
-              <strong>{modeLabel}</strong>
-            </div>
-            <button type="button" onClick={() => setSurface(null)} aria-label="Закрыть">×</button>
-          </header>
-          <div className="context-tools-actions">
-            {actions.slice(0, mode === 'gm' ? 7 : 5).map((action) => (
-              <button key={action.id} type="button" onClick={action.run}>
-                <span>{action.icon}</span>
-                <span><strong>{action.label}</strong><small>{action.hint}</small></span>
-              </button>
-            ))}
-          </div>
-          <button type="button" className="context-tools-search" onClick={() => { setSurface('command'); setQuery(''); window.requestAnimationFrame(() => commandInputRef.current?.focus()); }}>
-            <span>⌕ Найти действие</span><kbd>Ctrl K</kbd>
-          </button>
-        </section>
-      )}
+        <button
+          type="button"
+          className="context-ui-command-shortcut"
+          onClick={() => {
+            closeMapTools();
+            setSurface('command');
+            setQuery('');
+            window.requestAnimationFrame(() => commandInputRef.current?.focus());
+          }}
+          title="Найти действие · Ctrl+K"
+          aria-label="Найти действие"
+        >
+          <TabletopIcon name="search" />
+          <strong>Поиск</strong>
+          <kbd>Ctrl K</kbd>
+        </button>
+      </nav>
 
       {surface === 'command' && (
         <div className="context-command-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) setSurface(null); }}>
-          <section className="context-command-palette" role="dialog" aria-modal="true" aria-label="Палитра действий" data-wheel-isolation="true">
+          <section className="context-command-palette" role="dialog" aria-modal="true" aria-label="Поиск действий" data-wheel-isolation="true">
             <header>
-              <span>⌕</span>
+              <TabletopIcon name="search" />
               <input
                 ref={commandInputRef}
                 value={query}
@@ -535,7 +471,7 @@ export function TabletopContextUi({
             <div className="context-command-results">
               {filteredActions.map((action) => (
                 <button key={action.id} type="button" onClick={action.run}>
-                  <span>{action.icon}</span>
+                  <TabletopIcon name={action.icon} />
                   <span><strong>{action.label}</strong><small>{action.hint}</small></span>
                 </button>
               ))}
