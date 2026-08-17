@@ -2,10 +2,7 @@
 
 revoke all on function public.is_campaign_member(uuid) from public, anon, authenticated;
 revoke all on function public.is_campaign_gm(uuid) from public, anon, authenticated;
--- Historical local/bootstrap repair: `public.rls_auto_enable()` was never
--- created by the tracked migration chain, so revoking it made a clean
--- `supabase start` fail before pgTAP could run. No deployed schema depends on
--- this nonexistent helper.
+revoke all on function public.rls_auto_enable() from public, anon, authenticated;
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path=public as $$
@@ -41,6 +38,20 @@ end;
 $$;
 revoke all on function public.create_campaign(text,text,text,text,text) from public, anon;
 grant execute on function public.create_campaign(text,text,text,text,text) to authenticated;
+
+-- A campaign owner must be able to bootstrap their own membership before
+-- is_campaign_gm() can become true for the newly-created campaign.
+create policy campaign_members_owner_bootstrap_insert
+on public.campaign_members
+for insert
+with check (
+  user_id = auth.uid()
+  and role = 'owner'
+  and exists (
+    select 1 from public.campaigns c
+    where c.id = campaign_id and c.owner_id = auth.uid()
+  )
+);
 
 create or replace function public.campaign_for_scene(target_scene uuid) returns uuid language sql stable security definer set search_path=public as $$ select campaign_id from public.scenes where id=target_scene $$;
 create or replace function public.campaign_for_inventory(target_inventory uuid) returns uuid language sql stable security definer set search_path=public as $$ select campaign_id from public.inventories where id=target_inventory $$;
