@@ -14,7 +14,6 @@ import './sheet-v05.css';
 import './online-table-immersion-v2.css';
 import './player-character-window.css';
 import './tabletop-ui-focus.css';
-import './tabletop-ui-preferences.css';
 import './tabletop-shell.css';
 import './tabletop-shell-v2.css';
 import './tabletop-shell-v2-responsive.css';
@@ -22,6 +21,7 @@ import './tabletop-shell-v2-dice.css';
 import './tabletop-context-ui.css';
 import './tabletop-context-ui-zones.css';
 import './map-interaction-tools.css';
+import './tabletop-polish.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
