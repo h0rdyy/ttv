@@ -22,6 +22,7 @@ import './tabletop-context-ui.css';
 import './tabletop-context-ui-zones.css';
 import './map-interaction-tools.css';
 import './tabletop-polish.css';
+import './dice-tray-v2.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
