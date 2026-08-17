@@ -56,21 +56,6 @@ export function gridUnitsPerMapWidth(
   return roundMovementDistance((mapWidthPx / gridSizePx) * distancePerCell);
 }
 
-// Kept for compatibility with older tests/components. New movement code should
-// use mapMovementDistance() with a persisted scene calibration.
-export function gridMovementDistance(
-  deltaXpx: number,
-  deltaYpx: number,
-  cellPixels: number,
-  distancePerCell = DEFAULT_CELL_DISTANCE,
-) {
-  if (!Number.isFinite(cellPixels) || cellPixels <= 0) return 0;
-  const displacement = Math.max(Math.abs(deltaXpx), Math.abs(deltaYpx));
-  if (!Number.isFinite(displacement) || displacement < 0.75) return 0;
-  const cells = displacement / cellPixels;
-  return roundMovementDistance(cells * Math.max(0, distancePerCell));
-}
-
 export function shouldBlockCombatGridMove(distance: number, spent: number, speed: number, distanceScaleAvailable: boolean) {
   if (!distanceScaleAvailable) return false;
   if (!Number.isFinite(distance) || distance < 0) return true;
