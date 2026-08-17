@@ -6,17 +6,13 @@ import { useExclusiveTabletopSurface } from './useExclusiveTabletopSurface';
 export type TabletopUiDensity = 'normal' | 'compact';
 
 export type TabletopUiPreferences = {
-  dice: boolean;
   movement: boolean;
-  sceneInfo: boolean;
   presence: boolean;
   density: TabletopUiDensity;
 };
 
 const DEFAULT_PREFERENCES: TabletopUiPreferences = {
-  dice: true,
   movement: true,
-  sceneInfo: true,
   presence: true,
   density: 'normal',
 };
@@ -31,9 +27,7 @@ export function useTabletopUiPreferences(userId: string) {
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<TabletopUiPreferences>;
       setPreferences({
-        dice: typeof saved.dice === 'boolean' ? saved.dice : DEFAULT_PREFERENCES.dice,
         movement: typeof saved.movement === 'boolean' ? saved.movement : DEFAULT_PREFERENCES.movement,
-        sceneInfo: typeof saved.sceneInfo === 'boolean' ? saved.sceneInfo : DEFAULT_PREFERENCES.sceneInfo,
         presence: typeof saved.presence === 'boolean' ? saved.presence : DEFAULT_PREFERENCES.presence,
         density: saved.density === 'compact' ? 'compact' : 'normal',
       });
@@ -102,9 +96,7 @@ export function TabletopUiPreferencesPanel({
 
           <div className="tabletop-ui-preferences-group">
             <strong>Показывать на столе</strong>
-            <PreferenceToggle label="Кубы" checked={preferences.dice} onChange={(value) => onChange({ dice: value })} />
             <PreferenceToggle label="Движение" checked={preferences.movement} onChange={(value) => onChange({ movement: value })} />
-            <PreferenceToggle label="Название сцены" checked={preferences.sceneInfo} onChange={(value) => onChange({ sceneInfo: value })} />
             <PreferenceToggle label="Игроки онлайн" checked={preferences.presence} onChange={(value) => onChange({ presence: value })} />
           </div>
 
