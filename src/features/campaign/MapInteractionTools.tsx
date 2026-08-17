@@ -11,6 +11,7 @@ import {
   gridUnitsPerMapWidth,
   roundMovementDistance,
 } from './movement';
+import { removeRealtimeChannels } from './realtimeCleanup';
 
 type Mode = 'gm' | 'player';
 type Tool = 'ruler' | 'ping' | 'draw' | null;
@@ -138,6 +139,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
     setPings((current) => [...current.filter((value) => value.id !== ping.id), ping]);
     const timer = window.setTimeout(() => {
       setPings((current) => current.filter((value) => value.id !== ping.id));
+      pingTimersRef.current = pingTimersRef.current.filter((value) => value !== timer);
     }, 1800);
     pingTimersRef.current.push(timer);
   };
@@ -205,7 +207,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
       disposed = true;
       subscribedRef.current = false;
       channelRef.current = null;
-      void supabase.removeChannel(channel);
+      void removeRealtimeChannels(supabase, [channel]);
     };
   }, [campaignId, currentUserId, scene?.id]);
 
