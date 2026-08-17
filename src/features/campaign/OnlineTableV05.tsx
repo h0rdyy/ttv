@@ -11,6 +11,7 @@ import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
 import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
 import { TabletopIcon } from './TabletopIcon';
+import { TabletopSceneSwitcher } from './TabletopSceneSwitcher';
 import { TabletopShellV2 } from './TabletopShellV2';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
@@ -86,6 +87,7 @@ export function OnlineTableV05(props: Props) {
   const [selectedActorId, setSelectedActorId] = useState(() => props.mode === 'player' ? ownActor?.id ?? '' : '');
   const [characterActorId, setCharacterActorId] = useState<string | null>(null);
   const [actorMenu, setActorMenu] = useState<ActorContextMenu | null>(null);
+  const [deleteConfirmActorId, setDeleteConfirmActorId] = useState<string | null>(null);
   const [deletingActorId, setDeletingActorId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const pendingOpenActorIdRef = useRef<string | null>(null);
@@ -118,7 +120,8 @@ export function OnlineTableV05(props: Props) {
 
     if (characterActorId && !actorIds.has(characterActorId)) setCharacterActorId(null);
     if (selectedActorId && !actorIds.has(selectedActorId) && !pendingOpenActorIdRef.current) setSelectedActorId('');
-  }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, characterActorId]);
+    if (deleteConfirmActorId && !actorIds.has(deleteConfirmActorId)) setDeleteConfirmActorId(null);
+  }, [props.initialActors, props.mode, ownActor?.id, selectedActorId, characterActorId, deleteConfirmActorId]);
 
   useEffect(() => {
     if (props.mode !== 'gm' || !gmAllowed) return;
@@ -180,6 +183,7 @@ export function OnlineTableV05(props: Props) {
     ? props.initialInventories.find((inventory) => inventory.owner_actor_id === characterActor.id) ?? null
     : null;
   const contextActor = actorMenu ? actors.find((actor) => actor.id === actorMenu.actorId) ?? null : null;
+  const deleteActor = deleteConfirmActorId ? actors.find((actor) => actor.id === deleteConfirmActorId) ?? null : null;
 
   const refresh = () => router.refresh();
   const openSelectedCharacter = () => {
@@ -192,21 +196,26 @@ export function OnlineTableV05(props: Props) {
     setCharacterActorId(actorMenu.actorId);
     setActorMenu(null);
   };
-  const deleteContextActor = async () => {
-    if (!contextActor || !window.confirm(`Удалить персонажа «${contextActor.name}»? Вместе с ним будут удалены его фишки и инвентарь.`)) return;
-    setDeletingActorId(contextActor.id);
+  const requestDeleteContextActor = () => {
+    if (!contextActor) return;
+    setDeleteConfirmActorId(contextActor.id);
+    setActorMenu(null);
+  };
+  const deleteConfirmedActor = async () => {
+    if (!deleteActor || deletingActorId) return;
+    setDeletingActorId(deleteActor.id);
     const supabase = createClient();
     const { error } = await supabase.rpc('delete_campaign_actor', {
       target_campaign: props.campaign.id,
-      target_actor: contextActor.id,
+      target_actor: deleteActor.id,
     });
     if (error) setMessage(friendlyError(error, 'Не удалось удалить персонажа.'));
     else {
-      if (selectedActorIdRef.current === contextActor.id) setSelectedActorId('');
-      if (characterActorId === contextActor.id) setCharacterActorId(null);
+      if (selectedActorIdRef.current === deleteActor.id) setSelectedActorId('');
+      if (characterActorId === deleteActor.id) setCharacterActorId(null);
       pendingOpenActorIdRef.current = null;
-      setActorMenu(null);
-      setMessage(`Персонаж «${contextActor.name}» удалён.`);
+      setMessage(`Персонаж «${deleteActor.name}» удалён.`);
+      setDeleteConfirmActorId(null);
       refresh();
     }
     setDeletingActorId(null);
@@ -231,6 +240,16 @@ export function OnlineTableV05(props: Props) {
         combatRound={props.initialRuntime.combat_round}
         focusActive={Boolean(characterActor)}
       />
+
+      {props.mode === 'gm' && gmAllowed && (
+        <TabletopSceneSwitcher
+          campaignId={props.campaign.id}
+          activeSceneId={activeScene?.id ?? null}
+          scenes={props.initialScenes}
+          onChanged={refresh}
+          onMessage={setMessage}
+        />
+      )}
 
       <MapInteractionTools
         campaignId={props.campaign.id}
@@ -293,9 +312,26 @@ export function OnlineTableV05(props: Props) {
           <button type="button" role="menuitem" onClick={editContextActor}>
             <span>Открыть лист</span><small>Редактировать персонажа</small>
           </button>
-          <button type="button" role="menuitem" disabled={deletingActorId === contextActor.id} onClick={() => void deleteContextActor()} style={{ color: 'var(--danger, #d96868)' }}>
-            <span>Удалить</span><small>{deletingActorId === contextActor.id ? 'Удаление…' : 'Удалить персонажа'}</small>
+          <button type="button" role="menuitem" onClick={requestDeleteContextActor} style={{ color: 'var(--danger, #d96868)' }}>
+            <span>Удалить</span><small>Удалить персонажа</small>
           </button>
+        </div>
+      )}
+
+      {deleteActor && (
+        <div className="foundry-confirm-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget && !deletingActorId) setDeleteConfirmActorId(null); }}>
+          <section className="foundry-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="actor-delete-title" aria-describedby="actor-delete-description">
+            <div className="foundry-confirm-icon danger"><TabletopIcon name="trash" /></div>
+            <div>
+              <small>УДАЛЕНИЕ ПЕРСОНАЖА</small>
+              <h3 id="actor-delete-title">Удалить «{deleteActor.name}»?</h3>
+              <p id="actor-delete-description">Вместе с персонажем будут удалены его фишки и инвентарь. Это действие нельзя отменить.</p>
+            </div>
+            <footer>
+              <button type="button" className="button" disabled={Boolean(deletingActorId)} onClick={() => setDeleteConfirmActorId(null)}>Отмена</button>
+              <button type="button" className="button danger" disabled={Boolean(deletingActorId)} onClick={() => void deleteConfirmedActor()}>{deletingActorId ? 'Удаляем…' : 'Удалить персонажа'}</button>
+            </footer>
+          </section>
         </div>
       )}
 
