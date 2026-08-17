@@ -10,8 +10,8 @@ import type { SheetActor } from './OnlineActorSheet';
 import { PlayerCharacterWindow } from './PlayerCharacterWindow';
 import { PlayerImmersionHud } from './PlayerImmersionHud';
 import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
+import { TabletopIcon } from './TabletopIcon';
 import { TabletopShellV2 } from './TabletopShellV2';
-import { TabletopUiPreferencesPanel, useTabletopUiPreferences } from './TabletopUiPreferences';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -79,10 +79,6 @@ type Props = {
 export function OnlineTableV05(props: Props) {
   const router = useRouter();
   const { initialSheetTemplates, ...tableProps } = props;
-  // Classic pre-v0.5 actors stored health in `hp`; the flexible sheet stores the
-  // resource in `hit_points`. Keep `hit_points` canonical, but expose an in-memory
-  // `hp` alias so legacy table/sidebar code renders the same value without writing
-  // duplicate health data back to Supabase.
   const actors = props.initialActors.map(withCompatibleHealth);
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(props.role);
   const ownActor = actors.find((actor) => actor.owner_user_id === props.currentUserId) ?? null;
@@ -92,15 +88,10 @@ export function OnlineTableV05(props: Props) {
   const [actorMenu, setActorMenu] = useState<ActorContextMenu | null>(null);
   const [deletingActorId, setDeletingActorId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const { preferences, updatePreferences, resetPreferences } = useTabletopUiPreferences(props.currentUserId);
   const pendingOpenActorIdRef = useRef<string | null>(null);
   const selectedActorIdRef = useRef(selectedActorId);
   selectedActorIdRef.current = selectedActorId;
 
-  // Creation happens inside OnlineTable/GM sidebar. Their RPC returns the new id
-  // before router.refresh() brings the Actor into this wrapper. Remember that
-  // temporary unknown selection so an inner reconciliation cannot lose the
-  // request to open the freshly created character.
   useEffect(() => {
     if (props.mode !== 'gm' || !selectedActorId) return;
     const exists = actors.some((actor) => actor.id === selectedActorId);
@@ -132,8 +123,6 @@ export function OnlineTableV05(props: Props) {
   useEffect(() => {
     if (props.mode !== 'gm' || !gmAllowed) return;
 
-    // Token dragging currently begins on any pointer button. Intercept RMB before
-    // the map sees it so a context click never starts a token drag.
     const blockRightDrag = (event: PointerEvent) => {
       if (event.button !== 2) return;
       const target = event.target;
@@ -150,8 +139,6 @@ export function OnlineTableV05(props: Props) {
 
       event.preventDefault();
       event.stopPropagation();
-      // Both token and library row already know how to select their Actor. Reuse
-      // that source of truth, then open the menu after React flushes selection.
       actorTarget.click();
       const x = Math.max(8, Math.min(event.clientX, window.innerWidth - 238));
       const y = Math.max(8, Math.min(event.clientY, window.innerHeight - 126));
@@ -226,14 +213,9 @@ export function OnlineTableV05(props: Props) {
   };
 
   const immersionClasses = props.mode === 'player' ? ' player-immersion' : '';
-  const uiClasses = [
-    preferences.movement ? '' : ' ui-hide-movement',
-    preferences.presence ? '' : ' ui-hide-presence',
-    preferences.density === 'compact' ? ' ui-density-compact' : '',
-  ].join('');
 
   return (
-    <div className={`v05-table-layer tabletop-shell-v2${immersionClasses}${uiClasses}`}>
+    <div className={`v05-table-layer tabletop-shell-v2${immersionClasses}`}>
       <OnlineTable
         {...tableProps}
         initialActors={actors}
@@ -248,12 +230,6 @@ export function OnlineTableV05(props: Props) {
         combatActive={props.initialRuntime.combat_active}
         combatRound={props.initialRuntime.combat_round}
         focusActive={Boolean(characterActor)}
-      />
-
-      <TabletopUiPreferencesPanel
-        preferences={preferences}
-        onChange={updatePreferences}
-        onReset={resetPreferences}
       />
 
       <MapInteractionTools
@@ -271,6 +247,13 @@ export function OnlineTableV05(props: Props) {
           onChanged={refresh}
           onMessage={setMessage}
         />
+      )}
+
+      {props.mode === 'gm' && gmAllowed && selectedActor && !characterActor && (
+        <button type="button" className="gm-inspector-sheet-button" onClick={openSelectedCharacter}>
+          <TabletopIcon name="sheet" />
+          <span><strong>Открыть лист</strong><small>{selectedActor.name}</small></span>
+        </button>
       )}
 
       {props.mode === 'player' && (
@@ -308,10 +291,10 @@ export function OnlineTableV05(props: Props) {
           style={{ position: 'fixed', left: actorMenu.x, top: actorMenu.y, width: 230, zIndex: 112 }}
         >
           <button type="button" role="menuitem" onClick={editContextActor}>
-            <span>✎ Редактировать</span><small>Открыть персонажа</small>
+            <span>Открыть лист</span><small>Редактировать персонажа</small>
           </button>
           <button type="button" role="menuitem" disabled={deletingActorId === contextActor.id} onClick={() => void deleteContextActor()} style={{ color: 'var(--danger, #d96868)' }}>
-            <span>× Удалить</span><small>{deletingActorId === contextActor.id ? 'Удаление…' : 'Удалить персонажа'}</small>
+            <span>Удалить</span><small>{deletingActorId === contextActor.id ? 'Удаление…' : 'Удалить персонажа'}</small>
           </button>
         </div>
       )}
