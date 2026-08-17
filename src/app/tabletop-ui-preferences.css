@@ -2,7 +2,7 @@
   position: fixed;
   top: 62px;
   right: 12px;
-  z-index: 11800;
+  z-index: 114;
 }
 
 .tabletop-ui-preferences-trigger {
@@ -136,17 +136,9 @@
   justify-content: flex-end;
 }
 
-.v05-table-layer.ui-hide-dice .dice-tray-anchor {
-  display: none !important;
-}
-
 .v05-table-layer.ui-hide-movement .player-movement-chip,
 .v05-table-layer.ui-hide-movement .player-movement-ruler,
 .v05-table-layer.ui-hide-movement .player-movement-bubble {
-  display: none !important;
-}
-
-.v05-table-layer.ui-hide-scene-info .scene-chip {
   display: none !important;
 }
 
