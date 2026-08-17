@@ -35,6 +35,8 @@ jobs:
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
+        with:
+          version: 2.114.0
 
       - name: Initialize local Supabase config
         run: test -f supabase/config.toml || supabase init
