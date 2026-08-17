@@ -227,9 +227,7 @@ export function OnlineTableV05(props: Props) {
 
   const immersionClasses = props.mode === 'player' ? ' player-immersion' : '';
   const uiClasses = [
-    preferences.dice ? '' : ' ui-hide-dice',
     preferences.movement ? '' : ' ui-hide-movement',
-    preferences.sceneInfo ? '' : ' ui-hide-scene-info',
     preferences.presence ? '' : ' ui-hide-presence',
     preferences.density === 'compact' ? ' ui-density-compact' : '',
   ].join('');
@@ -307,7 +305,7 @@ export function OnlineTableV05(props: Props) {
           data-gm-actor-context-menu="true"
           role="menu"
           aria-label={`Действия с персонажем ${contextActor.name}`}
-          style={{ position: 'fixed', left: actorMenu.x, top: actorMenu.y, width: 230, zIndex: 12000 }}
+          style={{ position: 'fixed', left: actorMenu.x, top: actorMenu.y, width: 230, zIndex: 112 }}
         >
           <button type="button" role="menuitem" onClick={editContextActor}>
             <span>✎ Редактировать</span><small>Открыть персонажа</small>
