@@ -99,6 +99,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
     setLastRoll(null);
     setFormulaText('');
     setFormulaError('');
+    setQuickModifier(0);
   };
 
   return (
@@ -191,7 +192,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
                 <b>{rolling || !lastRoll ? '—' : lastRoll.total}</b>
               </div>
             </div>
-            <button type="button" className="dice-clear-board" disabled={rolling || (!lastRoll && !formulaText)} onClick={clearBoard}>
+            <button type="button" className="dice-clear-board" disabled={rolling || (!lastRoll && !formulaText && quickModifier === 0)} onClick={clearBoard}>
               <TabletopIcon name="clear" /> Очистить поле
             </button>
           </div>
