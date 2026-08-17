@@ -2,6 +2,17 @@
   display: none !important;
 }
 
+.v05-table-layer.tabletop-shell-v3 .gm-mode .online-table-campaign {
+  max-width: 200px !important;
+  overflow: hidden;
+}
+.v05-table-layer.tabletop-shell-v3 .gm-mode .online-table-campaign strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tabletop-scene-switcher {
   position: absolute;
   left: min(42vw, 220px);
