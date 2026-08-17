@@ -26,6 +26,7 @@ import './dice-tray-v2.css';
 import './character-confirm.css';
 import './scene-switcher.css';
 import './item-builder-polish.css';
+import './gm-inspector-polish.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',
