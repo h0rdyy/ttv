@@ -2,7 +2,10 @@
 
 revoke all on function public.is_campaign_member(uuid) from public, anon, authenticated;
 revoke all on function public.is_campaign_gm(uuid) from public, anon, authenticated;
-revoke all on function public.rls_auto_enable() from public, anon, authenticated;
+-- Historical local/bootstrap repair: `public.rls_auto_enable()` was never
+-- created by the tracked migration chain, so revoking it made a clean
+-- `supabase start` fail before pgTAP could run. No deployed schema depends on
+-- this nonexistent helper.
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path=public as $$
