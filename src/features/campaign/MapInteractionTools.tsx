@@ -12,10 +12,11 @@ import {
   roundMovementDistance,
 } from './movement';
 import { removeRealtimeChannels } from './realtimeCleanup';
+import { TabletopIcon } from './TabletopIcon';
 
 type Mode = 'gm' | 'player';
 type Tool = 'ruler' | 'ping' | 'draw' | null;
-type DrawTone = 'accent' | 'danger' | 'cool';
+type DrawTone = 'accent' | 'danger' | 'cool' | 'light';
 
 type Scene = {
   id: string;
@@ -56,6 +57,8 @@ const DRAW_EVENT = 'map_draw';
 const CLEAR_EVENT = 'map_draw_clear';
 const MAX_STROKES = 80;
 const MAX_STROKE_POINTS = 180;
+const RULER_LINGER_MS = 4200;
+const PING_LINGER_MS = 2600;
 
 function finiteNumber(value: unknown) {
   const number = Number(value);
@@ -77,7 +80,12 @@ function validPoint(value: unknown): Point | null {
 }
 
 function validTone(value: unknown): DrawTone {
-  return value === 'danger' || value === 'cool' ? value : 'accent';
+  return value === 'danger' || value === 'cool' || value === 'light' ? value : 'accent';
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
 export function MapInteractionTools({ campaignId, mode, currentUserId, displayName, scene }: Props) {
@@ -93,6 +101,23 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribedRef = useRef(false);
   const pingTimersRef = useRef<number[]>([]);
+  const rulerTimerRef = useRef<number | null>(null);
+
+  const clearRulerTimer = () => {
+    if (rulerTimerRef.current !== null) {
+      window.clearTimeout(rulerTimerRef.current);
+      rulerTimerRef.current = null;
+    }
+  };
+
+  const resetActiveTool = (keepPalette = true) => {
+    clearRulerTimer();
+    setTool(null);
+    setRuler(null);
+    setDraftStroke(null);
+    pointerIdRef.current = null;
+    if (!keepPalette) setOpen(false);
+  };
 
   useEffect(() => {
     const resolveWorld = () => {
@@ -106,13 +131,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
 
   useEffect(() => {
     const toggle = () => setOpen((current) => !current);
-    const close = () => {
-      setOpen(false);
-      setTool(null);
-      setRuler(null);
-      setDraftStroke(null);
-      pointerIdRef.current = null;
-    };
+    const close = () => resetActiveTool(false);
     window.addEventListener(TOGGLE_EVENT, toggle);
     window.addEventListener(CLOSE_EVENT, close);
     return () => {
@@ -122,17 +141,26 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
   }, []);
 
   useEffect(() => {
-    setTool(null);
-    setRuler(null);
-    setDraftStroke(null);
+    resetActiveTool();
     setStrokes([]);
     setPings([]);
-    pointerIdRef.current = null;
   }, [scene?.id]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLocaleLowerCase() !== 'q' || isTypingTarget(event.target)) return;
+      if (!tool && !ruler) return;
+      event.preventDefault();
+      resetActiveTool();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [tool, ruler]);
 
   useEffect(() => () => {
     pingTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     pingTimersRef.current = [];
+    clearRulerTimer();
   }, []);
 
   const showPing = (ping: Ping) => {
@@ -140,7 +168,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
     const timer = window.setTimeout(() => {
       setPings((current) => current.filter((value) => value.id !== ping.id));
       pingTimersRef.current = pingTimersRef.current.filter((value) => value !== timer);
-    }, 1800);
+    }, PING_LINGER_MS);
     pingTimersRef.current.push(timer);
   };
 
@@ -240,7 +268,14 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!tool || event.button !== 0 || !scene) return;
+    if (!tool || !scene) return;
+    if (event.button === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      resetActiveTool();
+      return;
+    }
+    if (event.button !== 0) return;
     const point = eventPoint(event);
     if (!point) return;
     event.preventDefault();
@@ -251,6 +286,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
       return;
     }
 
+    clearRulerTimer();
     pointerIdRef.current = event.pointerId;
     event.currentTarget.setPointerCapture(event.pointerId);
     if (tool === 'ruler') {
@@ -299,6 +335,13 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
       setStrokes((current) => [...current, finished].slice(-MAX_STROKES));
       broadcast(DRAW_EVENT, finished as unknown as Record<string, unknown>);
     }
+    if (tool === 'ruler') {
+      clearRulerTimer();
+      rulerTimerRef.current = window.setTimeout(() => {
+        setRuler(null);
+        rulerTimerRef.current = null;
+      }, RULER_LINGER_MS);
+    }
     setDraftStroke(null);
   };
 
@@ -310,6 +353,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
   };
 
   const toggleTool = (next: Exclude<Tool, null>) => {
+    clearRulerTimer();
     setTool((current) => current === next ? null : next);
     setDraftStroke(null);
     pointerIdRef.current = null;
@@ -346,25 +390,33 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
             points={draftStroke.points.map((point) => `${point.x},${point.y}`).join(' ')}
           />
         )}
-        {ruler && <line className="map-ruler-line" x1={ruler.start.x} y1={ruler.start.y} x2={ruler.end.x} y2={ruler.end.y} />}
+        {ruler && (
+          <g className="map-ruler-graphics">
+            <line className="map-ruler-line-shadow" x1={ruler.start.x} y1={ruler.start.y} x2={ruler.end.x} y2={ruler.end.y} />
+            <line className="map-ruler-line" x1={ruler.start.x} y1={ruler.start.y} x2={ruler.end.x} y2={ruler.end.y} />
+            <circle className="map-ruler-point" cx={ruler.start.x} cy={ruler.start.y} r="0.75" />
+            <circle className="map-ruler-point end" cx={ruler.end.x} cy={ruler.end.y} r="0.95" />
+          </g>
+        )}
       </svg>
 
       {ruler && (
         <div className="map-ruler-label" style={{ left: `${ruler.end.x}%`, top: `${ruler.end.y}%` }}>
           {rulerDistance !== null ? <strong>{formatMovementDistance(rulerDistance)} {distanceUnit}</strong> : <strong>Без масштаба</strong>}
-          <small>Линейка</small>
+          <small>Q — убрать</small>
         </div>
       )}
 
       {pings.map((ping) => (
         <div key={ping.id} className="map-ping-marker" style={{ left: `${ping.point.x}%`, top: `${ping.point.y}%` }}>
-          <i />
+          <i><b /></i>
           <span>{ping.senderName}</span>
         </div>
       ))}
 
       <div
         className={`map-interaction-hit-layer ${tool ? `active tool-${tool}` : ''}`}
+        onContextMenu={(event) => { if (tool) event.preventDefault(); }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={finishPointer}
@@ -383,35 +435,36 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
         <section className={`map-tools-palette ${mode}`} data-wheel-isolation="true" aria-label="Инструменты карты">
           <header>
             <div><small>{mode === 'gm' ? 'МАСТЕР' : 'ИГРОК'}</small><strong>Инструменты карты</strong></div>
-            <button type="button" aria-label="Закрыть инструменты карты" onClick={() => { setOpen(false); setTool(null); setRuler(null); }}>×</button>
+            <button type="button" aria-label="Закрыть инструменты карты" onClick={() => resetActiveTool(false)}><TabletopIcon name="close" /></button>
           </header>
 
           <div className="map-tools-actions">
             <button type="button" aria-pressed={tool === 'ruler'} className={tool === 'ruler' ? 'active' : ''} onClick={() => toggleTool('ruler')}>
-              <span>⌁</span><strong>Линейка</strong><small>Потяните по карте</small>
+              <TabletopIcon name="ruler" /><strong>Линейка</strong><small>Проведите по карте</small>
             </button>
             <button type="button" aria-pressed={tool === 'ping'} className={tool === 'ping' ? 'active' : ''} onClick={() => toggleTool('ping')}>
-              <span>◎</span><strong>Пинг</strong><small>Показать точку всем</small>
+              <TabletopIcon name="ping" /><strong>Пинг</strong><small>Яркая метка для всех</small>
             </button>
             {mode === 'gm' && (
               <button type="button" aria-pressed={tool === 'draw'} className={tool === 'draw' ? 'active' : ''} onClick={() => toggleTool('draw')}>
-                <span>✎</span><strong>Рисовать</strong><small>Временные пометки</small>
+                <TabletopIcon name="draw" /><strong>Рисовать</strong><small>Временные пометки</small>
               </button>
             )}
           </div>
 
           {mode === 'gm' && tool === 'draw' && (
             <div className="map-tools-draw-options" aria-label="Цвет рисунка">
-              <span>Цвет</span>
-              {(['accent', 'danger', 'cool'] as DrawTone[]).map((value) => (
+              <span>Цвет линии</span>
+              {(['accent', 'danger', 'cool', 'light'] as DrawTone[]).map((value) => (
                 <button key={value} type="button" aria-pressed={tone === value} className={`tone-${value} ${tone === value ? 'active' : ''}`} onClick={() => setTone(value)} aria-label={`Цвет ${value}`} />
               ))}
             </div>
           )}
 
           <footer>
-            <span>{tool === 'ruler' ? 'Измерение остаётся только у вас' : tool === 'ping' ? 'Пинг исчезнет автоматически' : tool === 'draw' ? 'Рисунок видят подключённые игроки' : 'Выберите инструмент'}</span>
-            {mode === 'gm' && strokes.length > 0 && <button type="button" onClick={clearDrawings}>Очистить рисунки</button>}
+            <span>{tool ? 'Q или ПКМ — сбросить инструмент' : 'Выберите инструмент карты'}</span>
+            {(tool || ruler) && <button type="button" onClick={() => resetActiveTool()}><TabletopIcon name="clear" /> Сбросить</button>}
+            {mode === 'gm' && strokes.length > 0 && <button type="button" onClick={clearDrawings}><TabletopIcon name="trash" /> Очистить рисунки</button>}
           </footer>
         </section>
       )}
