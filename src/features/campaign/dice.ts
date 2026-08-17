@@ -56,8 +56,6 @@ export function parseDiceFormula(value: string): ParsedDiceFormula | null {
     const diceMatch = /^(\d*)d(\d+)$/.exec(term);
 
     if (diceMatch) {
-      // Negative dice terms are intentionally unsupported. Removing a die is an
-      // editor action, not arithmetic on random variables.
       if (sign < 0) return null;
       const count = diceMatch[1] ? Number(diceMatch[1]) : 1;
       const dieSides = Number(diceMatch[2]);
@@ -123,20 +121,6 @@ export function mergeDiceRollHistory(history: DiceRoll[], roll: DiceRoll, limit 
   return [roll, ...history.filter((item) => item.id !== roll.id)]
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
     .slice(0, safeLimit);
-}
-
-export function removeDieFromRoll(roll: DiceRoll, index: number): DiceRoll | null {
-  if (!Number.isInteger(index) || index < 0 || index >= roll.values.length) return roll;
-  const values = roll.values.filter((_, valueIndex) => valueIndex !== index);
-  const sides = roll.sides.filter((_, sideIndex) => sideIndex !== index);
-  if (!values.length) return null;
-  return {
-    ...roll,
-    values,
-    sides,
-    formula: buildDiceFormula(sides, roll.modifier),
-    total: values.reduce((sum, value) => sum + value, 0) + roll.modifier,
-  };
 }
 
 function isUuid(value: string) {
