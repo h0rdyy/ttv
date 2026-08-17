@@ -13,6 +13,7 @@ import {
   type SheetSectionSlot,
 } from './actorSheets';
 import { actorMovementSpeed } from './movement';
+import { TabletopIcon } from './TabletopIcon';
 
 type Inventory = { id: string; owner_actor_id: string };
 type Container = { id: string; inventory_id: string; name: string; type: string; sort_order: number };
@@ -60,6 +61,7 @@ export function PlayerCharacterWindow({
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<CharacterTab>('overview');
+  const [confirmClose, setConfirmClose] = useState(false);
   const loadedActorIdRef = useRef(actor.id);
   const pendingSavedRef = useRef(new Map<string, unknown>());
 
@@ -91,6 +93,7 @@ export function PlayerCharacterWindow({
       pendingSavedRef.current.clear();
       setData(clone(actor.system_data));
       setDirtyKeys(new Set());
+      setConfirmClose(false);
       return;
     }
 
@@ -107,10 +110,20 @@ export function PlayerCharacterWindow({
     });
   }, [actor.id, actor.system_data, dirtyKeys]);
 
+  const requestClose = () => {
+    if (dirtyKeys.size > 0) {
+      setConfirmClose(true);
+      return;
+    }
+    onClose();
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      requestClose();
+      event.preventDefault();
+      if (confirmClose) setConfirmClose(false);
+      else requestClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -124,11 +137,6 @@ export function PlayerCharacterWindow({
       next.add(key);
       return next;
     });
-  };
-
-  const requestClose = () => {
-    if (dirtyKeys.size > 0 && !window.confirm('Есть несохранённые изменения. Закрыть окно персонажа?')) return;
-    onClose();
   };
 
   const save = async () => {
@@ -150,6 +158,7 @@ export function PlayerCharacterWindow({
       for (const key of keys) pendingSavedRef.current.set(key, cloneValue(savedData[key]));
       setData(clone(savedData));
       setDirtyKeys(new Set());
+      setConfirmClose(false);
       onMessage('Персонаж сохранён.');
       onChanged();
     }
@@ -167,72 +176,91 @@ export function PlayerCharacterWindow({
   const visibleSections = schema.sections.filter((section) => activeDefinition.slots.includes(section.slot ?? 'custom'));
 
   return (
-    <section className="foundry-character-window" data-wheel-isolation="true" role="dialog" aria-modal="true" aria-label={`Персонаж ${actor.name}`}>
-      <header className="foundry-character-head">
-        <div className="foundry-character-portrait">{actor.avatar || '🧙'}</div>
-        <div className="foundry-character-title">
-          <span>ПЕРСОНАЖ</span>
-          <h2>{actor.name}</h2>
-          <p>{identity || actor.subtitle || 'Персонаж кампании'}</p>
-        </div>
-        <div className="foundry-quick-stats" aria-label="Быстрые характеристики">
-          <QuickStat label="HP" value={hpMax > 0 ? `${hpCurrent} / ${hpMax}` : '— / —'} accent="health" />
-          <QuickStat label="КД" value={String(armorClass)} />
-          <QuickStat label="Скорость" value={`${speed} ft`} />
-          <QuickStat label="Инициатива" value={signed(initiative)} />
-        </div>
-        <button className="foundry-character-close" type="button" onClick={requestClose} aria-label="Закрыть окно персонажа">×</button>
-      </header>
-
-      <nav className="foundry-character-tabs" aria-label="Разделы персонажа">
-        {availableTabs.map((definition) => (
-          <button key={definition.id} type="button" className={tab === definition.id ? 'active' : ''} onClick={() => setTab(definition.id)}>
-            {definition.label}
-          </button>
-        ))}
-      </nav>
-
-      <div className="foundry-character-body">
-        {tab === 'overview' && <OverviewStrip data={data} />}
-
-        {tab === 'inventory' && inventory && (
-          <InventoryView containers={sortedContainers} instances={instances} itemById={itemById} />
-        )}
-
-        <div className={`foundry-section-grid foundry-tab-${tab}`}>
-          {visibleSections.map((section) => (
-            <CharacterSection
-              key={section.id}
-              section={section}
-              data={data}
-              disabled={!canEdit || busy || !template}
-              onPatch={patch}
-            />
-          ))}
-        </div>
-
-        {visibleSections.length === 0 && tab !== 'inventory' && (
-          <div className="foundry-character-empty">
-            <strong>В этом разделе пока нет полей.</strong>
-            <span>Мастер может добавить их в шаблон листа, и они появятся здесь автоматически.</span>
+    <>
+      <section className="foundry-character-window" data-wheel-isolation="true" role="dialog" aria-modal="true" aria-label={`Персонаж ${actor.name}`}>
+        <header className="foundry-character-head">
+          <div className="foundry-character-portrait">{actor.avatar || '🧙'}</div>
+          <div className="foundry-character-title">
+            <span>ПЕРСОНАЖ</span>
+            <h2>{actor.name}</h2>
+            <p>{identity || actor.subtitle || 'Персонаж кампании'}</p>
           </div>
-        )}
-      </div>
+          <div className="foundry-quick-stats" aria-label="Быстрые характеристики">
+            <QuickStat label="HP" value={hpMax > 0 ? `${hpCurrent} / ${hpMax}` : '— / —'} accent="health" />
+            <QuickStat label="КД" value={String(armorClass)} />
+            <QuickStat label="Скорость" value={`${speed} ft`} />
+            <QuickStat label="Инициатива" value={signed(initiative)} />
+          </div>
+          <button className="foundry-character-close" type="button" onClick={requestClose} aria-label="Закрыть окно персонажа"><TabletopIcon name="close" /></button>
+        </header>
 
-      <footer className="foundry-character-footer">
-        <span>
-          {!template ? 'Мастер ещё не назначил шаблон листа.' : dirtyKeys.size > 0 ? `Изменено полей: ${dirtyKeys.size}` : 'Все изменения сохранены.'}
-        </span>
-        <div>
-          <button className="button" type="button" onClick={requestClose}>Закрыть</button>
-          {canEdit && template && (
-            <button className="button primary" type="button" disabled={busy || dirtyKeys.size === 0} onClick={() => void save()}>
-              {busy ? 'Сохраняем…' : dirtyKeys.size > 0 ? 'Сохранить' : 'Сохранено'}
+        <nav className="foundry-character-tabs" aria-label="Разделы персонажа">
+          {availableTabs.map((definition) => (
+            <button key={definition.id} type="button" className={tab === definition.id ? 'active' : ''} onClick={() => setTab(definition.id)}>
+              {definition.label}
             </button>
+          ))}
+        </nav>
+
+        <div className="foundry-character-body">
+          {tab === 'overview' && <OverviewStrip data={data} />}
+
+          {tab === 'inventory' && inventory && (
+            <InventoryView containers={sortedContainers} instances={instances} itemById={itemById} />
+          )}
+
+          <div className={`foundry-section-grid foundry-tab-${tab}`}>
+            {visibleSections.map((section) => (
+              <CharacterSection
+                key={section.id}
+                section={section}
+                data={data}
+                disabled={!canEdit || busy || !template}
+                onPatch={patch}
+              />
+            ))}
+          </div>
+
+          {visibleSections.length === 0 && tab !== 'inventory' && (
+            <div className="foundry-character-empty">
+              <strong>В этом разделе пока нет полей.</strong>
+              <span>Мастер может добавить их в шаблон листа, и они появятся здесь автоматически.</span>
+            </div>
           )}
         </div>
-      </footer>
-    </section>
+
+        <footer className="foundry-character-footer">
+          <span>
+            {!template ? 'Мастер ещё не назначил шаблон листа.' : dirtyKeys.size > 0 ? `Изменено полей: ${dirtyKeys.size}` : 'Все изменения сохранены.'}
+          </span>
+          <div>
+            <button className="button" type="button" onClick={requestClose}>Закрыть</button>
+            {canEdit && template && (
+              <button className="button primary" type="button" disabled={busy || dirtyKeys.size === 0} onClick={() => void save()}>
+                {busy ? 'Сохраняем…' : dirtyKeys.size > 0 ? 'Сохранить' : 'Сохранено'}
+              </button>
+            )}
+          </div>
+        </footer>
+      </section>
+
+      {confirmClose && (
+        <div className="foundry-confirm-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) setConfirmClose(false); }}>
+          <section className="foundry-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="character-close-title" aria-describedby="character-close-description">
+            <div className="foundry-confirm-icon"><TabletopIcon name="sheet" /></div>
+            <div>
+              <small>НЕСОХРАНЁННЫЕ ИЗМЕНЕНИЯ</small>
+              <h3 id="character-close-title">Закрыть лист персонажа?</h3>
+              <p id="character-close-description">Изменения в «{actor.name}» не сохранены. Можно вернуться к листу или закрыть его без сохранения.</p>
+            </div>
+            <footer>
+              <button type="button" className="button" onClick={() => setConfirmClose(false)}>Продолжить редактирование</button>
+              <button type="button" className="button danger" onClick={() => { setConfirmClose(false); onClose(); }}>Закрыть без сохранения</button>
+            </footer>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
 
