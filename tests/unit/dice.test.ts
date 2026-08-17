@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDiceFormula,
   mergeDiceRollHistory,
+  parseDiceFormula,
   parseDiceRoll,
   removeDieFromRoll,
 } from '../../src/features/campaign/dice';
@@ -23,6 +24,17 @@ describe('dice contracts', () => {
     expect(buildDiceFormula([], 0)).toBe('Выберите кубы');
     expect(buildDiceFormula([20, 6, 20], 3)).toBe('2d20 + 1d6 + 3');
     expect(buildDiceFormula([8], -2)).toBe('1d8 − 2');
+  });
+
+  it('parses compact formulas with explicit safety bounds', () => {
+    expect(parseDiceFormula('d20')).toEqual({ sides: [20], modifier: 0 });
+    expect(parseDiceFormula('2d6 + d8 + 3')).toEqual({ sides: [6, 6, 8], modifier: 3 });
+    expect(parseDiceFormula('2d10−4')).toEqual({ sides: [10, 10], modifier: -4 });
+    expect(parseDiceFormula('21d6')).toBeNull();
+    expect(parseDiceFormula('2d7+3')).toBeNull();
+    expect(parseDiceFormula('d20-d6')).toBeNull();
+    expect(parseDiceFormula('101+d20')).toBeNull();
+    expect(parseDiceFormula('hello')).toBeNull();
   });
 
   it('accepts a canonical server payload and rejects tampering', () => {
