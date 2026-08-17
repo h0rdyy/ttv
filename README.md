@@ -14,15 +14,17 @@ TTV — универсальный VTT/GM-инструмент для кампа
 
 Online-кампания объединяет аккаунты, роли, Player View, GM-интерфейс, realtime, полноценные сцены с пользовательскими картами, классический fantasy-лист и общий лоток кубов.
 
-CI использует зафиксированное дерево зависимостей:
+Обязательный CI gate защищает критические пути:
 
 ```bash
 npm ci
-npm audit --omit=dev --audit-level=high
-npm test
+npm test                 # Vitest: deterministic critical unit tests
+supabase test db         # pgTAP: RLS/database contracts
 npm run typecheck
 npm run build
 ```
+
+Политика тестирования: [`docs/TESTING.md`](docs/TESTING.md). UI source/CSS snapshots не являются обязательным gate и удаляются, когда фиксируют уже отменённые требования.
 
 Подробности текущего milestone: [`docs/V0_5_CHARACTER_SHEETS.md`](docs/V0_5_CHARACTER_SHEETS.md).
 
