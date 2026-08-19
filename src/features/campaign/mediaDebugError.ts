@@ -1,4 +1,4 @@
-import { friendlyError } from '@/lib/friendlyError';
+import { friendlyError } from '../../lib/friendlyError';
 
 type ErrorRecord = Record<string, unknown>;
 
