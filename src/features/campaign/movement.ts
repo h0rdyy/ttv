@@ -86,3 +86,8 @@ export function actorMovementSpeed(systemData: MovementSystemData | null | undef
 export function remainingMovement(speed: number, spent: number, preview = 0) {
   return roundMovementDistance(Math.max(0, speed - spent - preview));
 }
+
+export function movementStorageKey(campaignId: string, actorId: string, sceneId: string, turnKey: string) {
+  if (!campaignId || !actorId || !sceneId || !turnKey) return '';
+  return `ttv:movement:${campaignId}:${actorId}:${sceneId}:${turnKey}`;
+}
