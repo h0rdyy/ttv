@@ -1,0 +1,192 @@
+.dice-tray-v2 {
+  width: min(430px, calc(100vw - 28px));
+  border-color: #665036;
+  background: linear-gradient(180deg, rgba(20,16,11,.995), rgba(8,7,5,.998));
+}
+
+.dice-tray-v2 .dice-tray-head {
+  min-height: 54px;
+  padding: 9px 12px;
+}
+.dice-tray-v2 .dice-tray-head strong { font-size: 16px; }
+.dice-tray-v2 .dice-tray-head > button { display: grid; place-items: center; padding: 0; }
+.dice-tray-v2 .dice-tray-head > button svg { width: 16px; height: 16px; }
+
+.dice-quick-section {
+  display: grid;
+  gap: 11px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(7,6,4,.32);
+}
+
+.dice-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0,1fr));
+  gap: 5px;
+}
+
+.dice-quick-grid > button {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 6px 2px;
+  border: 1px solid #443622;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #17130e, #0e0c09);
+  color: #9f8b69;
+  cursor: pointer;
+  transition: transform .1s ease, border-color .1s ease, background .1s ease;
+}
+.dice-quick-grid > button:hover:not(:disabled),
+.dice-quick-grid > button:focus-visible {
+  outline: none;
+  transform: translateY(-2px);
+  border-color: #8b6736;
+  background: #251a10;
+  color: #f0cb87;
+}
+.dice-quick-grid > button:active:not(:disabled) { transform: translateY(0); }
+.dice-quick-grid > button:disabled { opacity: .4; cursor: wait; }
+.dice-quick-grid > button.primary-die {
+  border-color: #79592f;
+  background: linear-gradient(180deg, #251a0f, #120e09);
+  color: #e7bd72;
+}
+.dice-quick-grid svg {
+  width: 27px;
+  height: 27px;
+  overflow: visible;
+  fill: rgba(201,146,79,.08);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.dice-quick-grid strong { font-size: 8px; font-weight: 800; }
+
+.dice-quick-meta {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1.05fr);
+  gap: 9px;
+}
+
+.dice-quick-modifier,
+.dice-visibility.compact { display: grid; gap: 5px; }
+.dice-quick-modifier > span,
+.dice-visibility.compact > span {
+  color: #847661;
+  font-size: 8px;
+  letter-spacing: .04em;
+}
+.dice-quick-modifier > div {
+  height: 34px;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  overflow: hidden;
+  border: 1px solid #443522;
+  border-radius: 7px;
+  background: #0e0b08;
+}
+.dice-quick-modifier button {
+  border: 0;
+  background: #17120d;
+  color: #c69c60;
+  font-size: 16px;
+  cursor: pointer;
+}
+.dice-quick-modifier button:hover:not(:disabled) { background: #291d11; color: #f1c981; }
+.dice-quick-modifier button:disabled { opacity: .3; }
+.dice-quick-modifier b { display: grid; place-items: center; color: #dbc49c; font-size: 11px; }
+.dice-visibility.compact > div { height: 34px; }
+
+.dice-formula {
+  display: grid;
+  gap: 6px;
+  padding: 11px 12px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.dice-formula > label { color: #9b8768; font-size: 9px; font-weight: 700; }
+.dice-formula > div {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  overflow: hidden;
+  border: 1px solid #594327;
+  border-radius: 8px;
+  background: #0d0b08;
+}
+.dice-formula input {
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #ead4ab;
+  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.dice-formula input::placeholder { color: #655a49; }
+.dice-formula > div > button {
+  min-width: 88px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid #594327;
+  background: #251a10;
+  color: #e8c077;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dice-formula > div > button:hover:not(:disabled) { background: #342314; }
+.dice-formula > div > button:disabled { opacity: .35; cursor: not-allowed; }
+.dice-formula > div > button svg { width: 15px; height: 15px; }
+.dice-formula > small { color: #6f6554; font-size: 8px; }
+.dice-formula > small.error { color: #c67d6b; }
+
+.dice-tray-v2 .dice-tray-board { display: grid; gap: 7px; padding: 11px 12px 12px; }
+.dice-tray-v2 .dice-roll-felt { min-height: 112px; gap: 9px; padding: 12px; }
+.dice-tray-v2 .dice-empty-felt > svg { width: 29px; height: 29px; opacity: .5; }
+.dice-tray-v2 .rolled-die { width: 47px; height: 47px; }
+
+.dice-clear-board {
+  justify-self: end;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid #3f3223;
+  border-radius: 7px;
+  background: #100d0a;
+  color: #897862;
+  font-size: 8px;
+  cursor: pointer;
+}
+.dice-clear-board svg { width: 13px; height: 13px; }
+.dice-clear-board:hover:not(:disabled) { border-color: #71502d; color: #d8b57b; }
+.dice-clear-board:disabled { opacity: .3; cursor: not-allowed; }
+
+.dice-tray-v2 .dice-history > header { min-height: 39px; }
+.dice-tray-v2 .dice-history article { min-height: 43px; }
+
+/* The contextual action bar owns the visible Dice entry point. */
+.v05-table-layer.tabletop-shell-v2 .dice-tray-toggle > svg { width: 16px; height: 16px; }
+
+@media (min-width: 901px) {
+  .v05-table-layer.player-immersion .dice-tray-anchor.open .dice-tray-v2 {
+    width: min(430px, var(--ttv-player-drawer));
+  }
+}
+
+@media (max-width: 560px) {
+  .dice-tray-v2 { width: calc(100vw - 12px); }
+  .dice-quick-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .dice-quick-meta { grid-template-columns: 1fr; }
+  .dice-tray-v2 .dice-roll-felt { min-height: 96px; }
+}

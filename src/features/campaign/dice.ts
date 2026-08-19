@@ -16,6 +16,11 @@ export type DiceRoll = {
   formula: string;
 };
 
+export type ParsedDiceFormula = {
+  sides: number[];
+  modifier: number;
+};
+
 const allowedSides = new Set<number>(DICE_SIDES);
 
 export function buildDiceFormula(sidesList: number[], modifier: number) {
@@ -25,6 +30,48 @@ export function buildDiceFormula(sidesList: number[], modifier: number) {
   const dice = [...counts.entries()].map(([sides, count]) => `${count}d${sides}`).join(' + ');
   if (!modifier) return dice;
   return `${dice} ${modifier > 0 ? '+' : '−'} ${Math.abs(modifier)}`;
+}
+
+/**
+ * Parses the compact player-facing syntax used by the dice tray, e.g.
+ * `d20`, `2d6+3`, or `2d8 + d4 - 1`.
+ *
+ * The server RPC remains authoritative for the actual random result; this
+ * parser only converts an explicitly bounded formula to the RPC arguments.
+ */
+export function parseDiceFormula(value: string): ParsedDiceFormula | null {
+  const compact = value.trim().toLocaleLowerCase('en').replace(/[−–—]/g, '-').replace(/\s+/g, '');
+  if (!compact) return null;
+
+  const expression = /^[+-]/.test(compact) ? compact : `+${compact}`;
+  const matches = [...expression.matchAll(/([+-])([^+-]+)/g)];
+  if (!matches.length || matches.map((match) => match[0]).join('') !== expression) return null;
+
+  const sides: number[] = [];
+  let modifier = 0;
+
+  for (const match of matches) {
+    const sign = match[1] === '-' ? -1 : 1;
+    const term = match[2];
+    const diceMatch = /^(\d*)d(\d+)$/.exec(term);
+
+    if (diceMatch) {
+      if (sign < 0) return null;
+      const count = diceMatch[1] ? Number(diceMatch[1]) : 1;
+      const dieSides = Number(diceMatch[2]);
+      if (!Number.isInteger(count) || count < 1 || count > 20 || !allowedSides.has(dieSides)) return null;
+      if (sides.length + count > 20) return null;
+      for (let index = 0; index < count; index += 1) sides.push(dieSides);
+      continue;
+    }
+
+    if (!/^\d+$/.test(term)) return null;
+    modifier += sign * Number(term);
+    if (!Number.isInteger(modifier) || modifier < -100 || modifier > 100) return null;
+  }
+
+  if (!sides.length) return null;
+  return { sides, modifier };
 }
 
 export function parseDiceRoll(value: unknown): DiceRoll | null {
@@ -74,20 +121,6 @@ export function mergeDiceRollHistory(history: DiceRoll[], roll: DiceRoll, limit 
   return [roll, ...history.filter((item) => item.id !== roll.id)]
     .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
     .slice(0, safeLimit);
-}
-
-export function removeDieFromRoll(roll: DiceRoll, index: number): DiceRoll | null {
-  if (!Number.isInteger(index) || index < 0 || index >= roll.values.length) return roll;
-  const values = roll.values.filter((_, valueIndex) => valueIndex !== index);
-  const sides = roll.sides.filter((_, sideIndex) => sideIndex !== index);
-  if (!values.length) return null;
-  return {
-    ...roll,
-    values,
-    sides,
-    formula: buildDiceFormula(sides, roll.modifier),
-    total: values.reduce((sum, value) => sum + value, 0) + roll.modifier,
-  };
 }
 
 function isUuid(value: string) {

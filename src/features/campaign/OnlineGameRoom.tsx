@@ -2,6 +2,31 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { OnlineTableV05 } from './OnlineTableV05';
 
+const SCENE_SELECT = 'id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,measurement_unit,measurement_units_per_map_width,created_at';
+const LEGACY_SCENE_SELECT = 'id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at';
+
+type SceneRow = {
+  id: string;
+  campaign_id: string;
+  name: string;
+  background_url: string | null;
+  background_path: string | null;
+  grid_enabled: boolean;
+  fog_enabled: boolean;
+  grid_size: number;
+  grid_offset_x: number;
+  grid_offset_y: number;
+  grid_snap: boolean;
+  fog_reveals: Array<{ id: string; x: number; y: number; width: number; height: number }>;
+  measurement_unit: string | null;
+  measurement_units_per_map_width: number | null;
+  measurement_supported: boolean;
+  created_at: string;
+};
+
+type RawSceneRow = Omit<SceneRow, 'measurement_supported'>;
+type LegacySceneRow = Omit<RawSceneRow, 'measurement_unit' | 'measurement_units_per_map_width'>;
+
 export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string; mode: 'gm' | 'player' }) {
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -18,30 +43,50 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(membership.role);
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
 
-  const [{ data: scenes }, { data: actors }, { data: inventories }, { data: definitions }, { data: sheetTemplates }] = await Promise.all([
-    supabase
-      .from('scenes')
-      .select('id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at')
-      .eq('campaign_id', campaignId)
-      .order('created_at'),
+  const [sceneResult, actorResult, inventoryResult, definitionResult, sheetTemplateResult] = await Promise.all([
+    supabase.from('scenes').select(SCENE_SELECT).eq('campaign_id', campaignId).order('created_at'),
     supabase.from('actors').select('id,campaign_id,owner_user_id,type,name,subtitle,avatar,system_data,sheet_template_id').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('inventories').select('id,campaign_id,owner_actor_id').eq('campaign_id', campaignId),
     supabase.from('item_definitions').select('id,name,description,category,rarity,icon,weight,price,currency,source,properties,effects').eq('campaign_id', campaignId).order('created_at'),
     supabase.from('actor_sheet_templates').select('id,campaign_id,name,schema,is_default,created_at,updated_at').eq('campaign_id', campaignId).order('created_at'),
   ]);
 
-  const rawSceneRows = scenes ?? [];
-  const sceneRows = rawSceneRows.map((scene) => {
-    if (!scene.background_path) return scene;
+  // During a rolling deploy the app may reach a database that has not received
+  // migration 0023 yet. Retry the old projection instead of taking the whole VTT
+  // down. The client can keep legacy 5-ft/grid movement until measurement support
+  // becomes available, but calibration controls stay disabled in that state.
+  let measurementSupported = !sceneResult.error;
+  let rawSceneRows = (sceneResult.data ?? []) as unknown as RawSceneRow[];
+  if (sceneResult.error) {
+    const legacyScenes = await supabase.from('scenes').select(LEGACY_SCENE_SELECT).eq('campaign_id', campaignId).order('created_at');
+    if (!legacyScenes.error) {
+      measurementSupported = false;
+      rawSceneRows = ((legacyScenes.data ?? []) as unknown as LegacySceneRow[]).map((scene) => ({
+        ...scene,
+        measurement_unit: 'ft',
+        measurement_units_per_map_width: null,
+      }));
+    } else {
+      rawSceneRows = [];
+    }
+  }
+
+  const sceneRows: SceneRow[] = rawSceneRows.map((scene) => {
+    const normalized: SceneRow = { ...scene, measurement_supported: measurementSupported };
+    if (!scene.background_path) return normalized;
     const version = encodeURIComponent(scene.background_path);
     return {
-      ...scene,
+      ...normalized,
       background_url: `/api/campaign/${campaignId}/scene/${scene.id}/map?v=${version}`,
     };
   });
 
+  const actors = actorResult.data ?? [];
+  const inventories = inventoryResult.data ?? [];
+  const definitions = definitionResult.data ?? [];
+  const sheetTemplates = sheetTemplateResult.data ?? [];
   const activeScene = sceneRows.find((scene) => scene.id === campaign.active_scene_id) ?? sceneRows[0] ?? null;
-  const inventoryRows = inventories ?? [];
+  const inventoryRows = inventories;
   const inventoryIds = inventoryRows.map((inventory) => inventory.id);
 
   const [{ data: tokens }, { data: containers }] = await Promise.all([
@@ -79,13 +124,13 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
       currentUserId={auth.user.id}
       displayName={displayName}
       initialScenes={sceneRows}
-      initialActors={actors ?? []}
+      initialActors={actors}
       initialTokens={tokens ?? []}
       initialInventories={inventoryRows}
       initialContainers={containerRows}
       initialItemInstances={instances ?? []}
-      initialItemDefinitions={definitions ?? []}
-      initialSheetTemplates={sheetTemplates ?? []}
+      initialItemDefinitions={definitions}
+      initialSheetTemplates={sheetTemplates}
       initialNotes={notes ?? []}
       initialRollTables={rollTables ?? []}
       initialRuntime={runtime ?? {
