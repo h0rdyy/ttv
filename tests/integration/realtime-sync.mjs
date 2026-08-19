@@ -32,6 +32,8 @@ let playerUserId = null;
 let campaignId = null;
 let gmChannel = null;
 let playerChannel = null;
+let gmMapChannel = null;
+let playerMapChannel = null;
 
 function check(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`);
@@ -85,6 +87,8 @@ async function cleanup() {
   await Promise.allSettled([
     gmChannel ? gm.removeChannel(gmChannel) : Promise.resolve(),
     playerChannel ? player.removeChannel(playerChannel) : Promise.resolve(),
+    gmMapChannel ? gm.removeChannel(gmMapChannel) : Promise.resolve(),
+    playerMapChannel ? player.removeChannel(playerMapChannel) : Promise.resolve(),
   ]);
 
   if (campaignId) {
@@ -168,7 +172,9 @@ async function main() {
     const playerTokenMoves = [];
     const gmStateChanges = [];
     const playerStateChanges = [];
+    const playerDraws = [];
     const topic = `campaign:${campaignId}`;
+    const mapTopic = `campaign-map:${campaignId}`;
 
     gmChannel = gm.channel(topic, {
       config: { private: true, broadcast: { self: false } },
@@ -182,9 +188,20 @@ async function main() {
       .on('broadcast', { event: 'token_move' }, ({ payload }) => playerTokenMoves.push(payload))
       .on('broadcast', { event: 'state_changed' }, ({ payload }) => playerStateChanges.push(payload));
 
+    gmMapChannel = gm.channel(mapTopic, {
+      config: { private: true, broadcast: { self: false } },
+    });
+
+    playerMapChannel = player.channel(mapTopic, {
+      config: { private: true, broadcast: { self: false } },
+    })
+      .on('broadcast', { event: 'map_draw' }, ({ payload }) => playerDraws.push(payload));
+
     await Promise.all([
       subscribe(gmChannel, 'GM campaign channel'),
       subscribe(playerChannel, 'player campaign channel'),
+      subscribe(gmMapChannel, 'GM map channel'),
+      subscribe(playerMapChannel, 'player map channel'),
     ]);
 
     const gmMove = {
@@ -211,6 +228,18 @@ async function main() {
     assert.equal(deliveredToGm.x, playerMove.x);
     assert.equal(deliveredToGm.y, playerMove.y);
 
+    const draw = {
+      id: crypto.randomUUID(),
+      sceneId,
+      senderUserId: gmUserId,
+      tone: 'accent',
+      points: [{ x: 10, y: 10 }, { x: 15, y: 14 }],
+    };
+    assert.equal(await gmMapChannel.send({ type: 'broadcast', event: 'map_draw', payload: draw }), 'ok');
+    const deliveredDraw = await waitFor('GM map_draw on player socket', () =>
+      playerDraws.find((payload) => payload?.id === draw.id && payload?.senderUserId === gmUserId));
+    assert.equal(deliveredDraw.sceneId, sceneId);
+
     gmStateChanges.length = 0;
     playerStateChanges.length = 0;
 
@@ -231,7 +260,7 @@ async function main() {
     assert.equal(persisted.x, 57.5);
     assert.equal(persisted.y, 46.25);
 
-    console.log('Realtime integration passed: GM↔player broadcast and persisted-state fallback are healthy.');
+    console.log('Realtime integration passed: GM↔player movement, protected drawing delivery and persisted-state fallback are healthy.');
   } finally {
     await cleanup();
   }
