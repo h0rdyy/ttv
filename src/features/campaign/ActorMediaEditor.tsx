@@ -147,7 +147,7 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
           <small>ВНЕШНИЙ ВИД</small>
           <strong>Портрет и фишка</strong>
         </div>
-        <TabletopIcon name="actor" />
+        <TabletopIcon name="characters" />
       </header>
 
       <section className="actor-media-block">
