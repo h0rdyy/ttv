@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import { ActorMediaEditor } from './ActorMediaEditor';
 import { MapInteractionTools } from './MapInteractionTools';
 import { OnlineTable } from './OnlineTable';
 import type { SheetActor } from './OnlineActorSheet';
@@ -13,6 +14,7 @@ import { SceneMeasurementCalibrator } from './SceneMeasurementCalibrator';
 import { TabletopIcon } from './TabletopIcon';
 import { TabletopSceneSwitcher } from './TabletopSceneSwitcher';
 import { TabletopShellV2 } from './TabletopShellV2';
+import { actorMedia, actorMediaUrl } from './actorMedia';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
 
@@ -184,6 +186,11 @@ export function OnlineTableV05(props: Props) {
     : null;
   const contextActor = actorMenu ? actors.find((actor) => actor.id === actorMenu.actorId) ?? null : null;
   const deleteActor = deleteConfirmActorId ? actors.find((actor) => actor.id === deleteConfirmActorId) ?? null : null;
+  const characterMedia = characterActor ? actorMedia(characterActor.system_data) : null;
+  const characterAvatarUrl = characterActor && characterMedia
+    ? actorMediaUrl(props.campaign.id, characterActor.id, 'avatar', characterMedia.avatarPath)
+    : null;
+  const canEditCharacter = Boolean(characterActor && (gmAllowed || characterActor.owner_user_id === props.currentUserId));
 
   const refresh = () => router.refresh();
   const openSelectedCharacter = () => {
@@ -287,18 +294,29 @@ export function OnlineTableV05(props: Props) {
       )}
 
       {characterActor && (
-        <PlayerCharacterWindow
-          actor={characterActor}
-          template={template}
-          inventory={characterInventory}
-          containers={props.initialContainers}
-          instances={props.initialItemInstances}
-          items={props.initialItemDefinitions}
-          canEdit={gmAllowed || characterActor.owner_user_id === props.currentUserId}
-          onClose={() => setCharacterActorId(null)}
-          onChanged={refresh}
-          onMessage={setMessage}
-        />
+        <div
+          className={`actor-sheet-media-shell ${characterAvatarUrl ? 'has-custom-avatar' : ''}`}
+          style={characterAvatarUrl ? { '--actor-sheet-avatar': `url("${characterAvatarUrl}")` } as CSSProperties : undefined}
+        >
+          <PlayerCharacterWindow
+            actor={characterActor}
+            template={template}
+            inventory={characterInventory}
+            containers={props.initialContainers}
+            instances={props.initialItemInstances}
+            items={props.initialItemDefinitions}
+            canEdit={canEditCharacter}
+            onClose={() => setCharacterActorId(null)}
+            onChanged={refresh}
+            onMessage={setMessage}
+          />
+          <ActorMediaEditor
+            actor={characterActor}
+            canEdit={canEditCharacter}
+            onChanged={refresh}
+            onMessage={setMessage}
+          />
+        </div>
       )}
 
       {actorMenu && contextActor && (
