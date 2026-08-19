@@ -5,6 +5,7 @@ import {
   formatMovementDistance,
   gridUnitsPerMapWidth,
   mapMovementDistance,
+  movementStorageKey,
   remainingMovement,
   roundMovementDistance,
   shouldBlockCombatGridMove,
@@ -43,6 +44,16 @@ describe('movement formulas', () => {
     expect(actorMovementSpeed({ walk_speed: '40' })).toBe(40);
     expect(actorMovementSpeed({})).toBe(30);
     expect(remainingMovement(25, 24.75, 0.25)).toBe(0);
+  });
+
+  it('scopes persisted movement budget to the active scene', () => {
+    const turn = '4:1:actor-1';
+    const firstScene = movementStorageKey('campaign-1', 'actor-1', 'scene-a', turn);
+    const secondScene = movementStorageKey('campaign-1', 'actor-1', 'scene-b', turn);
+
+    expect(firstScene).toBe('ttv:movement:campaign-1:actor-1:scene-a:4:1:actor-1');
+    expect(secondScene).not.toBe(firstScene);
+    expect(movementStorageKey('campaign-1', 'actor-1', '', turn)).toBe('');
   });
 
   it('fails closed for invalid calibrated inputs', () => {
