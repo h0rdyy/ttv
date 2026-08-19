@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, agent/v0.5.2-immersion-lab]
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -30,13 +30,8 @@ jobs:
       - name: Audit production packages
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Install deterministic Vitest runner
-        run: |
-          mkdir -p "$RUNNER_TEMP/ttv-vitest"
-          npm install --prefix "$RUNNER_TEMP/ttv-vitest" --no-save --package-lock=false vitest@4.1.10
-
       - name: Vitest
-        run: "$RUNNER_TEMP/ttv-vitest/node_modules/.bin/vitest" run tests/unit
+        run: npm test
 
       - name: Typecheck
         run: npm run typecheck
