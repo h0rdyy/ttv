@@ -410,3 +410,295 @@
     bottom: 126px;
   }
 }
+
+/* ---------- actor portrait + tabletop token art ---------- */
+.actor-sheet-media-shell.has-custom-avatar .foundry-character-portrait {
+  overflow: hidden;
+  border-color: #715433;
+  background-image: var(--actor-sheet-avatar) !important;
+  background-position: center !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 8px 24px rgba(0,0,0,.28);
+}
+
+.actor-media-editor {
+  position: fixed;
+  top: 88px;
+  right: 14px;
+  bottom: 78px;
+  z-index: 123;
+  width: 282px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #5a4328;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(25,19,13,.995), rgba(10,8,6,.998));
+  box-shadow: 0 28px 78px rgba(0,0,0,.62), inset 0 1px rgba(255,255,255,.025);
+  color: #bba481;
+  backdrop-filter: blur(18px);
+}
+
+.actor-media-editor > header {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 3px 9px;
+  border-bottom: 1px solid rgba(197,145,79,.13);
+}
+
+.actor-media-editor > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.actor-media-editor > header small {
+  color: #77664e;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.actor-media-editor > header strong {
+  color: #e6c994;
+  font: 700 14px Georgia, serif;
+}
+
+.actor-media-editor > header svg {
+  width: 21px;
+  height: 21px;
+  color: #b9874d;
+}
+
+.actor-media-block {
+  display: grid;
+  gap: 8px;
+  padding: 11px 2px;
+  border-bottom: 1px solid rgba(197,145,79,.1);
+}
+
+.actor-media-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.actor-media-heading strong {
+  color: #d7bd91;
+  font-size: 10px;
+}
+
+.actor-media-heading small,
+.actor-media-editor > footer {
+  color: #766a58;
+  font-size: 8px;
+}
+
+.actor-avatar-preview {
+  width: 92px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  justify-self: center;
+  border: 1px solid #5e472c;
+  border-radius: 12px;
+  background: #0a0806;
+  color: #bda37b;
+  font-size: 38px;
+}
+
+.actor-avatar-preview img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.actor-media-actions {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.actor-media-actions > input[type="file"] {
+  display: none;
+}
+
+.actor-media-actions .button {
+  min-height: 31px;
+  padding-inline: 10px;
+  font-size: 8px;
+}
+
+.actor-token-preview {
+  position: relative;
+  height: 188px;
+  overflow: hidden;
+  border: 1px solid #4d3b27;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 50% 78%, rgba(169,121,64,.12), transparent 25%),
+    #090806;
+}
+
+.actor-token-preview-grid {
+  position: absolute;
+  inset: 0;
+  opacity: .22;
+  background-image:
+    linear-gradient(rgba(164,125,77,.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(164,125,77,.2) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.actor-token-preview > img {
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  width: 88px;
+  height: 142px;
+  object-fit: contain;
+  object-position: 50% 100%;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 8px 7px rgba(0,0,0,.58));
+}
+
+.actor-token-preview-fallback {
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #8c6738;
+  border-radius: 50%;
+  background: #1b140e;
+  font-size: 23px;
+  transform: translate(-50%,-100%);
+}
+
+.actor-token-preview-anchor {
+  position: absolute;
+  left: 50%;
+  top: 78%;
+  width: 64px;
+  height: 14px;
+  border: 1px solid rgba(207,158,91,.75);
+  border-radius: 50%;
+  background: rgba(111,75,36,.16);
+  box-shadow: 0 0 14px rgba(177,126,65,.13);
+  transform: translate(-50%,-50%);
+}
+
+.actor-token-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.actor-token-controls label {
+  display: grid;
+  gap: 4px;
+}
+
+.actor-token-controls label > span {
+  display: flex;
+  justify-content: space-between;
+  color: #84745e;
+  font-size: 8px;
+}
+
+.actor-token-controls label b {
+  color: #c9aa7a;
+  font-variant-numeric: tabular-nums;
+}
+
+.actor-token-controls input[type="range"] {
+  width: 100%;
+  accent-color: #a57945;
+}
+
+.actor-media-editor > footer {
+  padding: 9px 3px 1px;
+  text-align: center;
+}
+
+.online-table-shell .token.token-custom-art {
+  overflow: visible !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.online-table-shell .token-custom-art .token-character-art {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--token-avatar-size);
+  height: calc(var(--token-avatar-size) * 1.85);
+  overflow: visible;
+  pointer-events: none;
+  transform: translate(-50%,-100%);
+  transform-origin: 50% 100%;
+}
+
+.online-table-shell .token-custom-art .token-character-art > img {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  object-position: 50% 100%;
+  user-select: none;
+  transform: translate(calc(-50% + var(--token-art-offset-x)), var(--token-art-offset-y)) scale(var(--token-art-scale));
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 4px 4px rgba(0,0,0,.72)) drop-shadow(0 0 1px rgba(245,222,184,.65));
+}
+
+.online-table-shell .token-custom-art .token-character-art::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: -5px;
+  width: 78%;
+  height: 12px;
+  border: 1px solid rgba(164,128,77,.6);
+  border-radius: 50%;
+  background: rgba(31,23,14,.42);
+  box-shadow: 0 3px 8px rgba(0,0,0,.5);
+  transform: translateX(-50%);
+}
+
+.online-table-shell .token-custom-art.selected .token-character-art::after {
+  border-color: #e1b468;
+  box-shadow: 0 0 0 2px rgba(225,180,104,.16), 0 0 15px rgba(225,180,104,.34);
+}
+
+.online-table-shell .token-custom-art.enemy .token-character-art::after {
+  border-color: #a85043;
+  background: rgba(93,35,27,.28);
+}
+
+.online-table-shell .token-custom-art .token-name,
+.online-table-shell .token-custom-art .token-hp,
+.online-table-shell .token-custom-art .hidden-token-mark {
+  z-index: 3;
+}
+
+@media (max-width: 1180px) {
+  .actor-media-editor {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    width: min(300px, calc(100vw - 16px));
+    max-height: 46dvh;
+  }
+}
