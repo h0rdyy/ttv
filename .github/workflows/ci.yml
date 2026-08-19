@@ -53,6 +53,14 @@ jobs:
       - name: Start local Supabase
         run: supabase start
 
+      - name: Realtime GM-player integration
+        run: |
+          eval "$(supabase status -o env)"
+          SUPABASE_URL="$API_URL" \
+          SUPABASE_ANON_KEY="$ANON_KEY" \
+          SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+          node tests/integration/realtime-sync.mjs
+
       - name: Supabase database tests
         run: supabase test db
 
