@@ -98,8 +98,10 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [pings, setPings] = useState<Ping[]>([]);
   const pointerIdRef = useRef<number | null>(null);
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const subscribedRef = useRef(false);
+  const campaignChannelRef = useRef<RealtimeChannel | null>(null);
+  const mapChannelRef = useRef<RealtimeChannel | null>(null);
+  const campaignSubscribedRef = useRef(false);
+  const mapSubscribedRef = useRef(false);
   const pingTimersRef = useRef<number[]>([]);
   const rulerTimerRef = useRef<number | null>(null);
 
@@ -176,29 +178,39 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
     if (!scene) return;
     const supabase = createClient();
     let disposed = false;
-    subscribedRef.current = false;
-    const channel = supabase.channel(`campaign:${campaignId}`, {
+    campaignSubscribedRef.current = false;
+    mapSubscribedRef.current = false;
+
+    const campaignChannel = supabase.channel(`campaign:${campaignId}`, {
       config: {
         private: true,
         broadcast: { self: false },
       },
     });
-    channelRef.current = channel;
+    const mapChannel = supabase.channel(`campaign-map:${campaignId}`, {
+      config: {
+        private: true,
+        broadcast: { self: false },
+      },
+    });
+    campaignChannelRef.current = campaignChannel;
+    mapChannelRef.current = mapChannel;
 
-    channel
-      .on('broadcast', { event: PING_EVENT }, ({ payload }) => {
-        const row = payload as Record<string, unknown>;
-        if (row.sceneId !== scene.id || row.senderUserId === currentUserId) return;
-        const point = validPoint(row.point);
-        if (!point || typeof row.id !== 'string' || typeof row.senderUserId !== 'string') return;
-        showPing({
-          id: row.id,
-          sceneId: scene.id,
-          senderUserId: row.senderUserId,
-          senderName: typeof row.senderName === 'string' && row.senderName ? row.senderName : 'Игрок',
-          point,
-        });
-      })
+    campaignChannel.on('broadcast', { event: PING_EVENT }, ({ payload }) => {
+      const row = payload as Record<string, unknown>;
+      if (row.sceneId !== scene.id || row.senderUserId === currentUserId) return;
+      const point = validPoint(row.point);
+      if (!point || typeof row.id !== 'string' || typeof row.senderUserId !== 'string') return;
+      showPing({
+        id: row.id,
+        sceneId: scene.id,
+        senderUserId: row.senderUserId,
+        senderName: typeof row.senderName === 'string' && row.senderName ? row.senderName : 'Игрок',
+        point,
+      });
+    });
+
+    mapChannel
       .on('broadcast', { event: DRAW_EVENT }, ({ payload }) => {
         const row = payload as Record<string, unknown>;
         if (row.sceneId !== scene.id || row.senderUserId === currentUserId || !Array.isArray(row.points)) return;
@@ -222,26 +234,39 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
       try {
         await supabase.realtime.setAuth();
         if (disposed) return;
-        channel.subscribe((status) => {
+        campaignChannel.subscribe((status) => {
           if (disposed) return;
-          subscribedRef.current = status === 'SUBSCRIBED';
+          campaignSubscribedRef.current = status === 'SUBSCRIBED';
+        });
+        mapChannel.subscribe((status) => {
+          if (disposed) return;
+          mapSubscribedRef.current = status === 'SUBSCRIBED';
         });
       } catch {
-        subscribedRef.current = false;
+        campaignSubscribedRef.current = false;
+        mapSubscribedRef.current = false;
       }
     })();
 
     return () => {
       disposed = true;
-      subscribedRef.current = false;
-      channelRef.current = null;
-      void removeRealtimeChannels(supabase, [channel]);
+      campaignSubscribedRef.current = false;
+      mapSubscribedRef.current = false;
+      campaignChannelRef.current = null;
+      mapChannelRef.current = null;
+      void removeRealtimeChannels(supabase, [campaignChannel, mapChannel]);
     };
   }, [campaignId, currentUserId, scene?.id]);
 
-  const broadcast = (event: string, payload: Record<string, unknown>) => {
-    const channel = channelRef.current;
-    if (!channel || !subscribedRef.current) return;
+  const broadcastCampaign = (event: string, payload: Record<string, unknown>) => {
+    const channel = campaignChannelRef.current;
+    if (!channel || !campaignSubscribedRef.current) return;
+    void channel.send({ type: 'broadcast', event, payload }).catch(() => undefined);
+  };
+
+  const broadcastMap = (event: string, payload: Record<string, unknown>) => {
+    const channel = mapChannelRef.current;
+    if (!channel || !mapSubscribedRef.current) return;
     void channel.send({ type: 'broadcast', event, payload }).catch(() => undefined);
   };
 
@@ -264,7 +289,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
       point,
     };
     showPing(ping);
-    broadcast(PING_EVENT, ping as unknown as Record<string, unknown>);
+    broadcastCampaign(PING_EVENT, ping as unknown as Record<string, unknown>);
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -333,7 +358,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
     if (tool === 'draw' && mode === 'gm' && draftStroke && draftStroke.points.length > 1) {
       const finished = draftStroke;
       setStrokes((current) => [...current, finished].slice(-MAX_STROKES));
-      broadcast(DRAW_EVENT, finished as unknown as Record<string, unknown>);
+      broadcastMap(DRAW_EVENT, finished as unknown as Record<string, unknown>);
     }
     if (tool === 'ruler') {
       clearRulerTimer();
@@ -349,7 +374,7 @@ export function MapInteractionTools({ campaignId, mode, currentUserId, displayNa
     if (!scene || mode !== 'gm') return;
     setStrokes([]);
     setDraftStroke(null);
-    broadcast(CLEAR_EVENT, { sceneId: scene.id, senderUserId: currentUserId });
+    broadcastMap(CLEAR_EVENT, { sceneId: scene.id, senderUserId: currentUserId });
   };
 
   const toggleTool = (next: Exclude<Tool, null>) => {
