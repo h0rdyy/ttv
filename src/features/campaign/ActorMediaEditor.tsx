@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { friendlyError } from '@/lib/friendlyError';
 import type { SheetActor } from './OnlineActorSheet';
 import { actorMedia, actorMediaUrl } from './actorMedia';
+import { mediaDebugError } from './mediaDebugError';
 import { TabletopIcon } from './TabletopIcon';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -43,11 +43,11 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
   const upload = async (kind: 'avatar' | 'token', file: File) => {
     if (!canEdit || busy) return;
     if (!IMAGE_TYPES.includes(file.type)) {
-      onMessage('Поддерживаются PNG, JPG и WebP.');
+      onMessage(`Неподдерживаемый формат · type=${file.type || '(empty)'} · name=${file.name}`);
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      onMessage('Изображение слишком большое. Максимум 4 МБ.');
+      onMessage(`Изображение слишком большое. Максимум 4 МБ · size=${file.size} bytes · name=${file.name}`);
       return;
     }
 
@@ -66,7 +66,13 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
       });
 
     if (uploadError) {
-      onMessage(friendlyError(uploadError, 'Не удалось загрузить изображение.'));
+      console.error('[ActorMediaEditor] storage upload failed', {
+        kind,
+        path,
+        file: { name: file.name, type: file.type, size: file.size },
+        error: uploadError,
+      });
+      onMessage(mediaDebugError(uploadError, 'Не удалось загрузить изображение.'));
       setBusy(false);
       return;
     }
@@ -78,8 +84,9 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
     });
 
     if (saveError) {
+      console.error('[ActorMediaEditor] media path save failed', { kind, path, error: saveError });
       await supabase.storage.from('campaign-actor-media').remove([path]);
-      onMessage(friendlyError(saveError, 'Не удалось сохранить изображение персонажа.'));
+      onMessage(mediaDebugError(saveError, 'Не удалось сохранить изображение персонажа.'));
       setBusy(false);
       return;
     }
@@ -88,7 +95,8 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
     else setTokenPath(path);
 
     if (previousPath && previousPath !== path) {
-      await supabase.storage.from('campaign-actor-media').remove([previousPath]);
+      const { error: cleanupError } = await supabase.storage.from('campaign-actor-media').remove([previousPath]);
+      if (cleanupError) console.error('[ActorMediaEditor] previous media cleanup failed', { previousPath, error: cleanupError });
     }
 
     onMessage(kind === 'avatar' ? 'Аватар листа обновлён.' : 'Фишка персонажа обновлена.');
@@ -109,7 +117,8 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
     });
 
     if (error) {
-      onMessage(friendlyError(error, 'Не удалось убрать изображение.'));
+      console.error('[ActorMediaEditor] media unlink failed', { kind, currentPath, error });
+      onMessage(mediaDebugError(error, 'Не удалось убрать изображение.'));
       setBusy(false);
       return;
     }
@@ -117,7 +126,12 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
     const { error: storageError } = await supabase.storage.from('campaign-actor-media').remove([currentPath]);
     if (kind === 'avatar') setAvatarPath(null);
     else setTokenPath(null);
-    onMessage(storageError ? 'Изображение отвязано, старый файл не удалось очистить.' : 'Изображение убрано.');
+    if (storageError) {
+      console.error('[ActorMediaEditor] storage delete failed', { kind, currentPath, error: storageError });
+      onMessage(mediaDebugError(storageError, 'Изображение отвязано, но старый файл не удалось удалить.'));
+    } else {
+      onMessage('Изображение убрано.');
+    }
     onChanged();
     setBusy(false);
   };
@@ -132,8 +146,10 @@ export function ActorMediaEditor({ actor, canEdit, onChanged, onMessage }: Props
       token_offset_x: tokenOffsetX,
       token_offset_y: tokenOffsetY,
     });
-    if (error) onMessage(friendlyError(error, 'Не удалось сохранить положение фишки.'));
-    else {
+    if (error) {
+      console.error('[ActorMediaEditor] token presentation save failed', { actorId: actor.id, error });
+      onMessage(mediaDebugError(error, 'Не удалось сохранить положение фишки.'));
+    } else {
       onMessage('Внешний вид фишки сохранён.');
       onChanged();
     }
