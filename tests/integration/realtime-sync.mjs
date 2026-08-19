@@ -25,6 +25,7 @@ const suffix = crypto.randomUUID().slice(0, 8);
 const password = `Ttv-Realtime-${suffix}-A1!`;
 const gmEmail = `realtime-gm-${suffix}@example.test`;
 const playerEmail = `realtime-player-${suffix}@example.test`;
+const campaignName = `Realtime Integration ${suffix}`;
 
 let gmUserId = null;
 let playerUserId = null;
@@ -86,9 +87,14 @@ async function cleanup() {
     playerChannel ? player.removeChannel(playerChannel) : Promise.resolve(),
   ]);
 
-  if (campaignId) await admin.from('campaigns').delete().eq('id', campaignId);
-  if (gmUserId) await admin.auth.admin.deleteUser(gmUserId);
+  if (campaignId) {
+    await gm.rpc('delete_campaign', {
+      target_campaign: campaignId,
+      expected_name: campaignName,
+    });
+  }
   if (playerUserId) await admin.auth.admin.deleteUser(playerUserId);
+  if (gmUserId) await admin.auth.admin.deleteUser(gmUserId);
 }
 
 async function main() {
@@ -114,17 +120,21 @@ async function main() {
     await signIn(player, playerEmail);
 
     const campaign = check(await gm.rpc('create_campaign', {
-      campaign_name: `Realtime Integration ${suffix}`,
+      campaign_name: campaignName,
       campaign_description: 'ephemeral CI campaign',
     }), 'create campaign');
     campaignId = campaign?.id ?? campaign?.[0]?.id ?? null;
     assert.ok(campaignId, 'create_campaign did not return an id.');
 
-    check(await admin.from('campaign_members').insert({
-      campaign_id: campaignId,
-      user_id: playerUserId,
-      role: 'player',
-    }), 'add player membership');
+    const inviteToken = check(await gm.rpc('ensure_campaign_player_invite', {
+      target_campaign: campaignId,
+    }), 'create player invite');
+    assert.equal(typeof inviteToken, 'string');
+
+    const acceptedCampaignId = check(await player.rpc('accept_campaign_invite', {
+      invite_token: inviteToken,
+    }), 'accept player invite');
+    assert.equal(acceptedCampaignId, campaignId);
 
     const sceneId = check(await gm.rpc('create_campaign_scene', {
       target_campaign: campaignId,
@@ -140,9 +150,13 @@ async function main() {
     }), 'create actor');
     assert.equal(typeof actorId, 'string');
 
-    check(await admin.from('actors').update({ owner_user_id: playerUserId }).eq('id', actorId), 'assign actor owner');
+    check(await gm.rpc('assign_actor_to_member', {
+      target_campaign: campaignId,
+      target_actor: actorId,
+      target_user: playerUserId,
+    }), 'assign actor to player');
 
-    const token = check(await admin
+    const token = check(await gm
       .from('scene_tokens')
       .select('id,x,y')
       .eq('scene_id', sceneId)
