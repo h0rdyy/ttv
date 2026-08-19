@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(5);
+select plan(8);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -57,6 +57,17 @@ select lives_ok(
   'actor owner may attach an avatar path under the owned actor prefix'
 );
 
+select lives_ok(
+  $$ insert into storage.objects(bucket_id, name, owner_id, metadata)
+     values (
+       'campaign-actor-media',
+       'd0000000-0000-4000-8000-000000000001/d1000000-0000-4000-8000-000000000001/avatar/owner-test.webp',
+       '52000000-0000-4000-8000-000000000002',
+       '{}'::jsonb
+     ) $$,
+  'actor owner may upload media into own actor storage prefix'
+);
+
 select set_config('request.jwt.claim.sub', '53000000-0000-4000-8000-000000000003', true);
 select isnt(
   public.can_edit_actor_media('d1000000-0000-4000-8000-000000000001'),
@@ -76,10 +87,34 @@ select throws_ok(
   'another player cannot update somebody else token presentation'
 );
 
+select throws_ok(
+  $$ insert into storage.objects(bucket_id, name, owner_id, metadata)
+     values (
+       'campaign-actor-media',
+       'd0000000-0000-4000-8000-000000000001/d1000000-0000-4000-8000-000000000001/token/other-test.webp',
+       '53000000-0000-4000-8000-000000000003',
+       '{}'::jsonb
+     ) $$,
+  '42501',
+  'new row violates row-level security policy for table "objects"',
+  'another player may not upload media into somebody else actor prefix'
+);
+
 select set_config('request.jwt.claim.sub', '51000000-0000-4000-8000-000000000001', true);
 select ok(
   public.can_edit_actor_media('d1000000-0000-4000-8000-000000000001'),
   'campaign GM may edit actor media'
+);
+
+select lives_ok(
+  $$ insert into storage.objects(bucket_id, name, owner_id, metadata)
+     values (
+       'campaign-actor-media',
+       'd0000000-0000-4000-8000-000000000001/d1000000-0000-4000-8000-000000000001/token/gm-test.webp',
+       '51000000-0000-4000-8000-000000000001',
+       '{}'::jsonb
+     ) $$,
+  'campaign GM may upload token media for an actor'
 );
 
 select * from finish();
