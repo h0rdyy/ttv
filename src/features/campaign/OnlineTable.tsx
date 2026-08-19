@@ -11,6 +11,7 @@ import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
 import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
 import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
+import { actorMedia, actorMediaUrl } from './actorMedia';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -314,8 +315,13 @@ export function OnlineTable(props: Props) {
     const { error } = await supabase.rpc('update_campaign_scene', {
       target_campaign: campaign.id,
       target_scene: activeScene.id,
+      scene_name: null,
       scene_grid_enabled: patch.grid ?? null,
       scene_fog_enabled: patch.fog ?? null,
+      scene_grid_size: null,
+      scene_grid_offset_x: null,
+      scene_grid_offset_y: null,
+      scene_grid_snap: null,
     });
     if (error) {
       setMessage(friendlyError(error, 'Не удалось изменить сцену.'));
@@ -660,10 +666,12 @@ export function OnlineTable(props: Props) {
                   const hiddenByFog = mode === 'player' && activeScene.fog_enabled && actor.owner_user_id !== currentUserId && !isPointRevealed(position, reveals);
                   if (hiddenByFog && draggingTokenId !== token.id) return null;
                   const canMove = !fogDrawMode && (mode === 'gm' || actor.owner_user_id === currentUserId);
+                  const media = actorMedia(actor.system_data);
+                  const tokenArtUrl = actorMediaUrl(campaign.id, actor.id, 'token', media.tokenPath);
                   return (
                     <button
                       key={token.id}
-                      className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
+                      className={`token ${tokenArtUrl ? 'token-custom-art' : ''} ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
                       style={{
                         left: `${position.x}%`,
                         top: `${position.y}%`,
@@ -671,6 +679,9 @@ export function OnlineTable(props: Props) {
                         '--token-avatar-size': `${Math.max(12, Math.round(46 * (token.size || 1)))}px`,
                         '--token-avatar-font-size': `${Math.max(9, Math.round(20 * (token.size || 1)))}px`,
                         '--token-border-size': `${Math.max(1, Math.round(3 * Math.min(token.size || 1, 1)))}px`,
+                        '--token-art-scale': String(media.tokenScale),
+                        '--token-art-offset-x': `${media.tokenOffsetX}%`,
+                        '--token-art-offset-y': `${media.tokenOffsetY}%`,
                       } as React.CSSProperties}
                       onPointerDown={(event) => {
                         event.stopPropagation();
@@ -684,7 +695,11 @@ export function OnlineTable(props: Props) {
                       onClick={() => setSelectedActorId(actor.id)}
                       title={canMove ? `${actor.name} — можно перемещать` : actor.name}
                     >
-                      <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+                      {tokenArtUrl ? (
+                        <span className="token-character-art" aria-hidden="true"><img src={tokenArtUrl} alt="" draggable={false} /></span>
+                      ) : (
+                        <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+                      )}
                       <span className="token-name">{actor.name}</span>
                       <span className="token-hp"><i style={{ width: `${hpPct}%` }}/></span>
                       {token.hidden && mode === 'gm' && <em className="hidden-token-mark">скрыт</em>}
