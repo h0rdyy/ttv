@@ -8,6 +8,7 @@ import {
   formatMovementDistance,
   gridUnitsPerMapWidth,
   mapMovementDistance,
+  movementStorageKey,
   remainingMovement,
   roundMovementDistance,
   shouldBlockCombatGridMove,
@@ -93,12 +94,14 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const turnKey = runtime.combat_active
     ? `${runtime.combat_round}:${runtime.combat_turn}:${currentActorId ?? 'gm'}`
     : 'free';
-  const storageKey = actor ? `ttv:movement:${campaignId}:${actor.id}:${turnKey}` : '';
+  const storageKey = actor && scene
+    ? movementStorageKey(campaignId, actor.id, scene.id, turnKey)
+    : '';
 
-  // Restore movement budget for this exact combat turn. Do not mirror `spent`
-  // back to storage from an effect: on mount React runs effects with the initial
-  // spent=0 state before the restored state render, which used to overwrite a
-  // valid saved budget. Writes now happen synchronously only when a move commits.
+  // Restore movement budget for this exact scene + combat turn. Do not mirror
+  // `spent` back to storage from an effect: on mount React runs effects with the
+  // initial spent=0 state before the restored state render, which used to
+  // overwrite a valid saved budget. Writes happen only when a move commits.
   useEffect(() => {
     if (!storageKey || !runtime.combat_active) {
       setSpent(0);
@@ -357,8 +360,8 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
             <div><span>Здоровье</span><strong>{Number.isFinite(hpCurrent) ? hpCurrent : '—'} / {Number.isFinite(hpMax) ? hpMax : '—'}</strong></div>
             <i><b style={{ width: `${hpPercent}%` }} /></i>
           </div>
-          <div className={`player-rpg-bar stamina ${staminaPercent <= 0 && isOwnTurn ? 'empty' : ''}`} title="Запас движения на текущий ход">
-            <div><span>Выносливость</span><strong>{hudDistance(movementForHud)} / {hudDistance(speed)}</strong></div>
+          <div className={`player-rpg-bar stamina ${staminaPercent <= 0 && isOwnTurn ? 'empty' : ''}`} title="Оставшаяся скорость на текущий ход">
+            <div><span>Скорость</span><strong>{hudDistance(movementForHud)} / {hudDistance(speed)}</strong></div>
             <i><b style={{ width: `${staminaPercent}%` }} /></i>
           </div>
         </div>
