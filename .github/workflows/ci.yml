@@ -28,10 +28,12 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Install deterministic Vitest runner
-        run: npm install --no-save --package-lock=false vitest@4.1.10
+        run: |
+          mkdir -p "$RUNNER_TEMP/ttv-vitest"
+          npm install --prefix "$RUNNER_TEMP/ttv-vitest" --no-save --package-lock=false vitest@4.1.10
 
       - name: Vitest
-        run: ./node_modules/.bin/vitest run tests/unit
+        run: "$RUNNER_TEMP/ttv-vitest/node_modules/.bin/vitest" run tests/unit
 
       - name: Typecheck
         run: npm run typecheck
