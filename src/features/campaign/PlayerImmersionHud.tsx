@@ -288,9 +288,14 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
   const hp = resourceValue(actor?.system_data, 'hit_points', 'hp');
   const hpCurrent = Number(hp?.current);
   const hpMax = Number(hp?.max);
+  const hpPercent = Number.isFinite(hpCurrent) && Number.isFinite(hpMax) && hpMax > 0
+    ? Math.max(0, Math.min(100, (hpCurrent / hpMax) * 100))
+    : 0;
   const preview = drag?.distance ?? 0;
   const projected = roundMovementDistance(spent + preview);
   const remaining = remainingMovement(speed, spent, preview);
+  const movementForHud = runtime.combat_active && isOwnTurn ? remaining : speed;
+  const staminaPercent = speed > 0 ? Math.max(0, Math.min(100, (movementForHud / speed) * 100)) : 0;
   const overBudget = isOwnTurn && drag !== null && drag.unitsPerMapWidth > 0 && projected > speed;
   const ruler = useMemo(() => {
     if (!drag) return null;
@@ -338,18 +343,30 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
         </>
       )}
 
-      <div className="player-immersion-dock" data-wheel-isolation="true">
-        <div className="player-identity">
+      <div className="player-immersion-dock player-rpg-hud" data-wheel-isolation="true">
+        <button type="button" className="player-rpg-character" onClick={onOpenCharacter} title="Открыть лист персонажа">
           <span className="player-identity-avatar">{actor.avatar || '🧙'}</span>
-          <span><strong>{actor.name}</strong><small>{runtime.combat_active ? (isOwnTurn ? 'Ваш ход' : `Ход: ${currentActor?.name ?? 'мастера'}`) : 'Свободная сцена'}</small></span>
+          <span className="player-rpg-character-copy">
+            <strong>{actor.name}</strong>
+            <small>{runtime.combat_active ? (isOwnTurn ? 'Ваш ход' : `Ход: ${currentActor?.name ?? 'мастера'}`) : 'Свободная сцена'}</small>
+          </span>
+        </button>
+
+        <div className="player-rpg-bars" aria-label="Состояние персонажа">
+          <div className="player-rpg-bar health">
+            <div><span>Здоровье</span><strong>{Number.isFinite(hpCurrent) ? hpCurrent : '—'} / {Number.isFinite(hpMax) ? hpMax : '—'}</strong></div>
+            <i><b style={{ width: `${hpPercent}%` }} /></i>
+          </div>
+          <div className={`player-rpg-bar stamina ${staminaPercent <= 0 && isOwnTurn ? 'empty' : ''}`} title="Запас движения на текущий ход">
+            <div><span>Выносливость</span><strong>{hudDistance(movementForHud)} / {hudDistance(speed)}</strong></div>
+            <i><b style={{ width: `${staminaPercent}%` }} /></i>
+          </div>
         </div>
-        <div className="player-vital-chip"><span>HP</span><strong>{Number.isFinite(hpCurrent) ? hpCurrent : '—'} / {Number.isFinite(hpMax) ? hpMax : '—'}</strong></div>
-        <div className={`player-movement-chip ${remainingMovement(speed, spent) <= 0 && isOwnTurn ? 'over' : ''}`}>
-          <span>Движение</span>
-          <strong>{runtime.combat_active && isOwnTurn ? `${formatMovementDistance(spent)} / ${formatMovementDistance(speed)}` : `${formatMovementDistance(speed)}`} {distanceUnit}</strong>
-          <i><b style={{ width: `${Math.min(100, speed > 0 ? (spent / speed) * 100 : 0)}%` }} /></i>
+
+        <div className="player-rpg-speed" title="Максимальная скорость перемещения">
+          <span>Скорость</span>
+          <strong>{hudDistance(speed)} <small>{distanceUnit}</small></strong>
         </div>
-        <button type="button" onClick={onOpenCharacter}>◇ Персонаж</button>
       </div>
 
       {notice && <div className="player-immersion-notice">{notice}</div>}
@@ -359,4 +376,9 @@ export function PlayerImmersionHud({ campaignId, actor, actors, scene, runtime, 
 
 function availableDistance(drag: ActiveDrag) {
   return drag.lastAllowedDistance;
+}
+
+function hudDistance(value: number) {
+  const rounded = roundMovementDistance(value);
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
