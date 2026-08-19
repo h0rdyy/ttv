@@ -27,13 +27,17 @@ jobs:
       - name: Audit production packages
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Install deterministic Vitest runner
+        run: npm install --no-save --package-lock=false vitest@4.1.10
+
       - name: Vitest
-        run: npm test
+        run: ./node_modules/.bin/vitest run tests/unit
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Setup Supabase CLI
+        id: supabase_cli
         uses: supabase/setup-cli@v1
         with:
           version: 2.114.0
@@ -48,7 +52,7 @@ jobs:
         run: supabase test db
 
       - name: Stop local Supabase
-        if: always()
+        if: always() && steps.supabase_cli.outcome == 'success'
         run: supabase stop --no-backup
 
       - name: Build
