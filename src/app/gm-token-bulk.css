@@ -1,0 +1,52 @@
+/* GM multi-select + bulk token actions */
+.token.multi-selected {
+  box-shadow: 0 0 0 3px rgba(226, 192, 125, 0.85), 0 0 22px rgba(200, 154, 82, 0.28);
+}
+
+.gm-token-bulk-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px;
+  border: 1px solid #5c4528;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(24, 19, 13, 0.97), rgba(12, 10, 8, 0.98));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+
+.gm-token-bulk-count {
+  margin-right: 4px;
+  padding: 0 8px 0 4px;
+  color: #a89478;
+  font-size: 11px;
+  white-space: nowrap;
+  border-right: 1px solid rgba(201, 154, 89, 0.22);
+}
+
+.gm-token-bulk-count strong {
+  color: #efd29a;
+  font-size: 13px;
+}
+
+.gm-token-bulk-bar .button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .gm-token-bulk-bar {
+    left: 8px;
+    right: 8px;
+    bottom: 12px;
+    flex-wrap: wrap;
+    transform: none;
+  }
+}
