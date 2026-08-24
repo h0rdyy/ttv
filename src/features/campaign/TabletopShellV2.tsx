@@ -43,6 +43,18 @@ export function TabletopShellV2({
     };
   }, [combatActive, uiHidden]);
 
+  // Context-first: start with map owning the workspace. Library rail stays;
+  // drawer opens only when the GM asks for it.
+  useEffect(() => {
+    if (mode !== 'gm') return;
+    const frame = window.requestAnimationFrame(() => {
+      const library = document.querySelector('.online-table-shell.gm-mode .gm-library.expanded');
+      if (!library) return;
+      document.querySelector<HTMLButtonElement>('.online-table-shell.gm-mode .gm-library-collapse')?.click();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode]);
+
   return (
     <TabletopContextUi
       mode={mode}
