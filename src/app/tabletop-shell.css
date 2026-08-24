@@ -78,55 +78,25 @@
   max-width: calc(100vw - 300px);
 }
 
-/* On desktop the opened player dice tray becomes a real right drawer.
-   The map gives up the same width, so the drawer never hides map controls/tokens. */
-@media (min-width: 901px) {
-  .v05-table-layer.player-immersion:has(.dice-tray-anchor.open) .player-mode .online-map-stage {
-    margin-right: var(--ttv-player-drawer);
-  }
-
-  .v05-table-layer.player-immersion .dice-tray-anchor.open .dice-tray {
-    position: fixed;
-    top: 60px;
-    right: 10px;
-    bottom: calc(var(--ttv-player-bottom-safe) + 8px);
-    left: auto;
-    width: var(--ttv-player-drawer);
-    max-height: none;
-    overflow: auto;
-  }
-}
-
-/* UI settings are part of top chrome, and disappear when a focus workspace owns the screen. */
-.v05-table-layer:has(.foundry-character-window) .tabletop-ui-preferences,
-.v05-table-layer:has(.online-workshop-panel .builder-view) .tabletop-ui-preferences {
-  display: none !important;
-}
-
-/* Medium desktop: keep all three GM zones, just make them denser. */
-@media (max-width: 1300px) {
+@media (max-width: 1100px) {
   .v05-table-layer {
     --ttv-gm-library: 278px;
     --ttv-gm-inspector: 286px;
   }
 
   .v05-table-layer .gm-mode .gm-library-drawer {
-    padding-inline: 10px;
+    font-size: 12px;
   }
 }
 
-/* Narrow GM screens: inspector becomes a bottom safe zone instead of covering the map. */
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .v05-table-layer {
     --ttv-gm-library: min(220px, 42vw);
   }
 
   .v05-table-layer .gm-mode .online-table-workspace {
     grid-template-columns: var(--ttv-gm-library) minmax(0, 1fr) !important;
-    grid-template-rows: minmax(0, 1fr) minmax(190px, 34vh);
-    grid-template-areas:
-      "library map"
-      "library inspector" !important;
+    grid-template-areas: "library map" !important;
   }
 
   .v05-table-layer .gm-mode .online-table-workspace:has(.gm-library.collapsed) {
@@ -134,25 +104,23 @@
   }
 
   .v05-table-layer .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
-    grid-template-rows: minmax(0, 1fr) 0;
+    /* already zero via variable when empty on desktop; on narrow keep inspector off-grid */
   }
 
   .v05-table-layer .gm-mode .gm-inspector {
-    height: calc(100% - 8px);
-    margin: 0 6px 8px;
-  }
-}
-
-/* Player compact screens use the whole bottom strip and move dice above it, never on top of it. */
-@media (max-width: 760px) {
-  .v05-table-layer {
-    --ttv-player-bottom-safe: 82px;
+    position: fixed;
+    top: 58px;
+    right: 8px;
+    bottom: 72px;
+    width: min(320px, calc(100vw - 24px));
+    height: auto;
+    margin: 0;
+    z-index: 40;
   }
 
   .v05-table-layer.player-immersion .player-immersion-dock {
     left: 8px;
     right: 8px;
-    bottom: 8px;
     max-width: none;
     transform: none;
   }
@@ -161,4 +129,19 @@
     left: 8px;
     bottom: 90px;
   }
+}
+
+/* Context-first GM defaults (test/gm-ux-context-first)
+   Library starts collapsed; inspector only claims space when an actor is selected.
+   Keep map as the dominant surface during ordinary play. */
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .online-table-workspace {
+  transition: grid-template-columns 0.18s ease;
+}
+
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .gm-library.collapsed .gm-library-rail {
+  box-shadow: inset -1px 0 0 rgba(201, 154, 89, 0.12);
+}
+
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .gm-inspector:not(:has(.gm-inspector-empty)) {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
