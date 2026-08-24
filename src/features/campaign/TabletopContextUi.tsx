@@ -66,7 +66,9 @@ export function TabletopContextUi({
 }: Props) {
   const [surface, setSurface] = useState<Surface>(null);
   const [preferredMode, setPreferredMode] = useState<Exclude<TableMode, 'combat'>>('play');
-  const tableMode: TableMode = combatActive ? 'combat' : preferredMode;
+  // Combat is an overlay on the table — it must not lock out scene/characters/workshop.
+  const tableMode: TableMode = preferredMode;
+  const inCombat = combatActive;
 
   const closeLegacyDrawer = () => {
     const library = document.querySelector('.online-table-shell.gm-mode .gm-library.expanded');
@@ -247,8 +249,20 @@ export function TabletopContextUi({
       ];
     }
 
+    const gmActions: Action[] = [];
+
+    if (inCombat) {
+      gmActions.push({
+        id: 'combat',
+        icon: 'combat',
+        label: `Бой · ${combatRound}`,
+        hint: 'Инициатива и текущий ход',
+        run: () => toggleLegacyDrawer('combat'),
+      });
+    }
+
     if (tableMode === 'prepare') {
-      return [
+      gmActions.push(
         {
           id: 'scene',
           icon: 'scene',
@@ -270,18 +284,10 @@ export function TabletopContextUi({
           hint: 'Предметы, таблицы и контент',
           run: openWorkshop,
         },
-        {
-          id: 'characters',
-          icon: 'characters',
-          label: 'Персонажи',
-          hint: 'Герои и NPC',
-          run: () => toggleLegacyDrawer('characters'),
-        },
-        ...common,
-      ];
+      );
     }
 
-    const gmActions: Action[] = [
+    gmActions.push(
       {
         id: 'characters',
         icon: 'characters',
@@ -290,29 +296,21 @@ export function TabletopContextUi({
         run: () => toggleLegacyDrawer('characters'),
       },
       ...common,
-    ];
-
-    if (tableMode === 'combat') {
-      gmActions.unshift({
-        id: 'combat',
-        icon: 'combat',
-        label: `Бой · ${combatRound}`,
-        hint: 'Инициатива и текущий ход',
-        run: () => toggleLegacyDrawer('combat'),
-      });
-    }
+    );
 
     return gmActions;
   // Adapter callbacks intentionally use current DOM state rather than React state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSceneName, canOpenCharacter, combatRound, mode, onOpenCharacter, tableMode]);
+  }, [activeSceneName, canOpenCharacter, combatRound, inCombat, mode, onOpenCharacter, tableMode]);
 
   const quickActionIds = mode === 'player'
     ? ['map-tools', 'dice']
-    : tableMode === 'combat'
-      ? ['combat', 'map-tools', 'dice']
+    : inCombat
+      ? (tableMode === 'prepare'
+          ? ['combat', 'scene', 'characters', 'map-tools', 'dice']
+          : ['combat', 'characters', 'map-tools', 'dice'])
       : tableMode === 'prepare'
-        ? ['scene', 'map-tools', 'dice']
+        ? ['scene', 'characters', 'map-tools', 'dice']
         : ['characters', 'map-tools', 'dice'];
   const quickActions = quickActionIds
     .map((id) => actions.find((action) => action.id === id))
@@ -355,12 +353,12 @@ export function TabletopContextUi({
 
   if (focusActive) return null;
 
-  const modeLabel = tableMode === 'combat'
+  const modeLabel = inCombat
     ? `Бой · ${combatRound}`
     : tableMode === 'prepare'
       ? 'Подготовка'
       : 'Игра';
-  const modeIcon: TabletopIconName = tableMode === 'combat' ? 'combat' : tableMode === 'prepare' ? 'prepare' : 'game';
+  const modeIcon: TabletopIconName = inCombat ? 'combat' : tableMode === 'prepare' ? 'prepare' : 'game';
 
   if (uiHidden) {
     return (
@@ -381,7 +379,7 @@ export function TabletopContextUi({
       <nav className={`context-ui-actionbar ${mode}`} aria-label="Действия на столе" data-wheel-isolation="true">
         <button
           type="button"
-          className={`context-ui-mode-chip mode-${tableMode}`}
+          className={`context-ui-mode-chip mode-${inCombat ? "combat" : tableMode}`}
           onClick={mode === 'gm' ? () => setSurface((current) => current === 'mode' ? null : 'mode') : undefined}
           aria-expanded={mode === 'gm' ? surface === 'mode' : undefined}
           aria-haspopup={mode === 'gm' ? 'menu' : undefined}
@@ -410,23 +408,21 @@ export function TabletopContextUi({
 
           <div className="context-mode-section">
             <span>РЕЖИМ</span>
-            {!combatActive && (
-              <>
-                <button type="button" className={tableMode === 'play' ? 'active' : ''} onClick={leavePrepare} role="menuitem">
-                  <TabletopIcon name="game" />
-                  <span><strong>Игра</strong><small>Ведение обычной сцены</small></span>
-                </button>
-                <button type="button" className={tableMode === 'prepare' ? 'active' : ''} onClick={enterPrepare} role="menuitem">
-                  <TabletopIcon name="prepare" />
-                  <span><strong>Подготовка</strong><small>Сцена, карта, сетка и контент</small></span>
-                </button>
-                <button type="button" className="combat-action" onClick={startCombat} role="menuitem">
-                  <TabletopIcon name="combat" />
-                  <span><strong>Начать бой</strong><small>Создать очередь и открыть раунд 1</small></span>
-                </button>
-              </>
+            <button type="button" className={!inCombat && tableMode === 'play' ? 'active' : ''} onClick={leavePrepare} role="menuitem">
+              <TabletopIcon name="game" />
+              <span><strong>Игра</strong><small>Ведение обычной сцены</small></span>
+            </button>
+            <button type="button" className={!inCombat && tableMode === 'prepare' ? 'active' : ''} onClick={enterPrepare} role="menuitem">
+              <TabletopIcon name="prepare" />
+              <span><strong>Подготовка</strong><small>Сцена, карта, сетка и контент</small></span>
+            </button>
+            {!inCombat && (
+              <button type="button" className="combat-action" onClick={startCombat} role="menuitem">
+                <TabletopIcon name="combat" />
+                <span><strong>Начать бой</strong><small>Создать очередь и открыть раунд 1</small></span>
+              </button>
             )}
-            {combatActive && (
+            {inCombat && (
               <button type="button" className="active combat-action" onClick={() => toggleLegacyDrawer('combat')} role="menuitem">
                 <TabletopIcon name="combat" />
                 <span><strong>Бой · раунд {combatRound}</strong><small>Инициатива, текущий ход и завершение боя</small></span>
@@ -434,9 +430,9 @@ export function TabletopContextUi({
             )}
           </div>
 
-          {tableMode === 'prepare' && !combatActive && (
+          {(tableMode === 'prepare' || inCombat) && (
             <div className="context-mode-section prepare-tools">
-              <span>ПОДГОТОВКА</span>
+              <span>{inCombat ? 'ИНСТРУМЕНТЫ СТОЛА' : 'ПОДГОТОВКА'}</span>
               <button type="button" onClick={openSceneWorkspace} role="menuitem">
                 <TabletopIcon name="scene" />
                 <span><strong>Настройки сцены</strong><small>Карта, сетка, туман и токены</small></span>
