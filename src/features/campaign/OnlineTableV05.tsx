@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
@@ -91,7 +91,12 @@ export function OnlineTableV05(props: Props) {
   const [actorMenu, setActorMenu] = useState<ActorContextMenu | null>(null);
   const [deleteConfirmActorId, setDeleteConfirmActorId] = useState<string | null>(null);
   const [deletingActorId, setDeletingActorId] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessageValue] = useState('');
+  const [messageRevision, setMessageRevision] = useState(0);
+  const setMessage = useCallback((next: string) => {
+    setMessageValue(next);
+    setMessageRevision((current) => current + 1);
+  }, []);
   const pendingOpenActorIdRef = useRef<string | null>(null);
   const selectedActorIdRef = useRef(selectedActorId);
   selectedActorIdRef.current = selectedActorId;
@@ -178,6 +183,12 @@ export function OnlineTableV05(props: Props) {
     };
   }, [actorMenu]);
 
+  useEffect(() => {
+    if (!message) return;
+    const timeout = window.setTimeout(() => setMessage(''), 4200);
+    return () => window.clearTimeout(timeout);
+  }, [message, messageRevision, setMessage]);
+
   const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? null;
   const characterActor = actors.find((actor) => actor.id === characterActorId) ?? null;
   const template = characterActor ? initialSheetTemplates.find((value) => value.id === characterActor.sheet_template_id) ?? null : null;
@@ -237,6 +248,7 @@ export function OnlineTableV05(props: Props) {
         initialActors={actors}
         selectedActorId={selectedActorId}
         onSelectActor={setSelectedActorId}
+        onMessage={setMessage}
       />
 
       <TabletopShellV2
@@ -353,7 +365,12 @@ export function OnlineTableV05(props: Props) {
         </div>
       )}
 
-      {message && <div className="auth-status online-table-message v05-sheet-message" onClick={() => setMessage('')}>{message}</div>}
+      {message && (
+        <div className="tabletop-toast" role="status" aria-live="polite">
+          <span>{message}</span>
+          <button type="button" onClick={() => setMessage('')} aria-label="Закрыть уведомление">×</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -75,10 +75,11 @@ type Props = {
   initialRuntime: CombatRuntime;
   selectedActorId: string;
   onSelectActor: (id: string) => void;
+  onMessage: (message: string) => void;
 };
 
 export function OnlineTable(props: Props) {
-  const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId } = props;
+  const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId, onMessage: setMessage } = props;
   const router = useRouter();
   const [campaign, setCampaign] = useState(props.campaign);
   const [actors, setActors] = useState(props.initialActors);
@@ -108,7 +109,6 @@ export function OnlineTable(props: Props) {
   const [mapStageSize, setMapStageSize] = useState<Size | null>(null);
   const [panning, setPanning] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
   const refreshTimerRef = useRef<number | null>(null);
   const lastBroadcastRef = useRef(0);
   const mapWorldRef = useRef<HTMLDivElement | null>(null);
@@ -907,7 +907,6 @@ export function OnlineTable(props: Props) {
         onMessage={setMessage}
       />
 
-      {message && <div className="auth-status online-table-message online-global-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
   );
 }
