@@ -1,13 +1,22 @@
 'use client';
 
-import { FormEvent, useRef, useState } from 'react';
+import { type CSSProperties, FormEvent, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 import { useExclusiveTabletopSurface } from './useExclusiveTabletopSurface';
 import {
   buildDiceFormula,
+  changeDicePool,
+  clampDiceModifier,
   DICE_SIDES,
+  dicePoolToSides,
+  diceSidesToPool,
+  MAX_DICE_COUNT,
+  MAX_DICE_MODIFIER,
+  MIN_DICE_MODIFIER,
+  type DicePool,
   type DiceRoll,
+  type DiceSide,
   type DiceVisibility,
   parseDiceFormula,
   parseDiceRoll,
@@ -25,7 +34,8 @@ type Props = {
 
 export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, onMessage }: Props) {
   const [open, setOpen] = useState(false);
-  const [quickModifier, setQuickModifier] = useState(0);
+  const [pool, setPool] = useState<DicePool>(() => diceSidesToPool([20]));
+  const [modifier, setModifier] = useState(0);
   const [formulaText, setFormulaText] = useState('');
   const [formulaError, setFormulaError] = useState('');
   const [visibility, setVisibility] = useState<DiceVisibility>('public');
@@ -36,13 +46,15 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
   const rollingRef = useRef(false);
   useExclusiveTabletopSurface('dice-tray', open, () => setOpen(false));
 
+  const selectedSides = dicePoolToSides(pool);
+  const selectedFormula = buildDiceFormula(selectedSides, modifier);
   const shownSides = rolling ? rollingSides : lastRoll?.sides ?? [];
   const shownValues = rolling ? rollingSides.map(() => 0) : lastRoll?.values ?? [];
 
-  const performRoll = async (sides: number[], modifier: number) => {
+  const performRoll = async (sides: number[], rollModifier: number) => {
     if (!sides.length || rollingRef.current) return;
     const requestedSides = [...sides];
-    const requestedModifier = modifier;
+    const requestedModifier = rollModifier;
     const requestedVisibility = visibility;
     const startedAt = performance.now();
 
@@ -83,6 +95,11 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
     }
   };
 
+  const changeDieCount = (sides: DiceSide, delta: number) => {
+    setPool((current) => changeDicePool(current, sides, delta));
+    setFormulaError('');
+  };
+
   const submitFormula = (event: FormEvent) => {
     event.preventDefault();
     const parsed = parseDiceFormula(formulaText);
@@ -90,16 +107,23 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
       setFormulaError('Пример: 2d6+3. До 20 кубов, модификатор от −100 до +100.');
       return;
     }
-    setFormulaText(buildDiceFormula(parsed.sides, parsed.modifier).replace(/\s/g, ''));
-    void performRoll(parsed.sides, parsed.modifier);
+    setPool(diceSidesToPool(parsed.sides));
+    setModifier(parsed.modifier);
+    setFormulaText('');
+    setFormulaError('');
+  };
+
+  const resetBuilder = () => {
+    if (rolling) return;
+    setPool(diceSidesToPool([20]));
+    setModifier(0);
+    setFormulaText('');
+    setFormulaError('');
   };
 
   const clearBoard = () => {
     if (rolling) return;
     setLastRoll(null);
-    setFormulaText('');
-    setFormulaError('');
-    setQuickModifier(0);
   };
 
   return (
@@ -107,61 +131,107 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
       {open && (
         <section className="dice-tray dice-tray-v2" data-wheel-isolation="true" aria-label="Лоток кубов">
           <header className="dice-tray-head">
-            <div><span>КУБЫ</span><strong>Быстрый бросок</strong></div>
+            <div><span>D&D КУБЫ</span><strong>Лоток броска</strong></div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть"><TabletopIcon name="close" /></button>
           </header>
 
-          <section className="dice-quick-section" aria-label="Быстрые кубы">
-            <div className="dice-quick-grid">
-              {DICE_SIDES.map((sides) => (
-                <button
-                  key={sides}
-                  type="button"
-                  className={sides === 20 ? 'primary-die' : ''}
-                  disabled={rolling}
-                  onClick={() => void performRoll([sides], quickModifier)}
-                  aria-label={`Бросить d${sides}${quickModifier ? ` с модификатором ${quickModifier}` : ''}`}
-                >
-                  <DiceGlyph sides={sides} />
-                  <strong>d{sides}</strong>
-                </button>
-              ))}
-            </div>
-            <div className="dice-quick-meta">
-              <div className="dice-quick-modifier">
-                <span>Модификатор быстрого броска</span>
-                <div>
-                  <button type="button" disabled={rolling || quickModifier <= -100} onClick={() => setQuickModifier((value) => Math.max(-100, value - 1))}>−</button>
-                  <b>{quickModifier > 0 ? `+${quickModifier}` : quickModifier}</b>
-                  <button type="button" disabled={rolling || quickModifier >= 100} onClick={() => setQuickModifier((value) => Math.min(100, value + 1))}>＋</button>
-                </div>
+          <section className="dice-builder" aria-label="Настройка броска">
+            <div className="dice-builder-title">
+              <div>
+                <span>НАБОР КУБОВ</span>
+                <small>Нажимайте +, чтобы собрать бросок</small>
               </div>
-              <div className="dice-visibility compact">
-                <span>Видимость</span>
-                <div role="group" aria-label="Видимость броска">
-                  <button type="button" aria-pressed={visibility === 'public'} onClick={() => setVisibility('public')}>Всем</button>
-                  <button type="button" aria-pressed={visibility === 'gm'} onClick={() => setVisibility('gm')}>{mode === 'gm' ? 'Мастерам' : 'Мастеру'}</button>
-                </div>
-              </div>
+              <b>{selectedSides.length}/{MAX_DICE_COUNT}</b>
             </div>
-          </section>
 
-          <form className="dice-formula" onSubmit={submitFormula}>
-            <label htmlFor="dice-formula-input">Сложный бросок</label>
-            <div>
-              <input
-                id="dice-formula-input"
-                value={formulaText}
-                disabled={rolling}
-                onChange={(event) => { setFormulaText(event.target.value); setFormulaError(''); }}
-                placeholder="2d6+3"
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button type="submit" disabled={rolling || !formulaText.trim()}><TabletopIcon name="dice" /> Бросить</button>
+            <div className="dice-pool-grid">
+              {DICE_SIDES.map((sides) => {
+                const count = pool[sides] ?? 0;
+                const cannotAdd = rolling || selectedSides.length >= MAX_DICE_COUNT;
+                return (
+                  <div key={sides} className={`dice-pool-card ${count > 0 ? 'selected' : ''} ${sides === 20 ? 'primary-die' : ''}`}>
+                    <button
+                      type="button"
+                      className="dice-pool-pick"
+                      disabled={cannotAdd}
+                      onClick={() => changeDieCount(sides, 1)}
+                      aria-label={`Добавить d${sides}`}
+                    >
+                      <DiceGlyph sides={sides} />
+                      <strong>d{sides}</strong>
+                    </button>
+                    <div className="dice-count-stepper">
+                      <button type="button" disabled={rolling || count === 0} onClick={() => changeDieCount(sides, -1)} aria-label={`Убрать d${sides}`}>−</button>
+                      <span aria-label={`Выбрано d${sides}: ${count}`}>{count}</span>
+                      <button type="button" disabled={cannotAdd} onClick={() => changeDieCount(sides, 1)} aria-label={`Добавить d${sides}`}>+</button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <small className={formulaError ? 'error' : ''}>{formulaError || 'Например: d20+5, 2d6+3, 3d8−2'}</small>
-          </form>
+
+            <div className="dice-builder-meta">
+              <label className="dice-modifier-control">
+                <span>МОДИФИКАТОР</span>
+                <div>
+                  <button type="button" disabled={rolling || modifier <= MIN_DICE_MODIFIER} onClick={() => setModifier((value) => clampDiceModifier(value - 1))}>−</button>
+                  <input
+                    type="number"
+                    min={MIN_DICE_MODIFIER}
+                    max={MAX_DICE_MODIFIER}
+                    value={modifier}
+                    disabled={rolling}
+                    onChange={(event) => setModifier(clampDiceModifier(event.target.valueAsNumber))}
+                    aria-label="Модификатор броска"
+                  />
+                  <button type="button" disabled={rolling || modifier >= MAX_DICE_MODIFIER} onClick={() => setModifier((value) => clampDiceModifier(value + 1))}>+</button>
+                </div>
+              </label>
+              <div className="dice-visibility compact">
+                <span>КТО УВИДИТ</span>
+                <div role="group" aria-label="Видимость броска">
+                  <button type="button" aria-pressed={visibility === 'public'} onClick={() => setVisibility('public')}>Все</button>
+                  <button type="button" aria-pressed={visibility === 'gm'} onClick={() => setVisibility('gm')}>{mode === 'gm' ? 'Только мастера' : 'Только мастер'}</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="dice-roll-summary">
+              <div>
+                <span>ГОТОВО К БРОСКУ</span>
+                <strong>{selectedFormula}</strong>
+              </div>
+              <button
+                type="button"
+                className="dice-roll-button"
+                disabled={rolling || selectedSides.length === 0}
+                onClick={() => void performRoll(selectedSides, modifier)}
+              >
+                <TabletopIcon name="dice" /> {rolling ? 'Бросаем…' : 'Бросить'}
+              </button>
+            </div>
+
+            <form className="dice-formula" onSubmit={submitFormula}>
+              <label htmlFor="dice-formula-input">Или введите формулу вручную</label>
+              <div>
+                <input
+                  id="dice-formula-input"
+                  value={formulaText}
+                  disabled={rolling}
+                  onChange={(event) => { setFormulaText(event.target.value); setFormulaError(''); }}
+                  placeholder="2d6+3"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button type="submit" disabled={rolling || !formulaText.trim()}>Применить</button>
+              </div>
+              <small className={formulaError ? 'error' : ''}>{formulaError || 'Поддерживаются d4, d6, d8, d10, d12, d20 и d100'}</small>
+            </form>
+
+            <button type="button" className="dice-reset-builder" disabled={rolling || (selectedSides.length === 1 && selectedSides[0] === 20 && modifier === 0)} onClick={resetBuilder}>
+              Сбросить к 1d20
+            </button>
+          </section>
 
           <div className="dice-tray-board">
             <div className={`dice-roll-surface ${rolling ? 'rolling' : 'settled'}`} aria-live="polite">
@@ -170,7 +240,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
                   <div className="dice-empty-felt">
                     <TabletopIcon name="dice" />
                     <strong>Поле броска</strong>
-                    <small>Нажмите на куб выше — бросок произойдёт сразу</small>
+                    <small>Соберите набор выше и нажмите «Бросить»</small>
                   </div>
                 )}
                 {shownSides.map((sides, index) => {
@@ -179,7 +249,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
                     <div
                       key={`${rolling ? 'rolling' : lastRoll?.id}-${index}`}
                       className={`rolled-die rolled-d${sides} ${!rolling && value === sides ? 'max' : ''} ${!rolling && value === 1 ? 'one' : ''}`}
-                      style={{ '--die-index': index } as React.CSSProperties}
+                      style={{ '--die-index': index } as CSSProperties}
                     >
                       <small>d{sides}</small>
                       <strong>{rolling ? '·' : value}</strong>
@@ -192,7 +262,7 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
                 <b>{rolling || !lastRoll ? '—' : lastRoll.total}</b>
               </div>
             </div>
-            <button type="button" className="dice-clear-board" disabled={rolling || (!lastRoll && !formulaText && quickModifier === 0)} onClick={clearBoard}>
+            <button type="button" className="dice-clear-board" disabled={rolling || !lastRoll} onClick={clearBoard}>
               <TabletopIcon name="clear" /> Очистить поле
             </button>
           </div>

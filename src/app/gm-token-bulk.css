@@ -5,9 +5,10 @@
 
 .gm-token-bulk-bar {
   position: fixed;
+  top: calc(var(--v2-topbar, 44px) + 12px);
   left: 50%;
-  bottom: 18px;
-  z-index: 70;
+  bottom: auto;
+  z-index: 118;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -43,9 +44,10 @@
 
 @media (max-width: 720px) {
   .gm-token-bulk-bar {
+    top: calc(var(--v2-topbar, 44px) + 8px);
     left: 8px;
     right: 8px;
-    bottom: 12px;
+    bottom: auto;
     flex-wrap: wrap;
     transform: none;
   }

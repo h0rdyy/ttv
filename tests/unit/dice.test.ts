@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDiceFormula,
+  changeDicePool,
+  clampDiceModifier,
+  dicePoolToSides,
+  diceSidesToPool,
   mergeDiceRollHistory,
   parseDiceFormula,
   parseDiceRoll,
@@ -19,6 +23,26 @@ const FIXED_ROLL = {
 } as const;
 
 describe('dice contracts', () => {
+  it('builds an editable standard dice pool without mutating its source', () => {
+    const initial = diceSidesToPool([20]);
+    const withBonusDice = changeDicePool(changeDicePool(initial, 6, 2), 20, 1);
+
+    expect(initial).toEqual({ 20: 1 });
+    expect(withBonusDice).toEqual({ 6: 2, 20: 2 });
+    expect(dicePoolToSides(withBonusDice)).toEqual([6, 6, 20, 20]);
+    expect(buildDiceFormula(dicePoolToSides(withBonusDice), 2)).toBe('2d6 + 2d20 + 2');
+    expect(changeDicePool(withBonusDice, 6, -20)).toEqual({ 20: 2 });
+  });
+
+  it('enforces the tray limits for dice and modifiers', () => {
+    const fullPool = changeDicePool({}, 20, 50);
+    expect(dicePoolToSides(fullPool)).toHaveLength(20);
+    expect(changeDicePool(fullPool, 6, 1)).toEqual(fullPool);
+    expect(clampDiceModifier(101)).toBe(100);
+    expect(clampDiceModifier(-101)).toBe(-100);
+    expect(clampDiceModifier(Number.NaN)).toBe(0);
+  });
+
   it('builds stable formulas', () => {
     expect(buildDiceFormula([], 0)).toBe('Выберите кубы');
     expect(buildDiceFormula([20, 6, 20], 3)).toBe('2d20 + 1d6 + 3');

@@ -1,162 +1,286 @@
 .dice-tray-v2 {
   width: min(430px, calc(100vw - 28px));
-  border-color: #665036;
-  background: linear-gradient(180deg, rgba(20,16,11,.995), rgba(8,7,5,.998));
+  border-color: #745835;
+  background:
+    radial-gradient(circle at 28% -10%, rgba(145, 96, 43, .19), transparent 35%),
+    linear-gradient(180deg, rgba(23, 18, 12, .997), rgba(8, 7, 5, .998));
 }
 
 .dice-tray-v2 .dice-tray-head {
-  min-height: 54px;
-  padding: 9px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 58px;
+  padding: 10px 13px;
+  background: rgba(18, 14, 10, .97);
+  backdrop-filter: blur(15px);
 }
-.dice-tray-v2 .dice-tray-head strong { font-size: 16px; }
+.dice-tray-v2 .dice-tray-head strong { font-size: 17px; }
 .dice-tray-v2 .dice-tray-head > button { display: grid; place-items: center; padding: 0; }
 .dice-tray-v2 .dice-tray-head > button svg { width: 16px; height: 16px; }
 
-.dice-quick-section {
+.dice-tray-v2 .dice-builder {
   display: grid;
   gap: 11px;
   padding: 12px;
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(7,6,4,.32);
+  background: rgba(7, 6, 4, .28);
 }
 
-.dice-quick-grid {
+.dice-builder-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dice-builder-title > div { display: grid; gap: 2px; }
+.dice-builder-title span,
+.dice-modifier-control > span,
+.dice-visibility.compact > span,
+.dice-roll-summary span {
+  color: #9b8768;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .11em;
+}
+.dice-builder-title small { color: #716552; font-size: 9px; }
+.dice-builder-title > b {
+  min-width: 43px;
+  padding: 4px 7px;
+  border: 1px solid #483823;
+  border-radius: 999px;
+  color: #ad9671;
+  background: #100d09;
+  font-size: 9px;
+  text-align: center;
+}
+
+.dice-pool-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0,1fr));
-  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
 }
 
-.dice-quick-grid > button {
+.dice-pool-card {
   min-width: 0;
-  min-height: 58px;
+  overflow: hidden;
+  border: 1px solid #3f3221;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #15110d, #0d0b08);
+  transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.dice-pool-card.selected {
+  border-color: #896437;
+  background: linear-gradient(180deg, #261b10, #120e09);
+  box-shadow: inset 0 0 18px rgba(196, 139, 65, .08);
+}
+.dice-pool-card.primary-die { grid-column: span 2; }
+
+.dice-pool-pick {
+  width: 100%;
+  min-height: 57px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 3px;
-  padding: 6px 2px;
-  border: 1px solid #443622;
-  border-radius: 9px;
-  background: linear-gradient(180deg, #17130e, #0e0c09);
+  gap: 2px;
+  padding: 5px 2px 3px;
+  border: 0;
+  background: transparent;
   color: #9f8b69;
   cursor: pointer;
-  transition: transform .1s ease, border-color .1s ease, background .1s ease;
 }
-.dice-quick-grid > button:hover:not(:disabled),
-.dice-quick-grid > button:focus-visible {
-  outline: none;
-  transform: translateY(-2px);
-  border-color: #8b6736;
-  background: #251a10;
-  color: #f0cb87;
-}
-.dice-quick-grid > button:active:not(:disabled) { transform: translateY(0); }
-.dice-quick-grid > button:disabled { opacity: .4; cursor: wait; }
-.dice-quick-grid > button.primary-die {
-  border-color: #79592f;
-  background: linear-gradient(180deg, #251a0f, #120e09);
-  color: #e7bd72;
-}
-.dice-quick-grid svg {
-  width: 27px;
-  height: 27px;
+.dice-pool-card.selected .dice-pool-pick,
+.dice-pool-card.primary-die .dice-pool-pick { color: #e8bd70; }
+.dice-pool-pick:hover:not(:disabled),
+.dice-pool-pick:focus-visible { outline: 0; color: #ffd992; }
+.dice-pool-pick:disabled { opacity: .42; cursor: not-allowed; }
+.dice-pool-pick svg {
+  width: 28px;
+  height: 28px;
   overflow: visible;
-  fill: rgba(201,146,79,.08);
+  fill: rgba(201, 146, 79, .08);
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
-.dice-quick-grid strong { font-size: 8px; font-weight: 800; }
+.dice-pool-pick strong { font-size: 9px; font-weight: 850; }
 
-.dice-quick-meta {
+.dice-count-stepper {
+  height: 28px;
   display: grid;
-  grid-template-columns: minmax(0,1fr) minmax(0,1.05fr);
-  gap: 9px;
+  grid-template-columns: 28px 1fr 28px;
+  border-top: 1px solid rgba(137, 100, 55, .28);
+  background: rgba(5, 4, 3, .5);
 }
-
-.dice-quick-modifier,
-.dice-visibility.compact { display: grid; gap: 5px; }
-.dice-quick-modifier > span,
-.dice-visibility.compact > span {
-  color: #847661;
-  font-size: 8px;
-  letter-spacing: .04em;
-}
-.dice-quick-modifier > div {
-  height: 34px;
-  display: grid;
-  grid-template-columns: 36px 1fr 36px;
-  overflow: hidden;
-  border: 1px solid #443522;
-  border-radius: 7px;
-  background: #0e0b08;
-}
-.dice-quick-modifier button {
+.dice-count-stepper button {
   border: 0;
-  background: #17120d;
-  color: #c69c60;
-  font-size: 16px;
+  background: rgba(255, 255, 255, .025);
+  color: #c49b60;
+  font-size: 14px;
   cursor: pointer;
 }
-.dice-quick-modifier button:hover:not(:disabled) { background: #291d11; color: #f1c981; }
-.dice-quick-modifier button:disabled { opacity: .3; }
-.dice-quick-modifier b { display: grid; place-items: center; color: #dbc49c; font-size: 11px; }
-.dice-visibility.compact > div { height: 34px; }
+.dice-count-stepper button:hover:not(:disabled) { background: #302115; color: #f2cc88; }
+.dice-count-stepper button:disabled { opacity: .24; cursor: not-allowed; }
+.dice-count-stepper span { display: grid; place-items: center; color: #e2cca5; font-size: 10px; font-weight: 800; }
 
-.dice-formula {
+.dice-builder-meta {
   display: grid;
-  gap: 6px;
-  padding: 11px 12px 12px;
-  border-bottom: 1px solid var(--line-soft);
+  grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr);
+  gap: 9px;
 }
-.dice-formula > label { color: #9b8768; font-size: 9px; font-weight: 700; }
-.dice-formula > div {
+.dice-modifier-control,
+.dice-visibility.compact { display: grid; gap: 5px; }
+.dice-modifier-control > div,
+.dice-visibility.compact > div {
+  height: 36px;
   display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
   overflow: hidden;
-  border: 1px solid #594327;
+  border: 1px solid #4b3924;
+  border-radius: 8px;
+  background: #0e0b08;
+}
+.dice-modifier-control > div { grid-template-columns: 36px minmax(0, 1fr) 36px; }
+.dice-modifier-control button {
+  border: 0;
+  background: #18130e;
+  color: #c69c60;
+  font-size: 17px;
+  cursor: pointer;
+}
+.dice-modifier-control button:hover:not(:disabled) { background: #2b1f13; color: #f1c981; }
+.dice-modifier-control button:disabled { opacity: .3; cursor: not-allowed; }
+.dice-modifier-control input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  border-right: 1px solid rgba(129, 93, 49, .28);
+  border-left: 1px solid rgba(129, 93, 49, .28);
+  outline: 0;
+  background: #0c0a07;
+  color: #ead2a8;
+  font: 800 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-align: center;
+  appearance: textfield;
+}
+.dice-modifier-control input::-webkit-inner-spin-button { appearance: none; }
+.dice-visibility.compact > div { grid-template-columns: 1fr 1.35fr; }
+.dice-visibility.compact button {
+  min-width: 0;
+  padding: 0 6px;
+  border: 0;
+  background: #17120d;
+  color: #8f816d;
+  font-size: 9px;
+  cursor: pointer;
+}
+.dice-visibility.compact button + button { border-left: 1px solid #443522; }
+.dice-visibility.compact button[aria-pressed="true"] { background: #332316; color: #edce94; }
+
+.dice-roll-summary {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 9px 9px 11px;
+  border: 1px solid #6d4e29;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 15% 0, rgba(169, 117, 51, .17), transparent 58%),
+    #130f0a;
+}
+.dice-roll-summary > div { min-width: 0; display: grid; gap: 3px; }
+.dice-roll-summary strong {
+  overflow: hidden;
+  color: #efd098;
+  font: 700 14px Georgia, serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dice-roll-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 15px;
+  border: 1px solid #b27b36;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #a46e30, #68431f);
+  color: #fff0cf;
+  box-shadow: 0 7px 20px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .15);
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.dice-roll-button svg { width: 17px; height: 17px; }
+.dice-roll-button:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+.dice-roll-button:disabled { opacity: .38; cursor: not-allowed; }
+
+.dice-tray-v2 .dice-formula {
+  display: grid;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+}
+.dice-tray-v2 .dice-formula > label { color: #81735e; font-size: 8px; font-weight: 700; }
+.dice-tray-v2 .dice-formula > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #453621;
   border-radius: 8px;
   background: #0d0b08;
 }
-.dice-formula input {
+.dice-tray-v2 .dice-formula input {
   min-width: 0;
-  height: 38px;
+  height: 36px;
   padding: 0 10px;
   border: 0;
   outline: 0;
   background: transparent;
   color: #ead4ab;
-  font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace;
+  font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace;
 }
-.dice-formula input::placeholder { color: #655a49; }
-.dice-formula > div > button {
-  min-width: 88px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+.dice-tray-v2 .dice-formula input::placeholder { color: #655a49; }
+.dice-tray-v2 .dice-formula > div > button {
+  min-width: 82px;
   padding: 0 10px;
   border: 0;
-  border-left: 1px solid #594327;
-  background: #251a10;
-  color: #e8c077;
-  font-size: 9px;
+  border-left: 1px solid #4c3922;
+  background: #21170f;
+  color: #d6ad6b;
+  font-size: 8px;
   font-weight: 800;
   cursor: pointer;
 }
-.dice-formula > div > button:hover:not(:disabled) { background: #342314; }
-.dice-formula > div > button:disabled { opacity: .35; cursor: not-allowed; }
-.dice-formula > div > button svg { width: 15px; height: 15px; }
-.dice-formula > small { color: #6f6554; font-size: 8px; }
-.dice-formula > small.error { color: #c67d6b; }
+.dice-tray-v2 .dice-formula > div > button:hover:not(:disabled) { background: #332215; }
+.dice-tray-v2 .dice-formula > div > button:disabled { opacity: .35; cursor: not-allowed; }
+.dice-tray-v2 .dice-formula > small { color: #6f6554; font-size: 8px; }
+.dice-tray-v2 .dice-formula > small.error { color: #c67d6b; }
+
+.dice-reset-builder {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #8e7a5d;
+  font-size: 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.dice-reset-builder:hover:not(:disabled) { color: #d5b174; }
+.dice-reset-builder:disabled { opacity: .3; cursor: default; }
 
 .dice-tray-v2 .dice-tray-board { display: grid; gap: 7px; padding: 11px 12px 12px; }
-.dice-tray-v2 .dice-roll-felt { min-height: 112px; gap: 9px; padding: 12px; }
+.dice-tray-v2 .dice-roll-felt { min-height: 96px; gap: 8px; padding: 11px; }
 .dice-tray-v2 .dice-empty-felt > svg { width: 29px; height: 29px; opacity: .5; }
-.dice-tray-v2 .rolled-die { width: 47px; height: 47px; }
+.dice-tray-v2 .rolled-die { width: 45px; height: 45px; }
 
 .dice-clear-board {
   justify-self: end;
-  min-height: 30px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -186,7 +310,10 @@
 
 @media (max-width: 560px) {
   .dice-tray-v2 { width: calc(100vw - 12px); }
-  .dice-quick-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
-  .dice-quick-meta { grid-template-columns: 1fr; }
-  .dice-tray-v2 .dice-roll-felt { min-height: 96px; }
+  .dice-tray-v2 .dice-tray-head { position: static; }
+  .dice-pool-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dice-pool-card.primary-die { grid-column: span 2; }
+  .dice-builder-meta { grid-template-columns: 1fr; }
+  .dice-roll-summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .dice-tray-v2 .dice-roll-felt { min-height: 88px; }
 }
