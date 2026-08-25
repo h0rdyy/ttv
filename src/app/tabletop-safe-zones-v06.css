@@ -39,6 +39,18 @@
   display: block;
 }
 
+/* Dice is a primary table action, so it keeps a readable label instead of
+   relying on an easy-to-miss icon. */
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button[data-action="dice"] {
+  width: auto;
+  min-width: 70px;
+  padding: 0 10px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button[data-action="dice"] > strong {
+  display: block;
+}
+
 /* The player HUD already owns bottom-center, so the player's three compact
    actions stay in a small dedicated slot on the left. */
 .v05-table-layer.tabletop-shell-v3 .context-ui-actionbar.player {

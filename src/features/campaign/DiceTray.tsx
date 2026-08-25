@@ -26,13 +26,15 @@ import { TabletopIcon } from './TabletopIcon';
 type Props = {
   campaignId: string;
   mode: 'gm' | 'player';
+  localOnly?: boolean;
+  displayName?: string;
   history: DiceRoll[];
   onRoll: (roll: DiceRoll) => void;
   onClearHistory: () => void;
   onMessage: (message: string) => void;
 };
 
-export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, onMessage }: Props) {
+export function DiceTray({ campaignId, mode, localOnly = false, displayName = 'Игрок', history, onRoll, onClearHistory, onMessage }: Props) {
   const [open, setOpen] = useState(false);
   const [pool, setPool] = useState<DicePool>(() => diceSidesToPool([20]));
   const [modifier, setModifier] = useState(0);
@@ -64,6 +66,26 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
     setFormulaError('');
 
     try {
+      if (localOnly) {
+        await new Promise((resolve) => window.setTimeout(resolve, 520));
+        const values = requestedSides.map((sides) => Math.floor(Math.random() * sides) + 1);
+        const result: DiceRoll = {
+          id: crypto.randomUUID(),
+          senderUserId: '00000000-0000-4000-8000-000000000000',
+          displayName,
+          sides: requestedSides,
+          values,
+          modifier: requestedModifier,
+          total: values.reduce((sum, value) => sum + value, 0) + requestedModifier,
+          visibility: requestedVisibility,
+          createdAt: new Date().toISOString(),
+          formula: buildDiceFormula(requestedSides, requestedModifier),
+        };
+        setLastRoll(result);
+        onRoll(result);
+        return;
+      }
+
       const supabase = createClient();
       const { data, error } = await supabase.rpc('broadcast_dice_roll', {
         target_campaign: campaignId,
@@ -289,6 +311,23 @@ export function DiceTray({ campaignId, mode, history, onRoll, onClearHistory, on
         <TabletopIcon name="dice" /><strong>Кубы</strong>
       </button>
     </div>
+  );
+}
+
+export function LocalDiceTray({ mode, displayName }: { mode: 'gm' | 'player'; displayName: string }) {
+  const [history, setHistory] = useState<DiceRoll[]>([]);
+
+  return (
+    <DiceTray
+      campaignId="demo"
+      mode={mode}
+      localOnly
+      displayName={displayName}
+      history={history}
+      onRoll={(roll) => setHistory((current) => [roll, ...current].slice(0, 12))}
+      onClearHistory={() => setHistory([])}
+      onMessage={() => undefined}
+    />
   );
 }
 

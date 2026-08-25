@@ -391,7 +391,7 @@ export function TabletopContextUi({
         </button>
 
         {quickActions.map((action) => (
-          <button key={action.id} type="button" onClick={action.run} title={action.hint} aria-label={action.label}>
+          <button key={action.id} type="button" data-action={action.id} onClick={action.run} title={action.hint} aria-label={action.label}>
             <TabletopIcon name={action.icon} />
             <strong>{action.label}</strong>
           </button>

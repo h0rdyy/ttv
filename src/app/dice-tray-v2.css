@@ -317,3 +317,20 @@
   .dice-roll-summary { grid-template-columns: minmax(0, 1fr) auto; }
   .dice-tray-v2 .dice-roll-felt { min-height: 88px; }
 }
+
+/* The standalone demo tables do not use the contextual v3 shell. Keep their
+   dice entry point obvious and away from the noisy bottom-left map controls. */
+.app-shell > .dice-tray-anchor,
+.player-shell > .dice-tray-anchor {
+  right: 14px;
+  bottom: 14px;
+  left: auto;
+  z-index: 112;
+  justify-items: end;
+}
+
+.app-shell > .dice-tray-anchor.open .dice-tray,
+.player-shell > .dice-tray-anchor.open .dice-tray {
+  max-height: calc(100dvh - 76px);
+  overflow: auto;
+}
