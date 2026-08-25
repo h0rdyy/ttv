@@ -76,15 +76,27 @@
   translate: -50% 0;
 }
 
-.v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
-  left: 50%;
-  bottom: calc(var(--tabletop-edge-gap) + var(--tabletop-action-height) + 10px);
-  translate: -50% 0;
+.v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette {
+  bottom: 94px;
 }
 
-.v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette,
-.v05-table-layer.tabletop-shell-v3.player-immersion .dice-tray-anchor.open {
-  bottom: 94px;
+/* The desktop dice tray is a true right drawer. Never translate its anchor:
+   translated ancestors change the containing block of fixed descendants and
+   used to collapse the tray into a bottom strip. */
+@media (min-width: 901px) {
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
+    top: calc(var(--v2-topbar, 44px) + 8px);
+    right: 8px;
+    bottom: 8px;
+    left: auto;
+    z-index: 116;
+    width: var(--v2-right-drawer, min(390px, 36vw));
+    translate: none;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open .dice-tray-v2 {
+    z-index: 1;
+  }
 }
 
 /* One shared notification surface. It is deliberately quiet, self-dismisses,
@@ -179,8 +191,7 @@
   }
 
   .v05-table-layer.tabletop-shell-v3 .context-mode-menu,
-  .v05-table-layer.tabletop-shell-v3 .map-tools-palette,
-  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
+  .v05-table-layer.tabletop-shell-v3 .map-tools-palette {
     left: 50%;
     right: auto;
     bottom: 62px;
@@ -188,8 +199,7 @@
     translate: -50% 0;
   }
 
-  .v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette,
-  .v05-table-layer.tabletop-shell-v3.player-immersion .dice-tray-anchor.open {
+  .v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette {
     bottom: 126px;
   }
 
@@ -197,6 +207,29 @@
     top: calc(var(--v2-topbar, 44px) + 8px) !important;
     right: 8px !important;
     bottom: auto !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
+    top: auto;
+    right: 8px;
+    bottom: 62px;
+    left: 8px;
+    z-index: 116;
+    width: auto;
+    max-width: none;
+    justify-items: stretch;
+    translate: none;
+  }
+
+  .v05-table-layer.tabletop-shell-v3.player-immersion .dice-tray-anchor.open {
+    bottom: 126px;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open .dice-tray-v2 {
+    width: 100%;
+    max-height: min(72dvh, 640px);
   }
 }
 
