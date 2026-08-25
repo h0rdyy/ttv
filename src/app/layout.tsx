@@ -30,6 +30,7 @@ import './gm-inspector-polish.css';
 import './tabletop-rpg-hud.css';
 import './token-art-quality.css';
 import './gm-token-bulk.css';
+import './combat-v06.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',

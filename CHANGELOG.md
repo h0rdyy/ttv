@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 — Combat & Actions
+
+### Combat runtime
+- Added automatic d20 initiative and fully manual initiative setup for visible tokens on the active scene.
+- Initiative can be edited during combat; the GM can jump to any participant and advance rounds normally.
+- Automatic control expires timed effects at round boundaries, while manual control leaves durations untouched.
+
+### Actions and effects
+- Added protected GM actions for damage and healing with the existing universal health compatibility layer.
+- Added campaign-synced conditions and effects with optional round duration.
+- Players can see initiative and active effects in their combat summary.
+- Ending combat now uses an in-product confirmation and clears combat-only runtime state.
+
+### Release hardening
+- Added runtime normalization tests and migration `0029_v06_combat_actions.sql`.
+- Fixed the Windows unit-test bootstrap on Node 24 by running the temporary npm install through the platform shell.
+- Preserved the legacy one-argument combat-start RPC for rolling deployments.
+
 ## 0.5.1 — Classic Sheets, Maps & Dice
 
 ### Character sheets

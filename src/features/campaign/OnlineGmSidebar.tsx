@@ -3,6 +3,14 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
+import {
+  combatEffectsForActor,
+  combatInitiative,
+  combatParticipants,
+  type CombatControl,
+  type CombatEffectKind,
+  type CombatRuntime,
+} from './combat';
 
 export type GmSidebarTab = 'session' | 'characters' | 'content' | 'notes' | 'party';
 
@@ -20,7 +28,6 @@ type Inventory = { id: string; owner_actor_id: string };
 type Container = { id: string; inventory_id: string; name: string; type: string; capacity: number | null; sort_order: number };
 type ItemInstance = { id: string; definition_id: string; container_id: string; quantity: number; custom_name: string | null; equipped: boolean; state: Record<string, any> };
 type ItemDefinition = { id: string; name: string; category: string; icon: string; weight: number | null };
-type Runtime = { combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[] };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type HealthValue = { current: number; max: number };
 type OptimisticHealth = HealthValue & { actorId: string };
@@ -36,12 +43,11 @@ type Props = {
   containers: Container[];
   instances: ItemInstance[];
   items: ItemDefinition[];
-  runtime: Runtime;
+  runtime: CombatRuntime;
   notes: Note[];
   busy: boolean;
   onCreateHero: () => void;
   onHp: (actor: Actor, delta: number) => void;
-  onCombat: (action: 'start' | 'next' | 'stop') => void;
   onOpenWorkshop: () => void;
   onChanged: () => void;
   onMessage: (message: string) => void;
@@ -196,13 +202,107 @@ function ContentLibrary({ items, instances, onOpenWorkshop }: Props) {
   );
 }
 
-function SessionLibrary({ runtime, actors, busy, onCombat }: Props) {
-  const order = runtime.combat_order
-    .map((id) => actors.find((actor) => actor.id === id))
-    .filter((actor): actor is Actor => Boolean(actor));
+function SessionLibrary({ campaignId, runtime, actors, selectedActorId, onSelectActor, busy, onChanged, onMessage }: Props) {
+  const order = combatParticipants(runtime, actors);
   const current = runtime.combat_active ? order[runtime.combat_turn] ?? null : null;
   const heroes = actors.filter((actor) => actor.type === 'player').length;
   const npcs = actors.length - heroes;
+  const [setupControl, setSetupControl] = useState<CombatControl>('automatic');
+  const [manualInitiative, setManualInitiative] = useState<Record<string, number>>({});
+  const [combatBusy, setCombatBusy] = useState(false);
+  const [healthAmount, setHealthAmount] = useState(1);
+  const [effectName, setEffectName] = useState('');
+  const [effectKind, setEffectKind] = useState<CombatEffectKind>('condition');
+  const [effectDuration, setEffectDuration] = useState('');
+  const [confirmStop, setConfirmStop] = useState(false);
+  const target = actors.find((actor) => actor.id === selectedActorId) ?? current;
+
+  const callCombatRpc = async (rpc: string, args: Record<string, unknown>, fallback: string) => {
+    setCombatBusy(true);
+    const supabase = createClient();
+    const { error } = await supabase.rpc(rpc, args);
+    if (error) onMessage(friendlyError(error, fallback));
+    else onChanged();
+    setCombatBusy(false);
+    return !error;
+  };
+
+  const startCombat = async () => {
+    const ok = await callCombatRpc('start_campaign_combat_v06', {
+      target_campaign: campaignId,
+      initiative_mode: setupControl,
+      manual_initiative: manualInitiative,
+    }, 'Не удалось начать бой. Проверьте, что на активной сцене есть видимые фишки.');
+    if (ok) onMessage(setupControl === 'automatic' ? 'Бой начат. Инициатива определена автоматически.' : 'Бой начат с ручной инициативой.');
+  };
+
+  const setInitiative = async (actorId: string, value: number) => {
+    if (!Number.isFinite(value)) return;
+    await callCombatRpc('set_campaign_combat_initiative', {
+      target_campaign: campaignId,
+      target_actor: actorId,
+      initiative_value: Math.max(-1000, Math.min(1000, Math.trunc(value))),
+    }, 'Не удалось изменить инициативу.');
+  };
+
+  const setTurn = async (actorId: string) => {
+    await callCombatRpc('set_campaign_combat_turn', { target_campaign: campaignId, target_actor: actorId }, 'Не удалось передать ход.');
+  };
+
+  const setControl = async (control: CombatControl) => {
+    if (control === runtime.combat_control) return;
+    await callCombatRpc('set_campaign_combat_control', { target_campaign: campaignId, control_mode: control }, 'Не удалось изменить управление эффектами.');
+  };
+
+  const applyHealth = async (direction: 'damage' | 'heal') => {
+    if (!target) {
+      onMessage('Выберите участника боя.');
+      return;
+    }
+    const amount = Math.max(1, Math.min(100000, Math.trunc(healthAmount || 1)));
+    const ok = await callCombatRpc('apply_campaign_combat_health', {
+      target_campaign: campaignId,
+      target_actor: target.id,
+      health_delta: direction === 'damage' ? -amount : amount,
+    }, direction === 'damage' ? 'Не удалось нанести урон.' : 'Не удалось восстановить здоровье.');
+    if (ok) onMessage(direction === 'damage' ? `${target.name} получает ${amount} урона.` : `${target.name} восстанавливает ${amount} здоровья.`);
+  };
+
+  const addEffect = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!target || !effectName.trim()) {
+      onMessage(target ? 'Введите название состояния или эффекта.' : 'Выберите участника боя.');
+      return;
+    }
+    const duration = effectDuration.trim() ? Math.max(1, Math.min(999, Number.parseInt(effectDuration, 10) || 1)) : null;
+    const ok = await callCombatRpc('add_campaign_combat_effect', {
+      target_campaign: campaignId,
+      target_actor: target.id,
+      effect_name: effectName.trim(),
+      effect_kind: effectKind,
+      effect_duration: duration,
+    }, 'Не удалось добавить эффект.');
+    if (ok) {
+      setEffectName('');
+      setEffectDuration('');
+    }
+  };
+
+  const removeEffect = async (effectId: string) => {
+    await callCombatRpc('remove_campaign_combat_effect', { target_campaign: campaignId, target_effect: effectId }, 'Не удалось снять эффект.');
+  };
+
+  const nextTurn = async () => {
+    await callCombatRpc('next_campaign_combat_turn', { target_campaign: campaignId }, 'Не удалось перейти к следующему ходу.');
+  };
+
+  const stopCombat = async () => {
+    const ok = await callCombatRpc('stop_campaign_combat', { target_campaign: campaignId }, 'Не удалось закончить бой.');
+    if (ok) {
+      setConfirmStop(false);
+      onMessage('Бой завершён.');
+    }
+  };
 
   return (
     <>
@@ -216,22 +316,86 @@ function SessionLibrary({ runtime, actors, busy, onCombat }: Props) {
       <section className="gm-library-section">
         <div className="gm-library-section-title"><strong>БОЙ</strong><span>{runtime.combat_active ? 'ИДЁТ' : 'ПАУЗА'}</span></div>
         {!runtime.combat_active ? (
-          <button className="button primary full" disabled={busy} onClick={() => onCombat('start')}>⚔ Начать бой</button>
+          <div className="combat-v06-setup">
+            <div className="combat-v06-toggle" role="group" aria-label="Способ определения инициативы">
+              <button type="button" className={setupControl === 'automatic' ? 'active' : ''} onClick={() => setSetupControl('automatic')}>Автоматически</button>
+              <button type="button" className={setupControl === 'manual' ? 'active' : ''} onClick={() => setSetupControl('manual')}>Вручную</button>
+            </div>
+            <p className="muted">В бой попадут видимые фишки активной сцены.</p>
+            {setupControl === 'manual' && (
+              <div className="combat-v06-manual-list">
+                {actors.map((actor) => (
+                  <label key={actor.id}><span>{actor.name}</span><input type="number" min={-1000} max={1000} value={manualInitiative[actor.id] ?? 0} onChange={(event) => setManualInitiative((value) => ({ ...value, [actor.id]: Number(event.target.value) }))} /></label>
+                ))}
+              </div>
+            )}
+            <button className="button primary full" disabled={busy || combatBusy} onClick={() => void startCombat()}>{combatBusy ? 'Начинаем…' : '⚔ Начать бой'}</button>
+          </div>
         ) : (
           <>
-            <div className="gm-combat-focus"><span>Сейчас ходит</span><strong>{current?.name ?? '—'}</strong></div>
-            <div className="gm-combat-order">
+            <div className="gm-combat-focus"><span>Сейчас ходит · инициатива {current ? combatInitiative(runtime, current.id) : '—'}</span><strong>{current?.name ?? '—'}</strong></div>
+            <div className="combat-v06-toggle compact" role="group" aria-label="Управление длительностью эффектов">
+              <button type="button" className={runtime.combat_control === 'automatic' ? 'active' : ''} disabled={combatBusy} onClick={() => void setControl('automatic')}>Автоэффекты</button>
+              <button type="button" className={runtime.combat_control === 'manual' ? 'active' : ''} disabled={combatBusy} onClick={() => void setControl('manual')}>Вручную</button>
+            </div>
+            <div className="gm-combat-order combat-v06-order">
               {order.map((actor, index) => {
                 const health = actorHealth(actor.system_data);
+                const effects = combatEffectsForActor(runtime, actor.id);
                 return (
-                  <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
-                    <span>{index + 1}</span><strong>{actor.name}</strong><small>{health?.current ?? '—'} HP</small>
+                  <div key={actor.id} className={`${index === runtime.combat_turn ? 'active' : ''} ${actor.id === target?.id ? 'selected' : ''}`}>
+                    <button type="button" className="combat-v06-turn" disabled={combatBusy} onClick={() => { onSelectActor(actor.id); void setTurn(actor.id); }} title="Сделать текущим ходом">{index + 1}</button>
+                    <button type="button" className="combat-v06-actor" onClick={() => onSelectActor(actor.id)}><strong>{actor.name}</strong><small>{health?.current ?? '—'} HP{effects.length ? ` · ${effects.length} эфф.` : ''}</small></button>
+                    <input aria-label={`Инициатива ${actor.name}`} type="number" min={-1000} max={1000} defaultValue={combatInitiative(runtime, actor.id)} key={`${actor.id}-${combatInitiative(runtime, actor.id)}`} disabled={combatBusy} onBlur={(event) => { const value = Number(event.target.value); if (value !== combatInitiative(runtime, actor.id)) void setInitiative(actor.id, value); }} />
                   </div>
                 );
               })}
             </div>
-            <button className="button primary full" disabled={busy} onClick={() => onCombat('next')}>Следующий ход →</button>
-            <button className="button full" disabled={busy} onClick={() => onCombat('stop')}>Закончить бой</button>
+
+            <section className="combat-v06-actions">
+              <div className="gm-library-section-title"><strong>ДЕЙСТВИЕ</strong><span>{target?.name ?? 'Выберите участника'}</span></div>
+              <label className="combat-v06-amount"><span>Значение</span><input type="number" min={1} max={100000} value={healthAmount} onChange={(event) => setHealthAmount(Number(event.target.value))} /></label>
+              <div className="combat-v06-action-row">
+                <button type="button" className="button danger" disabled={combatBusy || !target} onClick={() => void applyHealth('damage')}>Урон</button>
+                <button type="button" className="button" disabled={combatBusy || !target} onClick={() => void applyHealth('heal')}>Лечение</button>
+              </div>
+            </section>
+
+            <form className="combat-v06-effects" onSubmit={(event) => void addEffect(event)}>
+              <div className="gm-library-section-title"><strong>СОСТОЯНИЯ И ЭФФЕКТЫ</strong></div>
+              <input className="control full" value={effectName} onChange={(event) => setEffectName(event.target.value)} maxLength={80} placeholder="Например: Оглушён" aria-label="Название эффекта" />
+              <div className="combat-v06-effect-fields">
+                <div className="combat-v06-toggle compact" role="group" aria-label="Тип эффекта">
+                  <button type="button" className={effectKind === 'condition' ? 'active' : ''} onClick={() => setEffectKind('condition')}>Состояние</button>
+                  <button type="button" className={effectKind === 'effect' ? 'active' : ''} onClick={() => setEffectKind('effect')}>Эффект</button>
+                </div>
+                <input type="number" min={1} max={999} value={effectDuration} onChange={(event) => setEffectDuration(event.target.value)} placeholder="∞" aria-label="Раундов, пусто — без срока" />
+              </div>
+              <button className="button full" disabled={combatBusy || !target || !effectName.trim()}>Добавить</button>
+              <div className="combat-v06-effect-list">
+                {runtime.combat_effects.map((effect) => {
+                  const actor = actors.find((value) => value.id === effect.actorId);
+                  return (
+                    <div key={effect.id} className={effect.kind}>
+                      <span><strong>{effect.name}</strong><small>{actor?.name ?? 'Участник удалён'} · {effect.remainingRounds == null ? 'без срока' : `${effect.remainingRounds} раунд.`}</small></span>
+                      <button type="button" disabled={combatBusy} onClick={() => void removeEffect(effect.id)} aria-label={`Снять ${effect.name}`}>×</button>
+                    </div>
+                  );
+                })}
+                {!runtime.combat_effects.length && <div className="online-small-empty">Активных состояний пока нет.</div>}
+              </div>
+            </form>
+
+            <button className="button primary full" disabled={busy || combatBusy} onClick={() => void nextTurn()}>{combatBusy ? 'Обновляем…' : 'Следующий ход →'}</button>
+            {!confirmStop ? (
+              <button className="button full" disabled={busy || combatBusy} onClick={() => setConfirmStop(true)}>Закончить бой</button>
+            ) : (
+              <div className="combat-v06-stop" role="alertdialog" aria-label="Закончить бой?">
+                <strong>Закончить бой?</strong>
+                <p>Очередь, инициатива и боевые эффекты будут очищены.</p>
+                <div><button type="button" className="button" disabled={combatBusy} onClick={() => setConfirmStop(false)}>Отмена</button><button type="button" className="button danger" disabled={combatBusy} onClick={() => void stopCombat()}>Закончить бой</button></div>
+              </div>
+            )}
           </>
         )}
       </section>

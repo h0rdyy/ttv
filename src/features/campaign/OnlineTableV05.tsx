@@ -17,6 +17,7 @@ import { TabletopShellV2 } from './TabletopShellV2';
 import { actorMedia, actorMediaUrl } from './actorMedia';
 import type { ActorSheetTemplate } from './actorSheets';
 import type { FogReveal } from './OnlineSceneTools';
+import type { CombatRuntime } from './combat';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -55,7 +56,6 @@ type ItemDefinition = {
   properties: Record<string, any>;
   effects: any[];
 };
-type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
 type ActorContextMenu = { actorId: string; x: number; y: number };
@@ -76,7 +76,7 @@ type Props = {
   initialSheetTemplates: ActorSheetTemplate[];
   initialNotes: Note[];
   initialRollTables: RollTable[];
-  initialRuntime: Runtime;
+  initialRuntime: CombatRuntime;
 };
 
 export function OnlineTableV05(props: Props) {

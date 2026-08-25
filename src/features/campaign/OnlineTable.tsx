@@ -12,6 +12,7 @@ import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
 import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
 import { actorMedia, actorMediaUrl } from './actorMedia';
+import { combatEffectsForActor, combatInitiative, type CombatRuntime } from './combat';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -49,7 +50,6 @@ type ItemDefinition = {
   properties: Record<string, any>;
   effects: any[];
 };
-type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
 type Camera = { zoom: number; x: number; y: number };
@@ -71,7 +71,7 @@ type Props = {
   initialItemDefinitions: ItemDefinition[];
   initialNotes: Note[];
   initialRollTables: RollTable[];
-  initialRuntime: Runtime;
+  initialRuntime: CombatRuntime;
   selectedActorId: string;
   onSelectActor: (id: string) => void;
 };
@@ -511,17 +511,6 @@ export function OnlineTable(props: Props) {
     }
   };
 
-  const combatAction = async (action: 'start' | 'next' | 'stop') => {
-    setBusy(true); setMessage('');
-    const supabase = createClient();
-    const rpc = action === 'start' ? 'start_campaign_combat' : action === 'next' ? 'next_campaign_combat_turn' : 'stop_campaign_combat';
-    const { error } = await supabase.rpc(rpc, { target_campaign: campaign.id });
-    if (error) setMessage(friendlyError(error, action === 'start' ? 'Не удалось начать бой.' : 'Не удалось изменить ход боя.'));
-    else scheduleRefresh();
-    setBusy(false);
-  };
-
-
   const selectToken = (tokenId: string, actorId: string, additive: boolean) => {
     if (mode !== 'gm') {
       setSelectedActorId(actorId);
@@ -864,7 +853,6 @@ export function OnlineTable(props: Props) {
             busy={busy}
             onCreateHero={() => void createPlayerActor()}
             onHp={(actor, delta) => void changeHp(actor, delta)}
-            onCombat={(action) => void combatAction(action)}
             onOpenWorkshop={() => { setWorkshopOpen(true); setSceneToolsOpen(false); }}
             onChanged={scheduleRefresh}
             onMessage={setMessage}
@@ -956,7 +944,7 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
   );
 }
 
-function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
+function CombatCard({ runtime, actors }: { runtime: CombatRuntime; actors: Actor[] }) {
   const order = runtime.combat_order
     .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
     .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
@@ -964,6 +952,20 @@ function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) 
   const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
   return (
     <section className="online-combat-card">
+      {runtime.combat_active && (
+        <div className="combat-v06-player-summary" aria-label="Инициатива и эффекты">
+          {order.map(({ actor }) => {
+            const effects = combatEffectsForActor(runtime, actor.id);
+            return (
+              <div key={`v06-${actor.id}`}>
+                <span>Инициатива {combatInitiative(runtime, actor.id)}</span>
+                <strong>{actor.name}</strong>
+                {effects.length > 0 && <small>{effects.map((effect) => effect.name).join(' · ')}</small>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
       {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? 'Ход мастера'}</b></div><div className="online-combat-order">{order.map(({ actor, index }, visibleIndex) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{visibleIndex + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
     </section>

@@ -29,7 +29,7 @@ if (!installedRunnerIsCurrent()) {
       '--package-lock=false',
       `vitest@${VITEST_VERSION}`,
     ],
-    { stdio: 'inherit' },
+    { stdio: 'inherit', shell: process.platform === 'win32' },
   );
 
   if (install.error) throw install.error;

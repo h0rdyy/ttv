@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { OnlineTableV05 } from './OnlineTableV05';
+import { normalizeCombatControl, normalizeCombatEffects, normalizeCombatInitiative, type CombatRuntime } from './combat';
 
 const SCENE_SELECT = 'id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,measurement_unit,measurement_units_per_map_width,created_at';
 const LEGACY_SCENE_SELECT = 'id,campaign_id,name,background_url,background_path,grid_enabled,fog_enabled,grid_size,grid_offset_x,grid_offset_y,grid_snap,fog_reveals,created_at';
@@ -32,16 +33,39 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect('/login');
 
-  const [{ data: campaign }, { data: membership }, { data: runtime }] = await Promise.all([
+  const [{ data: campaign }, { data: membership }, runtimeResult] = await Promise.all([
     supabase.from('campaigns').select('id,name,description,owner_id,active_scene_id').eq('id', campaignId).maybeSingle(),
     supabase.from('campaign_members').select('role').eq('campaign_id', campaignId).eq('user_id', auth.user.id).maybeSingle(),
-    supabase.from('campaign_runtime').select('campaign_id,combat_active,combat_round,combat_turn,combat_order,updated_at').eq('campaign_id', campaignId).maybeSingle(),
+    supabase.from('campaign_runtime').select('campaign_id,combat_active,combat_round,combat_turn,combat_order,combat_initiative,combat_effects,combat_control,updated_at').eq('campaign_id', campaignId).maybeSingle(),
   ]);
 
   if (!campaign || !membership) redirect('/campaigns/online');
 
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(membership.role);
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
+
+  // Keep the table available during a rolling deploy before migration 0029 lands.
+  let rawRuntime = runtimeResult.data as Record<string, unknown> | null;
+  if (runtimeResult.error) {
+    const legacyRuntime = await supabase
+      .from('campaign_runtime')
+      .select('campaign_id,combat_active,combat_round,combat_turn,combat_order,updated_at')
+      .eq('campaign_id', campaignId)
+      .maybeSingle();
+    rawRuntime = legacyRuntime.data as Record<string, unknown> | null;
+  }
+
+  const runtime: CombatRuntime = {
+    campaign_id: typeof rawRuntime?.campaign_id === 'string' ? rawRuntime.campaign_id : campaignId,
+    combat_active: rawRuntime?.combat_active === true,
+    combat_round: Number.isInteger(rawRuntime?.combat_round) ? Number(rawRuntime?.combat_round) : 1,
+    combat_turn: Number.isInteger(rawRuntime?.combat_turn) ? Number(rawRuntime?.combat_turn) : 0,
+    combat_order: Array.isArray(rawRuntime?.combat_order) ? rawRuntime.combat_order.filter((id): id is string => typeof id === 'string') : [],
+    combat_initiative: normalizeCombatInitiative(rawRuntime?.combat_initiative),
+    combat_effects: normalizeCombatEffects(rawRuntime?.combat_effects),
+    combat_control: normalizeCombatControl(rawRuntime?.combat_control),
+    updated_at: typeof rawRuntime?.updated_at === 'string' ? rawRuntime.updated_at : new Date(0).toISOString(),
+  };
 
   const [sceneResult, actorResult, inventoryResult, definitionResult, sheetTemplateResult] = await Promise.all([
     supabase.from('scenes').select(SCENE_SELECT).eq('campaign_id', campaignId).order('created_at'),
@@ -133,14 +157,7 @@ export async function OnlineGameRoom({ campaignId, mode }: { campaignId: string;
       initialSheetTemplates={sheetTemplates}
       initialNotes={notes ?? []}
       initialRollTables={rollTables ?? []}
-      initialRuntime={runtime ?? {
-        campaign_id: campaignId,
-        combat_active: false,
-        combat_round: 1,
-        combat_turn: 0,
-        combat_order: [],
-        updated_at: new Date(0).toISOString(),
-      }}
+      initialRuntime={runtime}
     />
   );
 }
