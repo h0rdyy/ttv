@@ -13,6 +13,7 @@ import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
 import { actorMedia, actorMediaUrl } from './actorMedia';
 import { combatEffectsForActor, combatInitiative, type CombatRuntime } from './combat';
+import { nextTokenSelection } from './tokenSelection';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -99,6 +100,7 @@ export function OnlineTable(props: Props) {
   const [fogDraft, setFogDraft] = useState<FogReveal | null>(null);
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
+  const [failedTokenMediaUrls, setFailedTokenMediaUrls] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [camera, setCamera] = useState<Camera>({ zoom: 1, x: 0, y: 0 });
@@ -127,6 +129,7 @@ export function OnlineTable(props: Props) {
   useEffect(() => setRollTables(props.initialRollTables), [props.initialRollTables]);
   useEffect(() => setRuntime(props.initialRuntime), [props.initialRuntime]);
   useEffect(() => setDiceHistory([]), [props.campaign.id]);
+  useEffect(() => setFailedTokenMediaUrls(new Set()), [props.campaign.id]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
@@ -512,26 +515,21 @@ export function OnlineTable(props: Props) {
   };
 
   const selectToken = (tokenId: string, actorId: string, additive: boolean) => {
-    if (mode !== 'gm') {
-      setSelectedActorId(actorId);
-      setSelectedTokenIds([tokenId]);
-      return;
-    }
-    if (additive) {
-      setSelectedTokenIds((current) => {
-        if (current.includes(tokenId)) {
-          const next = current.filter((id) => id !== tokenId);
-          const primary = tokens.find((token) => next.includes(token.id));
-          setSelectedActorId(primary?.actor_id ?? '');
-          return next;
-        }
-        setSelectedActorId(actorId);
-        return [...current, tokenId];
-      });
-      return;
-    }
-    setSelectedTokenIds([tokenId]);
-    setSelectedActorId(actorId);
+    const next = nextTokenSelection(selectedTokenIds, tokenId, mode === 'gm' && additive);
+    const primaryActorId = next.includes(tokenId)
+      ? actorId
+      : tokens.find((token) => next.includes(token.id))?.actor_id ?? '';
+    setSelectedTokenIds(next);
+    setSelectedActorId(primaryActorId);
+  };
+
+  const markTokenMediaFailed = (url: string) => {
+    setFailedTokenMediaUrls((current) => {
+      if (current.has(url)) return current;
+      const next = new Set(current);
+      next.add(url);
+      return next;
+    });
   };
 
   const clearTokenSelection = () => {
@@ -749,7 +747,11 @@ export function OnlineTable(props: Props) {
                   if (hiddenByFog && draggingTokenId !== token.id) return null;
                   const canMove = !fogDrawMode && (mode === 'gm' || actor.owner_user_id === currentUserId);
                   const media = actorMedia(actor.system_data);
-                  const tokenArtUrl = actorMediaUrl(campaign.id, actor.id, 'token', media.tokenPath);
+                  const rawTokenArtUrl = actorMediaUrl(campaign.id, actor.id, 'token', media.tokenPath);
+                  const rawAvatarUrl = actorMediaUrl(campaign.id, actor.id, 'avatar', media.avatarPath);
+                  const tokenArtUrl = rawTokenArtUrl && !failedTokenMediaUrls.has(rawTokenArtUrl) ? rawTokenArtUrl : null;
+                  const avatarUrl = rawAvatarUrl && !failedTokenMediaUrls.has(rawAvatarUrl) ? rawAvatarUrl : null;
+                  const tokenEffects = runtime.combat_active ? combatEffectsForActor(runtime, actor.id) : [];
                   const isSelected = selectedTokenIds.includes(token.id) || (selectedTokenIds.length === 0 && selectedActorId === actor.id);
                   return (
                     <button
@@ -778,20 +780,33 @@ export function OnlineTable(props: Props) {
                       }}
                       onClick={(event) => {
                         event.stopPropagation();
+                        if (event.detail !== 0) return;
                         const additive = mode === 'gm' && (event.shiftKey || event.metaKey || event.ctrlKey);
                         selectToken(token.id, actor.id, additive);
                       }}
                       title={mode === 'gm'
-                        ? `${actor.name} · Shift+клик — несколько`
+                        ? `${actor.name}${tokenEffects.length ? ` · ${tokenEffects.map((effect) => effect.name).join(', ')}` : ''} · Shift+клик — несколько`
                         : canMove ? `${actor.name} — можно перемещать` : actor.name}
                     >
                       {tokenArtUrl ? (
-                        <span className="token-character-art" aria-hidden="true"><img src={tokenArtUrl} alt="" draggable={false} /></span>
+                        <span className="token-character-art" aria-hidden="true"><img src={tokenArtUrl} alt="" draggable={false} onError={() => markTokenMediaFailed(tokenArtUrl)} /></span>
+                      ) : avatarUrl ? (
+                        <span className="token-avatar token-avatar-image"><img src={avatarUrl} alt="" draggable={false} onError={() => markTokenMediaFailed(avatarUrl)} /></span>
                       ) : (
                         <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
                       )}
                       <span className="token-name">{actor.name}</span>
                       <span className="token-hp"><i style={{ width: `${hpPct}%` }}/></span>
+                      {tokenEffects.length > 0 && (
+                        <span className="token-combat-effects" aria-label={`Эффекты: ${tokenEffects.map((effect) => effect.name).join(', ')}`}>
+                          {tokenEffects.map((effect) => (
+                            <span key={effect.id} className={`token-combat-effect ${effect.kind}`} title={`${effect.name}${effect.remainingRounds === null ? ' · без срока' : ` · ${effect.remainingRounds} раунд.`}`}>
+                              <b>{effect.name}</b>
+                              {effect.remainingRounds !== null && <i>{effect.remainingRounds}</i>}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {token.hidden && mode === 'gm' && <em className="hidden-token-mark">скрыт</em>}
                     </button>
                   );
