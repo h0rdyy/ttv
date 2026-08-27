@@ -8,7 +8,8 @@ import { friendlyError } from '@/lib/friendlyError';
 import { useCampaignRealtime } from './useCampaignRealtime';
 import { OnlineGmWorkshop } from './OnlineGmWorkshop';
 import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
-import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
+import { OnlineSceneTools } from './OnlineSceneTools';
+import { isMeaningfulReveal, isPointRevealed, type FogReveal } from './fog';
 import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
 import { actorMedia, actorMediaUrl } from './actorMedia';
@@ -457,7 +458,7 @@ export function OnlineTable(props: Props) {
     const draft = fogDraft;
     fogStartRef.current = null;
     setFogDraft(null);
-    if (!draft || !activeScene || draft.width < 0.5 || draft.height < 0.5) return;
+    if (!draft || !activeScene || !isMeaningfulReveal(draft)) return;
     const reveal = { ...draft, id: crypto.randomUUID() };
     const reveals = [...(activeScene.fog_reveals ?? []), reveal];
     setScenes((current) => current.map((scene) => scene.id === activeScene.id ? { ...scene, fog_reveals: reveals } : scene));
@@ -927,10 +928,6 @@ function FogLayer({ reveals, draft, gm }: { reveals: FogReveal[]; draft: FogReve
       {gm && draft && <rect x={draft.x} y={draft.y} width={draft.width} height={draft.height} className="fog-draft-outline" />}
     </svg>
   );
-}
-
-function isPointRevealed(position: { x: number; y: number }, reveals: FogReveal[]) {
-  return reveals.some((reveal) => position.x >= reveal.x && position.x <= reveal.x + reveal.width && position.y >= reveal.y && position.y <= reveal.y + reveal.height);
 }
 
 function ActorCard({ actor }: { actor: Actor }) {

@@ -16,7 +16,7 @@ import { TabletopSceneSwitcher } from './TabletopSceneSwitcher';
 import { TabletopShellV2 } from './TabletopShellV2';
 import { actorMedia, actorMediaUrl } from './actorMedia';
 import type { ActorSheetTemplate } from './actorSheets';
-import type { FogReveal } from './OnlineSceneTools';
+import type { FogReveal } from './fog';
 import type { CombatRuntime } from './combat';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';

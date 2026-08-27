@@ -69,3 +69,65 @@ export function combatParticipants<T extends CombatActor>(runtime: Pick<CombatRu
     return actor ? [actor] : [];
   });
 }
+
+/**
+ * Returns the actor whose turn is current, or null when combat is inactive,
+ * the order is empty, or the turn index is out of bounds.
+ */
+export function combatCurrentActor<T extends CombatActor>(
+  runtime: Pick<CombatRuntime, 'combat_active' | 'combat_order' | 'combat_turn'>,
+  actors: T[],
+): T | null {
+  if (!runtime.combat_active) return null;
+  if (runtime.combat_turn < 0 || runtime.combat_turn >= runtime.combat_order.length) return null;
+  const id = runtime.combat_order[runtime.combat_turn];
+  if (!id) return null;
+  return actors.find((actor) => actor.id === id) ?? null;
+}
+
+/**
+ * Advances the turn pointer. When it wraps past the last actor, the round
+ * counter increments and effect durations decrement. Permanent effects
+ * (remainingRounds === null) are preserved. Returns the updated runtime.
+ */
+export function advanceCombatTurn(runtime: CombatRuntime): CombatRuntime {
+  if (!runtime.combat_active || runtime.combat_order.length === 0) return runtime;
+  const safeTurn = Math.max(0, Math.min(runtime.combat_turn, runtime.combat_order.length - 1));
+  const isLast = safeTurn >= runtime.combat_order.length - 1;
+  if (!isLast) {
+    return { ...runtime, combat_turn: safeTurn + 1, updated_at: new Date().toISOString() };
+  }
+  // Round wrap: bump round, reset turn, decrement effect durations.
+  const nextRound = runtime.combat_round + 1;
+  const nextEffects = runtime.combat_effects
+    .map((effect) => effect.remainingRounds === null
+      ? effect
+      : { ...effect, remainingRounds: effect.remainingRounds - 1 })
+    .filter((effect) => effect.remainingRounds === null || effect.remainingRounds > 0);
+  return {
+    ...runtime,
+    combat_round: nextRound,
+    combat_turn: 0,
+    combat_effects: nextEffects,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Returns the combat order sorted by initiative (descending), with ties broken
+ * by the existing stored position. This is the canonical ordering the UI
+ * should display — `combat_order` itself remains the source of truth for turns.
+ */
+export function sortByInitiative<T extends CombatActor>(
+  runtime: Pick<CombatRuntime, 'combat_initiative' | 'combat_order'>,
+  actors: T[],
+): T[] {
+  const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+  const storedIndex = new Map(runtime.combat_order.map((id, index) => [id, index]));
+  return runtime.combat_order
+    .map((id) => actorById.get(id))
+    .filter((actor): actor is T => Boolean(actor))
+    .map((actor) => ({ actor, init: combatInitiative(runtime, actor.id), order: storedIndex.get(actor.id) ?? 0 }))
+    .sort((a, b) => b.init - a.init || a.order - b.order)
+    .map((entry) => entry.actor);
+}
