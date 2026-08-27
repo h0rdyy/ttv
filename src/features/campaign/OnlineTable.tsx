@@ -15,6 +15,7 @@ import { type DiceRoll, mergeDiceRollHistory } from './dice';
 import { actorMedia, actorMediaUrl } from './actorMedia';
 import { combatEffectsForActor, combatInitiative, type CombatRuntime } from './combat';
 import { nextTokenSelection } from './tokenSelection';
+import { bulkSummary, partitionBulkResults, safeBulk } from './bulkOperations';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -544,19 +545,27 @@ export function OnlineTable(props: Props) {
     setMessage('');
     const supabase = createClient();
     const ids = [...selectedTokenIds];
-    const results = await Promise.all(ids.map((tokenId) => supabase.rpc('update_scene_token', {
+    const results = await Promise.all(ids.map((tokenId) => safeBulk(supabase.rpc('update_scene_token', {
       target_campaign: campaign.id,
       target_token: tokenId,
       token_hidden: hidden,
       token_size: null,
-    })));
-    const failed = results.find((result) => result.error)?.error;
-    if (failed) setMessage(friendlyError(failed, hidden ? 'Не удалось скрыть фишки.' : 'Не удалось показать фишки.'));
-    else {
-      setTokens((current) => current.map((token) => ids.includes(token.id) ? { ...token, hidden } : token));
-      setMessage(hidden ? `Скрыто фишек: ${ids.length}` : `Показано фишек: ${ids.length}`);
-      scheduleRefresh();
+    }))));
+    const { succeeded, failed } = partitionBulkResults(ids, results);
+    const succeededIds = new Set(succeeded.map((entry) => entry.item));
+    if (succeededIds.size) {
+      setTokens((current) => current.map((token) => succeededIds.has(token.id) ? { ...token, hidden } : token));
     }
+    const verb = hidden ? 'Скрыто фишек' : 'Показано фишек';
+    if (failed.length) {
+      const firstError = failed[0]?.error;
+      const fallback = hidden ? 'Не удалось скрыть все фишки.' : 'Не удалось показать все фишки.';
+      const base = firstError ? friendlyError(firstError, fallback) : fallback;
+      setMessage(`${base} ${bulkSummary(verb, succeeded.length, failed.length)}`);
+    } else {
+      setMessage(bulkSummary(verb, succeeded.length, 0));
+    }
+    if (succeeded.length) scheduleRefresh();
     setBulkBusy(false);
   };
 
@@ -567,18 +576,24 @@ export function OnlineTable(props: Props) {
     setMessage('');
     const supabase = createClient();
     const ids = [...selectedTokenIds];
-    const results = await Promise.all(ids.map((tokenId) => supabase.rpc('remove_scene_token', {
+    const results = await Promise.all(ids.map((tokenId) => safeBulk(supabase.rpc('remove_scene_token', {
       target_campaign: campaign.id,
       target_token: tokenId,
-    })));
-    const failed = results.find((result) => result.error)?.error;
-    if (failed) setMessage(friendlyError(failed, 'Не удалось убрать фишки со сцены.'));
-    else {
-      setTokens((current) => current.filter((token) => !ids.includes(token.id)));
-      clearTokenSelection();
-      setMessage(`Убрано со сцены: ${ids.length}`);
-      scheduleRefresh();
+    }))));
+    const { succeeded, failed } = partitionBulkResults(ids, results);
+    const succeededIds = new Set(succeeded.map((entry) => entry.item));
+    if (succeededIds.size) {
+      setTokens((current) => current.filter((token) => !succeededIds.has(token.id)));
+      setSelectedTokenIds((current) => current.filter((id) => !succeededIds.has(id)));
     }
+    if (failed.length) {
+      const firstError = failed[0]?.error;
+      const base = firstError ? friendlyError(firstError, 'Не удалось убрать все фишки со сцены.') : 'Не удалось убрать все фишки со сцены.';
+      setMessage(`${base} ${bulkSummary('Убрано со сцены', succeeded.length, failed.length)}`);
+    } else {
+      setMessage(bulkSummary('Убрано со сцены', succeeded.length, 0));
+    }
+    if (succeeded.length) scheduleRefresh();
     setBulkBusy(false);
   };
 
