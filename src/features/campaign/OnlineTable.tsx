@@ -13,7 +13,7 @@ import { isMeaningfulReveal, isPointRevealed, type FogReveal } from './fog';
 import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
 import { actorMedia, actorMediaUrl } from './actorMedia';
-import { combatEffectsForActor, combatInitiative, type CombatRuntime } from './combat';
+import { combatEffectsForActor, combatInitiative, combatCurrentActor, type CombatRuntime } from './combat';
 import { nextTokenSelection } from './tokenSelection';
 import { bulkSummary, partitionBulkResults, safeBulk } from './bulkOperations';
 
@@ -216,10 +216,16 @@ export function OnlineTable(props: Props) {
     onDiceRoll,
   });
 
+  const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
+  const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
+  const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
+
   const activeScene = scenes.find((scene) => scene.id === campaign.active_scene_id) ?? scenes[0] ?? null;
-  const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? null;
+  const selectedActor = selectedActorId ? actorById.get(selectedActorId) ?? null : null;
   const ownActor = actors.find((actor) => actor.owner_user_id === currentUserId) ?? null;
   const sidebarActor = mode === 'player' ? ownActor : selectedActor;
+  const selectedInventory = inventoryForActor(sidebarActor?.id);
+  const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(role);
 
   useEffect(() => {
@@ -259,15 +265,10 @@ export function OnlineTable(props: Props) {
 
   useEffect(() => {
     if (mode === 'player' && ownActor && selectedActorId !== ownActor.id) setSelectedActorId(ownActor.id);
-    if (mode === 'gm' && selectedActorId && !actors.some((actor) => actor.id === selectedActorId)) {
+    if (mode === 'gm' && selectedActorId && !actorById.has(selectedActorId)) {
       setSelectedActorId(actors.find((actor) => actor.type === 'player')?.id ?? actors[0]?.id ?? '');
     }
-  }, [actors, mode, ownActor, selectedActorId, setSelectedActorId]);
-
-  const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
-  const selectedInventory = inventoryForActor(sidebarActor?.id);
-  const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
-  const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
+  }, [actors, actorById, mode, ownActor, selectedActorId, setSelectedActorId]);
 
   const createScene = async () => {
     const name = window.prompt('Название новой сцены', 'Новая сцена')?.trim();
@@ -600,7 +601,7 @@ export function OnlineTable(props: Props) {
   const selectAllNpcTokens = () => {
     if (mode !== 'gm' || !activeScene) return;
     const npcTokenIds = tokens.filter((token) => {
-      const actor = actors.find((value) => value.id === token.actor_id);
+      const actor = actorById.get(token.actor_id);
       return actor && actor.type !== 'player';
     }).map((token) => token.id);
     setSelectedTokenIds(npcTokenIds);
@@ -754,7 +755,7 @@ export function OnlineTable(props: Props) {
                 )}
 
                 {tokens.map((token) => {
-                  const actor = actors.find((value) => value.id === token.actor_id);
+                  const actor = actorById.get(token.actor_id);
                   if (!actor) return null;
                   const hp = actor.system_data?.hp;
                   const hpPct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
@@ -971,11 +972,11 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
 }
 
 function CombatCard({ runtime, actors }: { runtime: CombatRuntime; actors: Actor[] }) {
+  const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
   const order = runtime.combat_order
-    .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
+    .map((id, index) => ({ actor: actorById.get(id) ?? null, index }))
     .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
-  const currentId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] : null;
-  const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
+  const current = runtime.combat_active ? combatCurrentActor(runtime, actors) : null;
   return (
     <section className="online-combat-card">
       {runtime.combat_active && (
@@ -1002,7 +1003,8 @@ function EmptyPlayerState({ campaignName, text }: { campaignName: string; text: 
   return <main className="auth-page"><section className="auth-card"><div className="brand">✦ TTV</div><span className="eyebrow">{campaignName}</span><h1>Стол ещё готовится</h1><p>{text}</p><Link className="button" href="/campaigns/online">К кампаниям</Link></section></main>;
 }
 
+const STAT_LABELS: Record<string, string> = { armor: 'Защита', level: 'Уровень', strength: 'Сила', agility: 'Ловкость', mana: 'Мана' };
+
 function statLabel(key: string) {
-  const labels: Record<string,string> = { armor:'Защита', level:'Уровень', strength:'Сила', agility:'Ловкость', mana:'Мана' };
-  return labels[key] ?? key;
+  return STAT_LABELS[key] ?? key;
 }
