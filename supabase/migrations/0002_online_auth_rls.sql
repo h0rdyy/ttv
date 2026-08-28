@@ -39,6 +39,20 @@ $$;
 revoke all on function public.create_campaign(text,text,text,text,text) from public, anon;
 grant execute on function public.create_campaign(text,text,text,text,text) to authenticated;
 
+-- A campaign owner must be able to bootstrap their own membership before
+-- is_campaign_gm() can become true for the newly-created campaign.
+create policy campaign_members_owner_bootstrap_insert
+on public.campaign_members
+for insert
+with check (
+  user_id = auth.uid()
+  and role = 'owner'
+  and exists (
+    select 1 from public.campaigns c
+    where c.id = campaign_id and c.owner_id = auth.uid()
+  )
+);
+
 create or replace function public.campaign_for_scene(target_scene uuid) returns uuid language sql stable security definer set search_path=public as $$ select campaign_id from public.scenes where id=target_scene $$;
 create or replace function public.campaign_for_inventory(target_inventory uuid) returns uuid language sql stable security definer set search_path=public as $$ select campaign_id from public.inventories where id=target_inventory $$;
 create or replace function public.campaign_for_container(target_container uuid) returns uuid language sql stable security definer set search_path=public as $$ select i.campaign_id from public.inventory_containers c join public.inventories i on i.id=c.inventory_id where c.id=target_container $$;

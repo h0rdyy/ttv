@@ -1,0 +1,19 @@
+/* Final responsive guard for TabletopShell v2.
+   Older shell experiments also define <=860px grid rows; v2 must remain the
+   authoritative layout and must not inherit the old two-row GM safe-zone grid. */
+
+@media (max-width: 900px) {
+  .v05-table-layer.tabletop-shell-v2 .gm-mode .online-table-workspace,
+  .v05-table-layer.tabletop-shell-v2 .gm-mode .online-table-workspace:has(.gm-library.collapsed),
+  .v05-table-layer.tabletop-shell-v2 .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
+    grid-template-columns: var(--v2-rail) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    grid-template-areas: "library map" !important;
+  }
+
+  .v05-table-layer.tabletop-shell-v2 .gm-mode .online-table-workspace:has(.gm-library.expanded) {
+    grid-template-columns: var(--v2-rail) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    grid-template-areas: "library map" !important;
+  }
+}

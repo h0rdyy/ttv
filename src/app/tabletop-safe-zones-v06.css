@@ -1,0 +1,266 @@
+/* Final tabletop safe-zone layer.
+   Persistent controls get separate viewport edges; transient notices never
+   compete with the primary actions in the bottom-left corner. */
+
+.v05-table-layer.tabletop-shell-v3 {
+  --tabletop-edge-gap: 14px;
+  --tabletop-action-height: 44px;
+}
+
+/* Keep the primary bar compact. Labels remain available through title/aria,
+   while the active table mode keeps a visible text anchor. */
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar {
+  left: 50%;
+  bottom: var(--tabletop-edge-gap);
+  max-width: calc(100vw - 260px);
+  gap: 5px;
+  transform: translateX(-50%);
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button {
+  width: var(--tabletop-action-height);
+  min-width: var(--tabletop-action-height);
+  height: var(--tabletop-action-height);
+  padding: 0;
+  border-radius: 10px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button > strong {
+  display: none;
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar .context-ui-mode-chip {
+  width: auto;
+  min-width: 74px;
+  padding: 0 11px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar .context-ui-mode-chip > strong {
+  display: block;
+}
+
+/* Dice is a primary table action, so it keeps a readable label instead of
+   relying on an easy-to-miss icon. */
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button[data-action="dice"] {
+  width: auto;
+  min-width: 70px;
+  padding: 0 10px;
+}
+
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar > button[data-action="dice"] > strong {
+  display: block;
+}
+
+/* The player HUD already owns bottom-center, so the player's three compact
+   actions stay in a small dedicated slot on the left. */
+.v05-table-layer.tabletop-shell-v3 .context-ui-actionbar.player {
+  left: var(--tabletop-edge-gap);
+  max-width: calc(50vw - 280px);
+  transform: none;
+}
+
+/* Camera owns bottom-right instead of sharing the action bar's center. */
+.v05-table-layer.tabletop-shell-v3 .gm-mode .map-zoom-controls {
+  right: var(--tabletop-edge-gap) !important;
+  bottom: var(--tabletop-edge-gap) !important;
+  left: auto !important;
+  transform: none !important;
+}
+
+/* Context surfaces open above the centered action bar. Only one can be open
+   at a time, so they safely share this transient zone. */
+.v05-table-layer.tabletop-shell-v3 .context-mode-menu,
+.v05-table-layer.tabletop-shell-v3 .map-tools-palette {
+  left: 50%;
+  bottom: calc(var(--tabletop-edge-gap) + var(--tabletop-action-height) + 10px);
+  translate: -50% 0;
+}
+
+.v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette {
+  bottom: 94px;
+}
+
+/* The desktop dice tray is a true right drawer. Never translate its anchor:
+   translated ancestors change the containing block of fixed descendants and
+   used to collapse the tray into a bottom strip. */
+@media (min-width: 901px) {
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
+    top: calc(var(--v2-topbar, 44px) + 8px);
+    right: 8px;
+    bottom: 8px;
+    left: auto;
+    z-index: 116;
+    width: var(--v2-right-drawer, min(390px, 36vw));
+    translate: none;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open .dice-tray-v2 {
+    z-index: 1;
+  }
+}
+
+/* One shared notification surface. It is deliberately quiet, self-dismisses,
+   and stays away from map controls and bottom HUDs. */
+.tabletop-toast {
+  position: fixed;
+  top: calc(var(--v2-topbar, 44px) + 12px);
+  right: var(--tabletop-edge-gap, 14px);
+  z-index: 130;
+  width: min(360px, calc(100vw - 28px));
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid rgba(135, 103, 59, .58);
+  border-radius: 10px;
+  background: rgba(17, 13, 9, .94);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, .48);
+  color: #d4c09e;
+  font-size: 11px;
+  line-height: 1.35;
+  backdrop-filter: blur(14px);
+  animation: tabletop-toast-in .16s ease-out both;
+}
+
+.tabletop-toast > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tabletop-toast > button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8d7a60;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tabletop-toast > button:hover,
+.tabletop-toast > button:focus-visible {
+  outline: none;
+  background: #281c12;
+  color: #efd09a;
+}
+
+/* Movement feedback uses the same calm upper-right region, below a global
+   notice if one happens to be visible. */
+.v05-table-layer.tabletop-shell-v3.player-immersion .player-immersion-notice {
+  top: calc(var(--v2-topbar, 44px) + 12px);
+  right: var(--tabletop-edge-gap);
+  bottom: auto;
+  left: auto;
+  max-width: min(360px, calc(100vw - 28px));
+  transform: none;
+}
+
+.v05-table-layer.tabletop-shell-v3:has(.tabletop-toast) .player-immersion-notice {
+  top: calc(var(--v2-topbar, 44px) + 68px);
+}
+
+.v05-table-layer.tabletop-shell-v3.ui-chrome-hidden .tabletop-toast {
+  display: none;
+}
+
+@keyframes tabletop-toast-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 860px) {
+  .v05-table-layer.tabletop-shell-v3 .context-ui-actionbar {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    max-width: none;
+    justify-content: center;
+    transform: none;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .context-ui-actionbar.player {
+    left: 8px;
+    right: auto;
+    max-width: calc(100vw - 16px);
+    justify-content: flex-start;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .context-mode-menu,
+  .v05-table-layer.tabletop-shell-v3 .map-tools-palette {
+    left: 50%;
+    right: auto;
+    bottom: 62px;
+    width: min(390px, calc(100vw - 16px));
+    translate: -50% 0;
+  }
+
+  .v05-table-layer.tabletop-shell-v3.player-immersion .map-tools-palette {
+    bottom: 126px;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .gm-mode .map-zoom-controls {
+    top: calc(var(--v2-topbar, 44px) + 8px) !important;
+    right: 8px !important;
+    bottom: auto !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open {
+    top: auto;
+    right: 8px;
+    bottom: 62px;
+    left: 8px;
+    z-index: 116;
+    width: auto;
+    max-width: none;
+    justify-items: stretch;
+    translate: none;
+  }
+
+  .v05-table-layer.tabletop-shell-v3.player-immersion .dice-tray-anchor.open {
+    bottom: 126px;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .dice-tray-anchor.open .dice-tray-v2 {
+    width: 100%;
+    max-height: min(72dvh, 640px);
+  }
+}
+
+@media (max-width: 560px) {
+  .v05-table-layer.tabletop-shell-v3 {
+    --tabletop-edge-gap: 8px;
+    --tabletop-action-height: 40px;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .context-ui-actionbar .context-ui-mode-chip {
+    min-width: var(--tabletop-action-height);
+    padding: 0;
+  }
+
+  .v05-table-layer.tabletop-shell-v3 .context-ui-actionbar .context-ui-mode-chip > strong {
+    display: none;
+  }
+
+  .tabletop-toast {
+    top: calc(var(--v2-topbar, 44px) + 8px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  .v05-table-layer.tabletop-shell-v3.player-immersion .player-immersion-notice {
+    top: auto;
+    right: 8px;
+    bottom: 116px;
+    left: 8px;
+    max-width: none;
+    text-align: center;
+  }
+}

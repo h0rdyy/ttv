@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { type DiceRoll, parseDiceRoll } from './dice';
+import { removeRealtimeChannels } from './realtimeCleanup';
 
 type PresenceUser = {
   userId: string;
@@ -139,8 +140,7 @@ export function useCampaignRealtime({
       disposed = true;
       subscribedRef.current = false;
       channelRef.current = null;
-      void supabase.removeChannel(channel);
-      if (gmChannel) void supabase.removeChannel(gmChannel);
+      void removeRealtimeChannels(supabase, [channel, gmChannel]);
     };
   }, [campaignId, currentUserId, displayName, mode, onDiceRoll, onRemoteTokenMove, onStateChanged]);
 
