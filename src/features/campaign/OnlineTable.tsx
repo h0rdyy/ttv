@@ -635,6 +635,13 @@ export function OnlineTable(props: Props) {
             <strong>{campaign.name}</strong>
             <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
           </div>
+          {mode === 'gm' && scenes.length > 0 && (
+            <div className="online-scene-controls">
+              <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
+                {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="map-zoom-controls">
             <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
             <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
@@ -664,13 +671,6 @@ export function OnlineTable(props: Props) {
         </div>
 
         <div className="online-table-topbar-secondary">
-          {mode === 'gm' && scenes.length > 0 && (
-            <div className="online-scene-controls">
-              <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
-                {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-              </select>
-            </div>
-          )}
           {mode === 'gm' && (
             <div className="online-topbar-menu" data-topbar-menu-root="true">
               <button
