@@ -7,31 +7,8 @@ import './player-switch.css';
 import './auth.css';
 import './online-table.css';
 import './online-table-contextual.css';
-import './online-table-immersion.css';
 import './scene-v04.css';
-import './scene-measurement.css';
 import './sheet-v05.css';
-import './online-table-immersion-v2.css';
-import './player-character-window.css';
-import './tabletop-ui-focus.css';
-import './tabletop-shell.css';
-import './tabletop-shell-v2.css';
-import './tabletop-shell-v2-responsive.css';
-import './tabletop-shell-v2-dice.css';
-import './tabletop-context-ui.css';
-import './tabletop-context-ui-zones.css';
-import './map-interaction-tools.css';
-import './tabletop-polish.css';
-import './dice-tray-v2.css';
-import './character-confirm.css';
-import './scene-switcher.css';
-import './item-builder-polish.css';
-import './gm-inspector-polish.css';
-import './tabletop-rpg-hud.css';
-import './token-art-quality.css';
-import './gm-token-bulk.css';
-import './combat-v06.css';
-import './tabletop-safe-zones-v06.css';
 
 export const metadata: Metadata = {
   title: 'TTV — виртуальный стол кампании',

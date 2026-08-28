@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 import { MapCropDialog } from './MapCropDialog';
-import type { FogReveal } from './fog';
 
 type Scene = {
   id: string;
@@ -21,6 +20,7 @@ type Scene = {
 
 type Actor = { id: string; type: string; name: string; avatar: string };
 type Token = { id: string; actor_id: string; hidden: boolean; size: number };
+export type FogReveal = { id: string; x: number; y: number; width: number; height: number };
 
 type Props = {
   campaignId: string;

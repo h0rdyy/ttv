@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { actors, campaign, scene } from '@/data/demo';
 import { getCampaignPreset } from '@/config/campaignPresets';
-import { LocalDiceTray } from '@/features/campaign/DiceTray';
 import { useCampaignStore } from '@/store/useCampaignStore';
 
 const playerTabs = [
@@ -156,7 +155,6 @@ export function PlayerView() {
           </div>
         </aside>
       </main>
-      <LocalDiceTray mode="player" displayName={player.name} />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { actors, campaign, scene } from '@/data/demo';
 import type { Inventory } from '@/domain/types';
 import { useCampaignStore } from '@/store/useCampaignStore';
 import { getCampaignPreset } from '@/config/campaignPresets';
-import { LocalDiceTray } from '@/features/campaign/DiceTray';
 import { ItemWorkshop } from './workshop/ItemWorkshop';
 import { NpcWorkshop } from './workshop/NpcWorkshop';
 import { LootWorkshop } from './workshop/LootWorkshop';
@@ -240,7 +239,6 @@ export function DmDashboard() {
           )}
         </aside>
       </main>
-      <LocalDiceTray mode="gm" displayName="Мастер" />
     </div>
   );
 }

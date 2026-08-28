@@ -1,16 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
-import {
-  combatEffectsForActor,
-  combatInitiative,
-  combatParticipants,
-  type CombatControl,
-  type CombatEffectKind,
-  type CombatRuntime,
-} from './combat';
 
 export type GmSidebarTab = 'session' | 'characters' | 'content' | 'notes' | 'party';
 
@@ -28,9 +20,8 @@ type Inventory = { id: string; owner_actor_id: string };
 type Container = { id: string; inventory_id: string; name: string; type: string; capacity: number | null; sort_order: number };
 type ItemInstance = { id: string; definition_id: string; container_id: string; quantity: number; custom_name: string | null; equipped: boolean; state: Record<string, any> };
 type ItemDefinition = { id: string; name: string; category: string; icon: string; weight: number | null };
+type Runtime = { combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[] };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
-type HealthValue = { current: number; max: number };
-type OptimisticHealth = HealthValue & { actorId: string };
 
 type Props = {
   campaignId: string;
@@ -43,11 +34,12 @@ type Props = {
   containers: Container[];
   instances: ItemInstance[];
   items: ItemDefinition[];
-  runtime: CombatRuntime;
+  runtime: Runtime;
   notes: Note[];
   busy: boolean;
   onCreateHero: () => void;
   onHp: (actor: Actor, delta: number) => void;
+  onCombat: (action: 'start' | 'next' | 'stop') => void;
   onOpenWorkshop: () => void;
   onChanged: () => void;
   onMessage: (message: string) => void;
@@ -147,16 +139,13 @@ function CharacterLibrary({ campaignId, actors, selectedActorId, onSelectActor, 
     setCreatingNpc(false);
   };
 
-  const actorRow = (actor: Actor) => {
-    const health = actorHealth(actor.system_data);
-    return (
-      <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
-        <span className="gm-library-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
-        <span><strong>{actor.name}</strong><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
-        <em>{health?.current ?? '—'}</em>
-      </button>
-    );
-  };
+  const actorRow = (actor: Actor) => (
+    <button key={actor.id} className={`gm-library-actor ${selectedActorId === actor.id ? 'selected' : ''}`} onClick={() => onSelectActor(actor.id)}>
+      <span className="gm-library-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+      <span><strong>{actor.name}</strong><small>{actor.subtitle || (actor.type === 'player' ? 'Персонаж игрока' : 'Персонаж мира')}</small></span>
+      <em>{actor.system_data?.hp?.current ?? '—'}</em>
+    </button>
+  );
 
   return (
     <>
@@ -202,107 +191,13 @@ function ContentLibrary({ items, instances, onOpenWorkshop }: Props) {
   );
 }
 
-function SessionLibrary({ campaignId, runtime, actors, selectedActorId, onSelectActor, busy, onChanged, onMessage }: Props) {
-  const order = combatParticipants(runtime, actors);
+function SessionLibrary({ runtime, actors, busy, onCombat }: Props) {
+  const order = runtime.combat_order
+    .map((id) => actors.find((actor) => actor.id === id))
+    .filter((actor): actor is Actor => Boolean(actor));
   const current = runtime.combat_active ? order[runtime.combat_turn] ?? null : null;
   const heroes = actors.filter((actor) => actor.type === 'player').length;
   const npcs = actors.length - heroes;
-  const [setupControl, setSetupControl] = useState<CombatControl>('automatic');
-  const [manualInitiative, setManualInitiative] = useState<Record<string, number>>({});
-  const [combatBusy, setCombatBusy] = useState(false);
-  const [healthAmount, setHealthAmount] = useState(1);
-  const [effectName, setEffectName] = useState('');
-  const [effectKind, setEffectKind] = useState<CombatEffectKind>('condition');
-  const [effectDuration, setEffectDuration] = useState('');
-  const [confirmStop, setConfirmStop] = useState(false);
-  const target = actors.find((actor) => actor.id === selectedActorId) ?? current;
-
-  const callCombatRpc = async (rpc: string, args: Record<string, unknown>, fallback: string) => {
-    setCombatBusy(true);
-    const supabase = createClient();
-    const { error } = await supabase.rpc(rpc, args);
-    if (error) onMessage(friendlyError(error, fallback));
-    else onChanged();
-    setCombatBusy(false);
-    return !error;
-  };
-
-  const startCombat = async () => {
-    const ok = await callCombatRpc('start_campaign_combat_v06', {
-      target_campaign: campaignId,
-      initiative_mode: setupControl,
-      manual_initiative: manualInitiative,
-    }, 'Не удалось начать бой. Проверьте, что на активной сцене есть видимые фишки.');
-    if (ok) onMessage(setupControl === 'automatic' ? 'Бой начат. Инициатива определена автоматически.' : 'Бой начат с ручной инициативой.');
-  };
-
-  const setInitiative = async (actorId: string, value: number) => {
-    if (!Number.isFinite(value)) return;
-    await callCombatRpc('set_campaign_combat_initiative', {
-      target_campaign: campaignId,
-      target_actor: actorId,
-      initiative_value: Math.max(-1000, Math.min(1000, Math.trunc(value))),
-    }, 'Не удалось изменить инициативу.');
-  };
-
-  const setTurn = async (actorId: string) => {
-    await callCombatRpc('set_campaign_combat_turn', { target_campaign: campaignId, target_actor: actorId }, 'Не удалось передать ход.');
-  };
-
-  const setControl = async (control: CombatControl) => {
-    if (control === runtime.combat_control) return;
-    await callCombatRpc('set_campaign_combat_control', { target_campaign: campaignId, control_mode: control }, 'Не удалось изменить управление эффектами.');
-  };
-
-  const applyHealth = async (direction: 'damage' | 'heal') => {
-    if (!target) {
-      onMessage('Выберите участника боя.');
-      return;
-    }
-    const amount = Math.max(1, Math.min(100000, Math.trunc(healthAmount || 1)));
-    const ok = await callCombatRpc('apply_campaign_combat_health', {
-      target_campaign: campaignId,
-      target_actor: target.id,
-      health_delta: direction === 'damage' ? -amount : amount,
-    }, direction === 'damage' ? 'Не удалось нанести урон.' : 'Не удалось восстановить здоровье.');
-    if (ok) onMessage(direction === 'damage' ? `${target.name} получает ${amount} урона.` : `${target.name} восстанавливает ${amount} здоровья.`);
-  };
-
-  const addEffect = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!target || !effectName.trim()) {
-      onMessage(target ? 'Введите название состояния или эффекта.' : 'Выберите участника боя.');
-      return;
-    }
-    const duration = effectDuration.trim() ? Math.max(1, Math.min(999, Number.parseInt(effectDuration, 10) || 1)) : null;
-    const ok = await callCombatRpc('add_campaign_combat_effect', {
-      target_campaign: campaignId,
-      target_actor: target.id,
-      effect_name: effectName.trim(),
-      effect_kind: effectKind,
-      effect_duration: duration,
-    }, 'Не удалось добавить эффект.');
-    if (ok) {
-      setEffectName('');
-      setEffectDuration('');
-    }
-  };
-
-  const removeEffect = async (effectId: string) => {
-    await callCombatRpc('remove_campaign_combat_effect', { target_campaign: campaignId, target_effect: effectId }, 'Не удалось снять эффект.');
-  };
-
-  const nextTurn = async () => {
-    await callCombatRpc('next_campaign_combat_turn', { target_campaign: campaignId }, 'Не удалось перейти к следующему ходу.');
-  };
-
-  const stopCombat = async () => {
-    const ok = await callCombatRpc('stop_campaign_combat', { target_campaign: campaignId }, 'Не удалось закончить бой.');
-    if (ok) {
-      setConfirmStop(false);
-      onMessage('Бой завершён.');
-    }
-  };
 
   return (
     <>
@@ -316,86 +211,19 @@ function SessionLibrary({ campaignId, runtime, actors, selectedActorId, onSelect
       <section className="gm-library-section">
         <div className="gm-library-section-title"><strong>БОЙ</strong><span>{runtime.combat_active ? 'ИДЁТ' : 'ПАУЗА'}</span></div>
         {!runtime.combat_active ? (
-          <div className="combat-v06-setup">
-            <div className="combat-v06-toggle" role="group" aria-label="Способ определения инициативы">
-              <button type="button" className={setupControl === 'automatic' ? 'active' : ''} onClick={() => setSetupControl('automatic')}>Автоматически</button>
-              <button type="button" className={setupControl === 'manual' ? 'active' : ''} onClick={() => setSetupControl('manual')}>Вручную</button>
-            </div>
-            <p className="muted">В бой попадут видимые фишки активной сцены.</p>
-            {setupControl === 'manual' && (
-              <div className="combat-v06-manual-list">
-                {actors.map((actor) => (
-                  <label key={actor.id}><span>{actor.name}</span><input type="number" min={-1000} max={1000} value={manualInitiative[actor.id] ?? 0} onChange={(event) => setManualInitiative((value) => ({ ...value, [actor.id]: Number(event.target.value) }))} /></label>
-                ))}
-              </div>
-            )}
-            <button className="button primary full" disabled={busy || combatBusy} onClick={() => void startCombat()}>{combatBusy ? 'Начинаем…' : '⚔ Начать бой'}</button>
-          </div>
+          <button className="button primary full" disabled={busy} onClick={() => onCombat('start')}>⚔ Начать бой</button>
         ) : (
           <>
-            <div className="gm-combat-focus"><span>Сейчас ходит · инициатива {current ? combatInitiative(runtime, current.id) : '—'}</span><strong>{current?.name ?? '—'}</strong></div>
-            <div className="combat-v06-toggle compact" role="group" aria-label="Управление длительностью эффектов">
-              <button type="button" className={runtime.combat_control === 'automatic' ? 'active' : ''} disabled={combatBusy} onClick={() => void setControl('automatic')}>Автоэффекты</button>
-              <button type="button" className={runtime.combat_control === 'manual' ? 'active' : ''} disabled={combatBusy} onClick={() => void setControl('manual')}>Вручную</button>
-            </div>
-            <div className="gm-combat-order combat-v06-order">
-              {order.map((actor, index) => {
-                const health = actorHealth(actor.system_data);
-                const effects = combatEffectsForActor(runtime, actor.id);
-                return (
-                  <div key={actor.id} className={`${index === runtime.combat_turn ? 'active' : ''} ${actor.id === target?.id ? 'selected' : ''}`}>
-                    <button type="button" className="combat-v06-turn" disabled={combatBusy} onClick={() => { onSelectActor(actor.id); void setTurn(actor.id); }} title="Сделать текущим ходом">{index + 1}</button>
-                    <button type="button" className="combat-v06-actor" onClick={() => onSelectActor(actor.id)}><strong>{actor.name}</strong><small>{health?.current ?? '—'} HP{effects.length ? ` · ${effects.length} эфф.` : ''}</small></button>
-                    <input aria-label={`Инициатива ${actor.name}`} type="number" min={-1000} max={1000} defaultValue={combatInitiative(runtime, actor.id)} key={`${actor.id}-${combatInitiative(runtime, actor.id)}`} disabled={combatBusy} onBlur={(event) => { const value = Number(event.target.value); if (value !== combatInitiative(runtime, actor.id)) void setInitiative(actor.id, value); }} />
-                  </div>
-                );
-              })}
-            </div>
-
-            <section className="combat-v06-actions">
-              <div className="gm-library-section-title"><strong>ДЕЙСТВИЕ</strong><span>{target?.name ?? 'Выберите участника'}</span></div>
-              <label className="combat-v06-amount"><span>Значение</span><input type="number" min={1} max={100000} value={healthAmount} onChange={(event) => setHealthAmount(Number(event.target.value))} /></label>
-              <div className="combat-v06-action-row">
-                <button type="button" className="button danger" disabled={combatBusy || !target} onClick={() => void applyHealth('damage')}>Урон</button>
-                <button type="button" className="button" disabled={combatBusy || !target} onClick={() => void applyHealth('heal')}>Лечение</button>
-              </div>
-            </section>
-
-            <form className="combat-v06-effects" onSubmit={(event) => void addEffect(event)}>
-              <div className="gm-library-section-title"><strong>СОСТОЯНИЯ И ЭФФЕКТЫ</strong></div>
-              <input className="control full" value={effectName} onChange={(event) => setEffectName(event.target.value)} maxLength={80} placeholder="Например: Оглушён" aria-label="Название эффекта" />
-              <div className="combat-v06-effect-fields">
-                <div className="combat-v06-toggle compact" role="group" aria-label="Тип эффекта">
-                  <button type="button" className={effectKind === 'condition' ? 'active' : ''} onClick={() => setEffectKind('condition')}>Состояние</button>
-                  <button type="button" className={effectKind === 'effect' ? 'active' : ''} onClick={() => setEffectKind('effect')}>Эффект</button>
+            <div className="gm-combat-focus"><span>Сейчас ходит</span><strong>{current?.name ?? '—'}</strong></div>
+            <div className="gm-combat-order">
+              {order.map((actor, index) => (
+                <div key={actor.id} className={index === runtime.combat_turn ? 'active' : ''}>
+                  <span>{index + 1}</span><strong>{actor.name}</strong><small>{actor.system_data?.hp?.current ?? '—'} HP</small>
                 </div>
-                <input type="number" min={1} max={999} value={effectDuration} onChange={(event) => setEffectDuration(event.target.value)} placeholder="∞" aria-label="Раундов, пусто — без срока" />
-              </div>
-              <button className="button full" disabled={combatBusy || !target || !effectName.trim()}>Добавить</button>
-              <div className="combat-v06-effect-list">
-                {runtime.combat_effects.map((effect) => {
-                  const actor = actors.find((value) => value.id === effect.actorId);
-                  return (
-                    <div key={effect.id} className={effect.kind}>
-                      <span><strong>{effect.name}</strong><small>{actor?.name ?? 'Участник удалён'} · {effect.remainingRounds == null ? 'без срока' : `${effect.remainingRounds} раунд.`}</small></span>
-                      <button type="button" disabled={combatBusy} onClick={() => void removeEffect(effect.id)} aria-label={`Снять ${effect.name}`}>×</button>
-                    </div>
-                  );
-                })}
-                {!runtime.combat_effects.length && <div className="online-small-empty">Активных состояний пока нет.</div>}
-              </div>
-            </form>
-
-            <button className="button primary full" disabled={busy || combatBusy} onClick={() => void nextTurn()}>{combatBusy ? 'Обновляем…' : 'Следующий ход →'}</button>
-            {!confirmStop ? (
-              <button className="button full" disabled={busy || combatBusy} onClick={() => setConfirmStop(true)}>Закончить бой</button>
-            ) : (
-              <div className="combat-v06-stop" role="alertdialog" aria-label="Закончить бой?">
-                <strong>Закончить бой?</strong>
-                <p>Очередь, инициатива и боевые эффекты будут очищены.</p>
-                <div><button type="button" className="button" disabled={combatBusy} onClick={() => setConfirmStop(false)}>Отмена</button><button type="button" className="button danger" disabled={combatBusy} onClick={() => void stopCombat()}>Закончить бой</button></div>
-              </div>
-            )}
+              ))}
+            </div>
+            <button className="button primary full" disabled={busy} onClick={() => onCombat('next')}>Следующий ход →</button>
+            <button className="button full" disabled={busy} onClick={() => onCombat('stop')}>Закончить бой</button>
           </>
         )}
       </section>
@@ -414,6 +242,7 @@ function ActorInspector(props: Props) {
     instances,
     items,
     runtime,
+    onHp,
     onOpenWorkshop,
     onChanged,
     onMessage,
@@ -421,92 +250,10 @@ function ActorInspector(props: Props) {
   const [view, setView] = useState<InspectorView>('sheet');
   const [deleting, setDeleting] = useState(false);
   const [dragged, setDragged] = useState<string | null>(null);
-  const [optimisticHealth, setOptimisticHealth] = useState<OptimisticHealth | null>(null);
-  const optimisticHealthRef = useRef<OptimisticHealth | null>(null);
-  const hpQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const hpSequenceRef = useRef(0);
   const actor = actors.find((value) => value.id === selectedActorId) ?? null;
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const inventory = inventories.find((value) => value.owner_actor_id === actor?.id);
   const actorContainers = inventory ? containers.filter((value) => value.inventory_id === inventory.id) : [];
-  const serverHealth = actor ? actorHealth(actor.system_data) : null;
-  const visibleHealth = optimisticHealth?.actorId === actor?.id ? optimisticHealth : serverHealth;
-
-  useEffect(() => {
-    optimisticHealthRef.current = optimisticHealth;
-  }, [optimisticHealth]);
-
-  useEffect(() => {
-    if (!actor) {
-      optimisticHealthRef.current = null;
-      setOptimisticHealth(null);
-      return;
-    }
-    const optimistic = optimisticHealthRef.current;
-    if (optimistic && optimistic.actorId !== actor.id) {
-      optimisticHealthRef.current = null;
-      setOptimisticHealth(null);
-      return;
-    }
-    if (optimistic && serverHealth && optimistic.actorId === actor.id && optimistic.current === serverHealth.current && optimistic.max === serverHealth.max) {
-      optimisticHealthRef.current = null;
-      setOptimisticHealth(null);
-    }
-  }, [actor?.id, serverHealth?.current, serverHealth?.max]);
-
-  const changeQuickHp = (delta: number) => {
-    if (!actor) return;
-    const currentHealth = optimisticHealthRef.current?.actorId === actor.id
-      ? optimisticHealthRef.current
-      : actorHealth(actor.system_data);
-    if (!currentHealth || currentHealth.max <= 0) {
-      onMessage('Для персонажа не задан ресурс здоровья.');
-      return;
-    }
-
-    const nextCurrent = Math.max(0, Math.min(currentHealth.max, currentHealth.current + delta));
-    const effectiveDelta = nextCurrent - currentHealth.current;
-    if (effectiveDelta === 0) return;
-
-    const optimistic: OptimisticHealth = { actorId: actor.id, current: nextCurrent, max: currentHealth.max };
-    optimisticHealthRef.current = optimistic;
-    setOptimisticHealth(optimistic);
-    const sequence = ++hpSequenceRef.current;
-    const actorId = actor.id;
-
-    // Serialize quick-HP mutations so rapid clicks preserve their order, while the
-    // visible number updates immediately instead of waiting for a network roundtrip.
-    hpQueueRef.current = hpQueueRef.current.then(async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc('adjust_actor_hp', { target_actor: actorId, hp_delta: effectiveDelta });
-      if (error) {
-        if (sequence === hpSequenceRef.current && optimisticHealthRef.current?.actorId === actorId) {
-          optimisticHealthRef.current = null;
-          setOptimisticHealth(null);
-        }
-        onMessage(friendlyError(error, 'Не удалось изменить здоровье.'));
-        onChanged();
-        return;
-      }
-
-      if (sequence === hpSequenceRef.current && data && typeof data === 'object') {
-        const saved = actorHealth(data as Record<string, any>);
-        if (saved) {
-          const confirmed: OptimisticHealth = { actorId, ...saved };
-          optimisticHealthRef.current = confirmed;
-          setOptimisticHealth(confirmed);
-        }
-        onChanged();
-      }
-    }).catch(() => {
-      if (sequence === hpSequenceRef.current && optimisticHealthRef.current?.actorId === actorId) {
-        optimisticHealthRef.current = null;
-        setOptimisticHealth(null);
-      }
-      onMessage('Не удалось изменить здоровье.');
-      onChanged();
-    });
-  };
 
   const deleteHero = async () => {
     if (!actor || actor.type !== 'player' || !window.confirm(`Удалить героя «${actor.name}» из кампании? Вместе с ним удалятся его фишки, лист и инвентарь. Игрок останется участником кампании.`)) return;
@@ -573,14 +320,14 @@ function ActorInspector(props: Props) {
           <>
             <section className="gm-inspector-card">
               <div className="gm-inspector-card-title"><strong>Быстрые параметры</strong><span>Контекст персонажа</span></div>
-              {visibleHealth ? (
+              {actor.system_data?.hp ? (
                 <div className="gm-hp-control">
-                  <div><span>Здоровье</span><strong>{visibleHealth.current} / {visibleHealth.max}</strong></div>
+                  <div><span>Здоровье</span><strong>{actor.system_data.hp.current} / {actor.system_data.hp.max}</strong></div>
                   <div className="gm-hp-actions">
-                    <button onClick={() => changeQuickHp(-5)}>−5</button>
-                    <button onClick={() => changeQuickHp(-1)}>−1</button>
-                    <button onClick={() => changeQuickHp(1)}>＋1</button>
-                    <button onClick={() => changeQuickHp(5)}>＋5</button>
+                    <button onClick={() => onHp(actor, -5)}>−5</button>
+                    <button onClick={() => onHp(actor, -1)}>−1</button>
+                    <button onClick={() => onHp(actor, 1)}>＋1</button>
+                    <button onClick={() => onHp(actor, 5)}>＋5</button>
                   </div>
                 </div>
               ) : <div className="online-small-empty">Для персонажа не задан ресурс здоровья.</div>}
@@ -711,17 +458,4 @@ function NotesPanel({ campaignId, notes, onChanged, onMessage }: Props) {
       {!notes.length && <div className="online-small-empty">Заметок пока нет.</div>}
     </>
   );
-}
-
-function actorHealth(data: Record<string, any> | null | undefined): HealthValue | null {
-  const resource = objectResource(data?.hit_points) ?? objectResource(data?.hp);
-  if (!resource) return null;
-  const current = Number(resource.current);
-  const max = Number(resource.max);
-  if (!Number.isFinite(current) || !Number.isFinite(max)) return null;
-  return { current, max };
-}
-
-function objectResource(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
