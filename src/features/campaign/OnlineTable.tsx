@@ -16,7 +16,7 @@ import { actorMedia, actorMediaUrl } from './actorMedia';
 import { combatEffectsForActor, combatInitiative, combatCurrentActor, type CombatRuntime } from './combat';
 import { nextTokenSelection } from './tokenSelection';
 import { bulkSummary, partitionBulkResults, safeBulk } from './bulkOperations';
-import { useTopbarLayout, type TopbarSlot } from './topbarLayout';
+import { useTopbarLayout, topbarLayoutToSource, type TopbarSlot } from './topbarLayout';
 import { DraggableTopbarItem } from './DraggableTopbarItem';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
@@ -381,6 +381,33 @@ export function OnlineTable(props: Props) {
   const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
 
   const { layout: topbarLayout, moveSlot, reset: resetTopbarLayout, editMode, toggleEdit } = useTopbarLayout();
+  const [topbarCopyState, setTopbarCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const copyTopbarForProd = useCallback(async () => {
+    const snippet = topbarLayoutToSource(topbarLayout);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(snippet);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = snippet;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (!ok) throw new Error('execCommand copy failed');
+      } else {
+        throw new Error('clipboard unavailable');
+      }
+      setTopbarCopyState('copied');
+      window.setTimeout(() => setTopbarCopyState('idle'), 1800);
+    } catch {
+      setTopbarCopyState('error');
+      window.setTimeout(() => setTopbarCopyState('idle'), 2400);
+    }
+  }, [topbarLayout]);
   const handleTopbarMove = useCallback((fromId: string, toHint: string) => {
     const [toId, side] = toHint.split(':');
     if (!toId || fromId === toId) return;
@@ -882,6 +909,15 @@ export function OnlineTable(props: Props) {
         {editMode && (
           <div className="online-table-topbar-editor" data-wheel-isolation="true">
             <span className="online-table-topbar-editor-hint">Перетащи блоки · изменения сохранятся</span>
+            <button
+              type="button"
+              className="button"
+              onClick={copyTopbarForProd}
+              title="Скопировать раскладку как DEFAULT_TOPBAR, чтобы вставить в код и задеплоить"
+              aria-label="Скопировать раскладку для продакшна"
+            >
+              {topbarCopyState === 'copied' ? 'Скопировано ✓' : topbarCopyState === 'error' ? 'Ошибка копирования' : 'Copy for prod'}
+            </button>
             <button type="button" className="button" onClick={resetTopbarLayout}>Сбросить</button>
             <button type="button" className="button primary" onClick={toggleEdit}>Готово</button>
           </div>
