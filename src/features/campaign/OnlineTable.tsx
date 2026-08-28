@@ -635,6 +635,11 @@ export function OnlineTable(props: Props) {
             <strong>{campaign.name}</strong>
             <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
           </div>
+          <div className="map-zoom-controls">
+            <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
+            <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
+            <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
+          </div>
           <div className="online-table-topbar-meta">
             <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
               <button
@@ -666,11 +671,6 @@ export function OnlineTable(props: Props) {
               </select>
             </div>
           )}
-          <div className="map-zoom-controls">
-            <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
-            <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
-            <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
-          </div>
           {mode === 'gm' && (
             <div className="online-topbar-menu" data-topbar-menu-root="true">
               <button
