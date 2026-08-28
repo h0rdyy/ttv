@@ -16,6 +16,8 @@ import { actorMedia, actorMediaUrl } from './actorMedia';
 import { combatEffectsForActor, combatInitiative, combatCurrentActor, type CombatRuntime } from './combat';
 import { nextTokenSelection } from './tokenSelection';
 import { bulkSummary, partitionBulkResults, safeBulk } from './bulkOperations';
+import { useTopbarLayout, type TopbarSlot } from './topbarLayout';
+import { DraggableTopbarItem } from './DraggableTopbarItem';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -79,6 +81,164 @@ type Props = {
   onSelectActor: (id: string) => void;
   onMessage: (message: string) => void;
 };
+
+const SLOT_LABELS: Record<TopbarSlot, string> = {
+  brand: 'Бренд',
+  campaign: 'Название кампании',
+  'scene-select': 'Селектор сцены',
+  zoom: 'Масштаб',
+  menu: 'Меню сессии',
+  presence: 'Сейчас в сети',
+  'scene-menu': 'Меню сцены',
+  workshop: 'Мастерская',
+};
+
+function TopbarSlotContent({
+  slot,
+  mode,
+  campaign,
+  activeScene,
+  scenes,
+  busy,
+  switchScene,
+  topbarMenu,
+  setTopbarMenu,
+  sceneToolsOpen,
+  workshopOpen,
+  setSceneToolsOpen,
+  setWorkshopOpen,
+  patchScene,
+  createScene,
+  zoomLabel,
+  cameraZoom,
+  changeZoom,
+  resetZoom,
+  gmAllowed,
+  onlineTitle,
+  liveStatus,
+  onlineUsers,
+}: {
+  slot: TopbarSlot;
+  mode: 'gm' | 'player';
+  campaign: Campaign;
+  activeScene: Scene | null;
+  scenes: Scene[];
+  busy: boolean;
+  switchScene: (id: string) => Promise<void>;
+  topbarMenu: TopbarMenu;
+  setTopbarMenu: React.Dispatch<React.SetStateAction<TopbarMenu>>;
+  sceneToolsOpen: boolean;
+  workshopOpen: boolean;
+  setSceneToolsOpen: (updater: (value: boolean) => boolean) => void;
+  setWorkshopOpen: (updater: (value: boolean) => boolean) => void;
+  patchScene: (patch: { grid?: boolean; fog?: boolean }) => Promise<void>;
+  createScene: () => Promise<void>;
+  zoomLabel: string;
+  cameraZoom: number;
+  changeZoom: (next: number) => void;
+  resetZoom: () => void;
+  gmAllowed: boolean;
+  onlineTitle: string;
+  liveStatus: 'online' | 'connecting' | 'offline';
+  onlineUsers: { name: string; mode: 'gm' | 'player' }[];
+}) {
+  if (slot === 'brand') {
+    return <div className="online-table-brand">{mode === 'gm' ? '✥ TTV' : '✦ TTV'}</div>;
+  }
+  if (slot === 'campaign') {
+    return (
+      <div className="online-table-campaign" title={campaign.name}>
+        <strong>{campaign.name}</strong>
+        <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
+      </div>
+    );
+  }
+  if (slot === 'scene-select') {
+    if (mode !== 'gm' || scenes.length === 0) return null;
+    return (
+      <div className="online-scene-controls">
+        <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
+          {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+        </select>
+      </div>
+    );
+  }
+  if (slot === 'zoom') {
+    return (
+      <div className="map-zoom-controls">
+        <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(cameraZoom - 0.1)}>−</button>
+        <button className="button zoom-label" title="Сбросить вид" onClick={resetZoom}>{zoomLabel}</button>
+        <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(cameraZoom + 0.1)}>＋</button>
+      </div>
+    );
+  }
+  if (slot === 'menu') {
+    return (
+      <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
+        <button
+          className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={topbarMenu === 'session'}
+          onClick={() => setTopbarMenu(topbarMenu === 'session' ? null : 'session')}
+        >
+          ☰ <span>Меню</span>
+        </button>
+        {topbarMenu === 'session' && (
+          <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
+            {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
+            {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
+            <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (slot === 'presence') {
+    return (
+      <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
+    );
+  }
+  if (slot === 'scene-menu') {
+    if (mode !== 'gm') return null;
+    return (
+      <div className="online-topbar-menu" data-topbar-menu-root="true">
+        <button
+          className={`button online-menu-trigger ${topbarMenu === 'scene' || sceneToolsOpen ? 'active' : ''}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={topbarMenu === 'scene'}
+          onClick={() => setTopbarMenu(topbarMenu === 'scene' ? null : 'scene')}
+        >
+          ▣ Сцена <span aria-hidden="true">⌄</span>
+        </button>
+        {topbarMenu === 'scene' && (
+          <div className="online-menu-popover scene-menu" role="menu" aria-label="Действия сцены">
+            <button type="button" role="menuitem" disabled={busy} onClick={() => { setTopbarMenu(null); void createScene(); }}>
+              <span>＋ Новая сцена</span><small>Создать чистую игровую сцену</small>
+            </button>
+            <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.grid_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ grid: !activeScene?.grid_enabled }); }}>
+              <span>▦ Сетка</span><em>{activeScene?.grid_enabled ? 'Включена' : 'Выключена'}</em>
+            </button>
+            <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.fog_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ fog: !activeScene?.fog_enabled }); }}>
+              <span>♟ Туман войны</span><em>{activeScene?.fog_enabled ? 'Включён' : 'Выключен'}</em>
+            </button>
+            <button type="button" role="menuitem" disabled={!activeScene} onClick={() => { setTopbarMenu(null); setSceneToolsOpen((value) => !value); setWorkshopOpen((value) => value); }}>
+              <span>⚙ Настройки сцены</span><small>Карта, фишки, сетка и туман</small>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (slot === 'workshop') {
+    if (mode !== 'gm') return null;
+    return (
+      <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen((value) => value); }}>⚒ Мастерская</button>
+    );
+  }
+  return null;
+}
 
 export function OnlineTable(props: Props) {
   const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId, onMessage: setMessage } = props;
@@ -219,6 +379,20 @@ export function OnlineTable(props: Props) {
   const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
   const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
   const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
+
+  const { layout: topbarLayout, moveSlot, reset: resetTopbarLayout, editMode, toggleEdit } = useTopbarLayout();
+  const handleTopbarMove = useCallback((fromId: string, toHint: string) => {
+    const [toId, side] = toHint.split(':');
+    if (!toId || fromId === toId) return;
+    const targetItem = topbarLayout.find((item) => item.slot === toId);
+    if (!targetItem) return;
+    const sameRow = topbarLayout
+      .filter((item) => item.slot !== fromId && item.row === targetItem.row)
+      .map((item) => item.slot);
+    const toIndexInRow = sameRow.indexOf(toId as TopbarSlot);
+    const insertAt = side === 'left' ? toIndexInRow : toIndexInRow + 1;
+    moveSlot(fromId as TopbarSlot, insertAt, targetItem.row);
+  }, [moveSlot, topbarLayout]);
 
   const activeScene = scenes.find((scene) => scene.id === campaign.active_scene_id) ?? scenes[0] ?? null;
   const selectedActor = selectedActorId ? actorById.get(selectedActorId) ?? null : null;
@@ -628,82 +802,102 @@ export function OnlineTable(props: Props) {
 
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
-      <header className="online-table-topbar">
-        <div className="online-table-topbar-primary">
-          <div className="online-table-brand">{mode === 'gm' ? '✥ TTV' : '✦ TTV'}</div>
-          <div className="online-table-campaign" title={campaign.name}>
-            <strong>{campaign.name}</strong>
-            <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
-          </div>
-          {mode === 'gm' && scenes.length > 0 && (
-            <div className="online-scene-controls">
-              <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
-                {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="map-zoom-controls">
-            <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
-            <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
-            <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
-          </div>
-          <div className="online-table-topbar-meta">
-            <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
-              <button
-                className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={topbarMenu === 'session'}
-                onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
-              >
-                ☰ <span>Меню</span>
-              </button>
-              {topbarMenu === 'session' && (
-                <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
-                  {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
-                  {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
-                  <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
-                </div>
-              )}
-            </div>
-            <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
-          </div>
+      <header className="online-table-topbar" data-edit-mode={editMode ? 'true' : 'false'}>
+        <div className="online-table-topbar-primary" data-topbar-row="primary">
+          {topbarLayout.filter((item) => item.row === 'primary').map((item) => (
+            <DraggableTopbarItem
+              key={item.slot}
+              id={item.slot}
+              label={SLOT_LABELS[item.slot]}
+              editMode={editMode}
+              onMove={handleTopbarMove}
+            >
+              <TopbarSlotContent
+                slot={item.slot}
+                mode={mode}
+                campaign={campaign}
+                activeScene={activeScene}
+                scenes={scenes}
+                busy={busy}
+                switchScene={switchScene}
+                topbarMenu={topbarMenu}
+                setTopbarMenu={setTopbarMenu}
+                sceneToolsOpen={sceneToolsOpen}
+                workshopOpen={workshopOpen}
+                setSceneToolsOpen={setSceneToolsOpen}
+                setWorkshopOpen={setWorkshopOpen}
+                patchScene={patchScene}
+                createScene={createScene}
+                zoomLabel={zoomLabel}
+                cameraZoom={camera.zoom}
+                changeZoom={changeZoom}
+                resetZoom={() => setCamera({ zoom: 1, x: 0, y: 0 })}
+                gmAllowed={gmAllowed}
+                onlineTitle={onlineTitle}
+                liveStatus={liveStatus}
+                onlineUsers={onlineUsers}
+              />
+            </DraggableTopbarItem>
+          ))}
         </div>
 
-        <div className="online-table-topbar-secondary">
-          {mode === 'gm' && (
-            <div className="online-topbar-menu" data-topbar-menu-root="true">
-              <button
-                className={`button online-menu-trigger ${topbarMenu === 'scene' || sceneToolsOpen ? 'active' : ''}`}
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={topbarMenu === 'scene'}
-                onClick={() => setTopbarMenu((current) => current === 'scene' ? null : 'scene')}
-              >
-                ▣ Сцена <span aria-hidden="true">⌄</span>
-              </button>
-              {topbarMenu === 'scene' && (
-                <div className="online-menu-popover scene-menu" role="menu" aria-label="Действия сцены">
-                  <button type="button" role="menuitem" disabled={busy} onClick={() => { setTopbarMenu(null); void createScene(); }}>
-                    <span>＋ Новая сцена</span><small>Создать чистую игровую сцену</small>
-                  </button>
-                  <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.grid_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ grid: !activeScene?.grid_enabled }); }}>
-                    <span>▦ Сетка</span><em>{activeScene?.grid_enabled ? 'Включена' : 'Выключена'}</em>
-                  </button>
-                  <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.fog_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ fog: !activeScene?.fog_enabled }); }}>
-                    <span>♟ Туман войны</span><em>{activeScene?.fog_enabled ? 'Включён' : 'Выключен'}</em>
-                  </button>
-                  <button type="button" role="menuitem" disabled={!activeScene} onClick={() => { setTopbarMenu(null); setSceneToolsOpen((value) => !value); setWorkshopOpen(false); }}>
-                    <span>⚙ Настройки сцены</span><small>Карта, фишки, сетка и туман</small>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {mode === 'gm' && (
-            <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
-          )}
+        <div className="online-table-topbar-secondary" data-topbar-row="secondary">
+          {topbarLayout.filter((item) => item.row === 'secondary').map((item) => (
+            <DraggableTopbarItem
+              key={item.slot}
+              id={item.slot}
+              label={SLOT_LABELS[item.slot]}
+              editMode={editMode}
+              onMove={handleTopbarMove}
+            >
+              <TopbarSlotContent
+                slot={item.slot}
+                mode={mode}
+                campaign={campaign}
+                activeScene={activeScene}
+                scenes={scenes}
+                busy={busy}
+                switchScene={switchScene}
+                topbarMenu={topbarMenu}
+                setTopbarMenu={setTopbarMenu}
+                sceneToolsOpen={sceneToolsOpen}
+                workshopOpen={workshopOpen}
+                setSceneToolsOpen={setSceneToolsOpen}
+                setWorkshopOpen={setWorkshopOpen}
+                patchScene={patchScene}
+                createScene={createScene}
+                zoomLabel={zoomLabel}
+                cameraZoom={camera.zoom}
+                changeZoom={changeZoom}
+                resetZoom={() => setCamera({ zoom: 1, x: 0, y: 0 })}
+                gmAllowed={gmAllowed}
+                onlineTitle={onlineTitle}
+                liveStatus={liveStatus}
+                onlineUsers={onlineUsers}
+              />
+            </DraggableTopbarItem>
+          ))}
         </div>
+
+        {editMode && (
+          <div className="online-table-topbar-editor" data-wheel-isolation="true">
+            <span className="online-table-topbar-editor-hint">Перетащи блоки · изменения сохранятся</span>
+            <button type="button" className="button" onClick={resetTopbarLayout}>Сбросить</button>
+            <button type="button" className="button primary" onClick={toggleEdit}>Готово</button>
+          </div>
+        )}
+
+        {!editMode && (
+          <button
+            type="button"
+            className="online-table-topbar-edit-toggle"
+            onClick={toggleEdit}
+            title="Изменить расположение блоков"
+            aria-label="Изменить расположение блоков"
+          >
+            ⋮⋮
+          </button>
+        )}
       </header>
 
       <main className="online-table-workspace">
