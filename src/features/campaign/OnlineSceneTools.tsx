@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { friendlyError } from '@/lib/friendlyError';
 import { MapCropDialog } from './MapCropDialog';
-import type { FogReveal } from './fog';
 
 type Scene = {
   id: string;
@@ -21,6 +20,7 @@ type Scene = {
 
 type Actor = { id: string; type: string; name: string; avatar: string };
 type Token = { id: string; actor_id: string; hidden: boolean; size: number };
+export type FogReveal = { id: string; x: number; y: number; width: number; height: number };
 
 type Props = {
   campaignId: string;
@@ -95,28 +95,6 @@ export function OnlineSceneTools({
       onChanged();
     }
     setBusy(false);
-  };
-
-  const setSnapImmediately = async (next: boolean) => {
-    setSnap(next);
-    const supabase = createClient();
-    const { error } = await supabase.rpc('update_campaign_scene', {
-      target_campaign: campaignId,
-      target_scene: scene.id,
-      scene_name: null,
-      scene_grid_enabled: null,
-      scene_fog_enabled: null,
-      scene_grid_size: null,
-      scene_grid_offset_x: null,
-      scene_grid_offset_y: null,
-      scene_grid_snap: next,
-    });
-    if (error) {
-      setSnap(scene.grid_snap);
-      onMessage(friendlyError(error, 'Не удалось изменить привязку к сетке.'));
-      return;
-    }
-    onChanged();
   };
 
   const uploadMap = async (file: File) => {
@@ -325,7 +303,7 @@ export function OnlineSceneTools({
             <label><span>Смещение X</span><input className="control" type="number" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} /></label>
             <label><span>Смещение Y</span><input className="control" type="number" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} /></label>
           </div>
-          <label className="scene-check"><input type="checkbox" checked={snap} onChange={(event) => void setSnapImmediately(event.target.checked)} /> Притягивать фишки к сетке</label>
+          <label className="scene-check"><input type="checkbox" checked={snap} onChange={(event) => setSnap(event.target.checked)} /> Притягивать фишки к сетке</label>
         </section>
 
         <section className="scene-tools-section">

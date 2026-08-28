@@ -10,23 +10,21 @@ TTV — универсальный VTT/GM-инструмент для кампа
 
 ## Статус
 
-**v0.6.0 — Combat & Actions.**
+**v0.5.1 — Classic Fantasy Sheets, Maps & Dice.**
 
-Online-кампания объединяет аккаунты, роли, Player View, GM-интерфейс, realtime, полноценные сцены с пользовательскими картами, классический fantasy-лист, общий лоток кубов и синхронный боевой трекер.
+Online-кампания объединяет аккаунты, роли, Player View, GM-интерфейс, realtime, полноценные сцены с пользовательскими картами, классический fantasy-лист и общий лоток кубов.
 
-Обязательный CI gate защищает критические пути:
+CI использует зафиксированное дерево зависимостей:
 
 ```bash
 npm ci
-npm test                 # Vitest: deterministic critical unit tests
-supabase test db         # pgTAP: RLS/database contracts
+npm audit --omit=dev --audit-level=high
+npm test
 npm run typecheck
 npm run build
 ```
 
-Политика тестирования: [`docs/TESTING.md`](docs/TESTING.md). UI source/CSS snapshots не являются обязательным gate и удаляются, когда фиксируют уже отменённые требования.
-
-Подробности текущего milestone: [`docs/V0_6_COMBAT_ACTIONS.md`](docs/V0_6_COMBAT_ACTIONS.md).
+Подробности текущего milestone: [`docs/V0_5_CHARACTER_SHEETS.md`](docs/V0_5_CHARACTER_SHEETS.md).
 
 ## Что уже работает
 
@@ -183,12 +181,12 @@ Realtime разделяет временное и постоянное сост�
 
 ### v0.6 — Combat / Effects
 
-- автоматическая и ручная инициатива;
-- раунды, очередь и ручная передача хода;
-- realtime-броски по формуле;
-- урон и лечение;
-- эффекты и состояния с длительностью;
-- автоматическое или ручное управление длительностью.
+- универсальные ресурсы вместо legacy HP-привязки;
+- инициатива;
+- броски из характеристик и формулы;
+- эффекты;
+- conditions;
+- более глубокая автоматизация боя.
 
 ### v0.7 — Books / Lore / Codex
 

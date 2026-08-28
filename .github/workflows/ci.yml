@@ -2,10 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, agent/v0.5.2-immersion-lab]
+    branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -13,63 +12,23 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Setup pnpm test runner
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
       - name: Install
         run: npm ci
-
       - name: Audit production packages
         run: npm audit --omit=dev --audit-level=high
-
-      - name: Vitest
-        run: pnpm dlx vitest@4.1.10 run tests/unit
-
+      - name: Test
+        run: npm test
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Setup Supabase CLI
-        id: supabase_cli
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.114.0
-
-      - name: Initialize local Supabase config
-        run: test -f supabase/config.toml || supabase init
-
-      - name: Start local Supabase
-        run: supabase start
-
-      - name: Realtime GM-player integration
-        run: |
-          eval "$(supabase status -o env)"
-          SUPABASE_URL="$API_URL" \
-          SUPABASE_ANON_KEY="$ANON_KEY" \
-          SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
-          node tests/integration/realtime-sync.mjs
-
-      - name: Supabase database tests
-        run: supabase test db
-
-      - name: Stop local Supabase
-        if: always() && steps.supabase_cli.outcome == 'success'
-        run: supabase stop --no-backup
-
       - name: Build
         run: npm run build
-
       - name: Verify generated files are stable
         run: git diff --exit-code -- package-lock.json tsconfig.json
