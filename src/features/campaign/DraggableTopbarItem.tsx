@@ -1,75 +1,136 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+
+const DRAG_THRESHOLD_PX = 4;
+
+type DragHover = { targetId: string; side: 'left' | 'right' };
 
 type Props = {
   id: string;
   label: string;
   editMode: boolean;
-  onMove: (fromId: string, toId: string) => void;
+  onMove: (fromId: string, toHint: string) => void;
   children: ReactNode;
 };
 
 export function DraggableTopbarItem({ id, label, editMode, onMove, children }: Props) {
-  const [dragOver, setDragOver] = useState<'left' | 'right' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragHover, setDragHover] = useState<DragHover | null>(null);
+  // Refs carry the live drag state across handlers without forcing a re-bind
+  // on every render, and they survive a render that overwrites a stale
+  // closure during an in-flight drag.
+  const startRef = useRef<{ x: number; y: number; pointerId: number; root: HTMLElement } | null>(null);
+  const hoverRef = useRef<DragHover | null>(null);
+  hoverRef.current = dragHover;
+
+  const beginTracking = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return; // primary button / single touch only
+    startRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+      root: event.currentTarget,
+    };
+  }, []);
+
+  // We listen on the wrapper for pointerdown, but we move the move/up/cancel
+  // listeners to the document once a drag is in progress. This way the
+  // pointer can leave the wrapper mid-drag without losing tracking, and
+  // native clicks on the wrapper's children (buttons, selects) are not
+  // stolen — setPointerCapture would suppress their click event because
+  // pointerup would then fire on the wrapper instead of the original target.
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (event: PointerEvent) => {
+      const start = startRef.current;
+      if (!start || start.pointerId !== event.pointerId) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance <= DRAG_THRESHOLD_PX) return;
+
+      // elementFromPoint ignores the element being captured, so the wrapper
+      // itself is skipped automatically and we get the slot under the cursor.
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      const slotEl = under?.closest<HTMLElement>('[data-topbar-slot-id]');
+      if (slotEl && slotEl.dataset.topbarSlotId && slotEl.dataset.topbarSlotId !== id) {
+        const rect = slotEl.getBoundingClientRect();
+        const midpoint = rect.left + rect.width / 2;
+        const side: 'left' | 'right' = event.clientX < midpoint ? 'left' : 'right';
+        const next: DragHover = { targetId: slotEl.dataset.topbarSlotId, side };
+        const prev = hoverRef.current;
+        if (!prev || prev.targetId !== next.targetId || prev.side !== next.side) {
+          setDragHover(next);
+        }
+      } else if (hoverRef.current) {
+        setDragHover(null);
+      }
+    };
+
+    const handleUp = (event: PointerEvent) => {
+      const start = startRef.current;
+      if (!start || start.pointerId !== event.pointerId) return;
+      const hover = hoverRef.current;
+      if (hover && hover.targetId !== id) {
+        onMove(id, `${hover.targetId}:${hover.side}`);
+      }
+      startRef.current = null;
+      setIsDragging(false);
+      setDragHover(null);
+    };
+
+    const handleCancel = (event: PointerEvent) => {
+      if (!startRef.current || startRef.current.pointerId !== event.pointerId) return;
+      startRef.current = null;
+      setIsDragging(false);
+      setDragHover(null);
+    };
+
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
+    document.addEventListener('pointercancel', handleCancel);
+    return () => {
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
+      document.removeEventListener('pointercancel', handleCancel);
+    };
+  }, [isDragging, id, onMove]);
+
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      beginTracking(event);
+    },
+    [beginTracking],
+  );
+
+  // Once the user crosses the drag threshold on the same pointer that started
+  // the press, promote the gesture to a real drag and attach the document
+  // listeners. Doing this on the wrapper (rather than capturing immediately)
+  // preserves click events on the inner buttons/selects for sub-threshold
+  // presses.
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (isDragging) return; // document listener takes over once we promote
+      const start = startRef.current;
+      if (!start || start.pointerId !== event.pointerId) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+        setIsDragging(true);
+      }
+    },
+    [isDragging],
+  );
+
+  const handlePointerCancel = useCallback(() => {
+    startRef.current = null;
+    setIsDragging(false);
+    setDragHover(null);
+  }, []);
 
   if (!editMode) {
     return <>{children}</>;
   }
-
-  const handleDragStart = (event: React.DragEvent<HTMLDivElement>) => {
-    // Both custom type and text/plain (Firefox fallback)
-    event.dataTransfer.setData('text/topbar-slot', id);
-    event.dataTransfer.setData('text/plain', id);
-    event.dataTransfer.effectAllowed = 'move';
-    // Use a transparent drag image so the default ghost is hidden
-    if (event.dataTransfer.setDragImage) {
-      const img = new Image();
-      img.src =
-        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" fill="transparent"/></svg>';
-      try {
-        event.dataTransfer.setDragImage(img, 0, 0);
-      } catch {
-        // ignore
-      }
-    }
-    setIsDragging(true);
-  };
-
-  const handleDragEnd = () => {
-    setIsDragging(false);
-    setDragOver(null);
-  };
-
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    const types = Array.from(event.dataTransfer.types);
-    if (!types.includes('text/topbar-slot') && !types.includes('text/plain')) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    if (isDragging) return; // skip if we're the dragged element
-    const rect = event.currentTarget.getBoundingClientRect();
-    const midpoint = rect.left + rect.width / 2;
-    setDragOver(event.clientX < midpoint ? 'left' : 'right');
-  };
-
-  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
-    const related = event.relatedTarget as Node | null;
-    if (related && event.currentTarget.contains(related)) return;
-    setDragOver(null);
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const fromId =
-      event.dataTransfer.getData('text/topbar-slot') ||
-      event.dataTransfer.getData('text/plain');
-    setDragOver(null);
-    setIsDragging(false);
-    if (!fromId || fromId === id) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const midpoint = rect.left + rect.width / 2;
-    const side = event.clientX < midpoint ? 'left' : 'right';
-    onMove(fromId, `${id}:${side}`);
-  };
 
   const wrapperStyle: CSSProperties = {
     position: 'relative',
@@ -79,28 +140,26 @@ export function DraggableTopbarItem({ id, label, editMode, onMove, children }: P
     MozUserSelect: 'none',
     msUserSelect: 'none',
     touchAction: 'none',
-    outline: dragOver
+    outline: dragHover
       ? '2px solid #c9a25a'
       : '2px dashed rgba(201, 162, 90, 0.35)',
     outlineOffset: '2px',
     borderRadius: '6px',
     transition: 'outline-color 0.12s, opacity 0.12s',
     opacity: isDragging ? 0.4 : 1,
-    background: dragOver ? 'rgba(201, 162, 90, 0.06)' : 'transparent',
+    background: dragHover ? 'rgba(201, 162, 90, 0.06)' : 'transparent',
   };
 
   return (
     <div
-      draggable
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      data-topbar-slot-id={id}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerCancel={handlePointerCancel}
       title={`Тащи меня: ${label}`}
       style={wrapperStyle}
     >
-      {dragOver === 'left' && (
+      {dragHover?.side === 'left' && (
         <span
           aria-hidden
           style={{
@@ -116,7 +175,7 @@ export function DraggableTopbarItem({ id, label, editMode, onMove, children }: P
           }}
         />
       )}
-      {dragOver === 'right' && (
+      {dragHover?.side === 'right' && (
         <span
           aria-hidden
           style={{
