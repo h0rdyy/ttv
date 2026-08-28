@@ -635,6 +635,27 @@ export function OnlineTable(props: Props) {
             <strong>{campaign.name}</strong>
             <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
           </div>
+          <div className="online-table-topbar-meta">
+            <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
+              <button
+                className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={topbarMenu === 'session'}
+                onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
+              >
+                ☰ <span>Меню</span>
+              </button>
+              {topbarMenu === 'session' && (
+                <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
+                  {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
+                  {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
+                  <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
+                </div>
+              )}
+            </div>
+            <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
+          </div>
         </div>
 
         <div className="online-table-topbar-secondary">
@@ -682,26 +703,6 @@ export function OnlineTable(props: Props) {
           {mode === 'gm' && (
             <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
           )}
-          <div className="online-table-spacer" />
-          <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
-          <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
-            <button
-              className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={topbarMenu === 'session'}
-              onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
-            >
-              ☰ <span>Меню</span>
-            </button>
-            {topbarMenu === 'session' && (
-              <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
-                {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
-                {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
-                <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
-              </div>
-            )}
-          </div>
         </div>
       </header>
 
