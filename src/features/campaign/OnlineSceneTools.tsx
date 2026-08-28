@@ -119,6 +119,50 @@ export function OnlineSceneTools({
     onChanged();
   };
 
+  const setGridEnabledImmediately = async (next: boolean) => {
+    setGridEnabled(next);
+    const supabase = createClient();
+    const { error } = await supabase.rpc('update_campaign_scene', {
+      target_campaign: campaignId,
+      target_scene: scene.id,
+      scene_name: null,
+      scene_grid_enabled: next,
+      scene_fog_enabled: null,
+      scene_grid_size: null,
+      scene_grid_offset_x: null,
+      scene_grid_offset_y: null,
+      scene_grid_snap: null,
+    });
+    if (error) {
+      setGridEnabled(scene.grid_enabled);
+      onMessage(friendlyError(error, 'Не удалось изменить сетку.'));
+      return;
+    }
+    onChanged();
+  };
+
+  const setFogEnabledImmediately = async (next: boolean) => {
+    setFogEnabled(next);
+    const supabase = createClient();
+    const { error } = await supabase.rpc('update_campaign_scene', {
+      target_campaign: campaignId,
+      target_scene: scene.id,
+      scene_name: null,
+      scene_grid_enabled: null,
+      scene_fog_enabled: next,
+      scene_grid_size: null,
+      scene_grid_offset_x: null,
+      scene_grid_offset_y: null,
+      scene_grid_snap: null,
+    });
+    if (error) {
+      setFogEnabled(scene.fog_enabled);
+      onMessage(friendlyError(error, 'Не удалось изменить туман войны.'));
+      return;
+    }
+    onChanged();
+  };
+
   const uploadMap = async (file: File) => {
     if (!MAP_TYPES.includes(file.type)) {
       onMessage('Поддерживаются PNG, JPG и WebP.');
@@ -293,10 +337,6 @@ export function OnlineSceneTools({
         <section className="scene-tools-section">
           <h3>ОСНОВНОЕ</h3>
           <label><span>Название</span><input className="control full" value={name} onChange={(event) => setName(event.target.value)} /></label>
-          <div className="scene-toggle-row">
-            <label><input type="checkbox" checked={gridEnabled} onChange={(event) => setGridEnabled(event.target.checked)} /> Сетка</label>
-            <label><input type="checkbox" checked={fogEnabled} onChange={(event) => setFogEnabled(event.target.checked)} /> Туман</label>
-          </div>
           <button className="button primary full" disabled={busy} onClick={() => void saveScene()}>Сохранить сцену</button>
         </section>
 
@@ -320,6 +360,10 @@ export function OnlineSceneTools({
 
         <section className="scene-tools-section">
           <h3>СЕТКА</h3>
+          <div className="scene-switch-row">
+            <span>▦ Сетка</span>
+            <button type="button" className={`button ${gridEnabled ? 'active' : ''}`} disabled={busy} onClick={() => void setGridEnabledImmediately(!gridEnabled)}>{gridEnabled ? 'Включена' : 'Выключена'}</button>
+          </div>
           <div className="scene-grid-fields">
             <label><span>Клетка, px</span><input className="control" type="number" min={16} max={256} value={gridSize} onChange={(event) => setGridSize(Number(event.target.value))} /></label>
             <label><span>Смещение X</span><input className="control" type="number" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} /></label>
@@ -330,6 +374,10 @@ export function OnlineSceneTools({
 
         <section className="scene-tools-section">
           <h3>ТУМАН</h3>
+          <div className="scene-switch-row">
+            <span>♟ Туман войны</span>
+            <button type="button" className={`button ${fogEnabled ? 'active' : ''}`} disabled={busy} onClick={() => void setFogEnabledImmediately(!fogEnabled)}>{fogEnabled ? 'Включен' : 'Выключен'}</button>
+          </div>
           <p className="muted">Включите туман и рисуйте мышью прямоугольники, которые должны быть видны игрокам.</p>
           <button className={`button full ${fogDrawMode ? 'active' : ''}`} disabled={!fogEnabled} onClick={() => onFogDrawMode(!fogDrawMode)}>{fogDrawMode ? '✓ Режим открытия включён' : 'Открывать область мышью'}</button>
           <button className="button full" disabled={!fogEnabled || scene.fog_reveals.length === 0} onClick={() => void clearFogReveals()}>Закрыть всю карту</button>

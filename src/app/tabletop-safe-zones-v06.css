@@ -264,3 +264,20 @@
     text-align: center;
   }
 }
+
+/* The topbar has backdrop-filter, which makes it the containing block for
+   position:fixed children — the fixed bottom/right camera rules anchored the
+   zoom controls to the bar and pushed them half outside the viewport. Pin the
+   GM camera controls to the visual center of the topbar instead. */
+@media (min-width: 861px) {
+  .v05-table-layer.tabletop-shell-v2 .gm-mode .map-zoom-controls,
+  .v05-table-layer.tabletop-shell-v3 .gm-mode .map-zoom-controls {
+    position: absolute !important;
+    top: 50% !important;
+    bottom: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 30 !important;
+  }
+}
