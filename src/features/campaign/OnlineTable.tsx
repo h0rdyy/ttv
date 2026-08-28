@@ -630,7 +630,7 @@ export function OnlineTable(props: Props) {
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
       <header className="online-table-topbar">
         <div className="online-table-brand">{mode === 'gm' ? '✥ ПАНЕЛЬ МАСТЕРА' : '✦ TTV'}</div>
-        <div className="online-table-campaign"><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
+        <div className="online-table-campaign" title={campaign.name}><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
 
         {mode === 'gm' && scenes.length > 0 && (
           <div className="online-scene-controls">
