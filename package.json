@@ -1,13 +1,14 @@
 {
   "name": "ttv",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node scripts/run-unit-tests.mjs",
+    "test:db": "supabase test db",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,9 +20,12 @@
     "zustand": "5.0.14"
   },
   "devDependencies": {
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/react": "16.1.0",
     "@types/node": "26.1.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "happy-dom": "15.11.7",
     "typescript": "6.0.3"
   },
   "overrides": {

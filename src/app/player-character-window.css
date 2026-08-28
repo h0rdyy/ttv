@@ -1,0 +1,479 @@
+.foundry-character-window {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 76;
+  width: min(1040px, calc(100vw - 34px));
+  height: min(760px, calc(100dvh - 42px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid #6d5638;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(178, 132, 70, .10), transparent 30%),
+    linear-gradient(180deg, rgba(24, 20, 15, .995), rgba(11, 10, 8, .998));
+  box-shadow: 0 34px 110px rgba(0,0,0,.82), inset 0 1px rgba(255,255,255,.025);
+  color: #e8dcc7;
+  transform: translate(-50%, -50%);
+}
+
+.foundry-character-window::before {
+  content: "";
+  position: fixed;
+  inset: -100vh -100vw;
+  z-index: -1;
+  background: rgba(0,0,0,.58);
+  backdrop-filter: blur(3px);
+}
+
+.foundry-character-head {
+  min-height: 92px;
+  display: grid;
+  grid-template-columns: 68px minmax(150px, 1fr) auto 32px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-bottom: 1px solid #3c3022;
+  background: linear-gradient(180deg, rgba(31,25,18,.98), rgba(19,16,12,.98));
+}
+
+.foundry-character-portrait {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #81613a;
+  border-radius: 9px;
+  background: radial-gradient(circle at 45% 35%, #302619, #17120d 72%);
+  box-shadow: inset 0 0 20px rgba(0,0,0,.35);
+  font-size: 38px;
+}
+
+.foundry-character-title {
+  min-width: 0;
+}
+
+.foundry-character-title > span {
+  color: #9d8057;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .17em;
+}
+
+.foundry-character-title h2 {
+  margin: 2px 0 2px;
+  overflow: hidden;
+  color: #efd6a5;
+  font: 700 25px Georgia, serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-character-title p {
+  margin: 0;
+  overflow: hidden;
+  color: #93856f;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.foundry-quick-stat {
+  min-width: 76px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid #463724;
+  border-radius: 7px;
+  background: #110e0b;
+}
+
+.foundry-quick-stat span {
+  color: #81725c;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.foundry-quick-stat strong {
+  color: #e0caa5;
+  font: 700 15px Georgia, serif;
+  white-space: nowrap;
+}
+
+.foundry-quick-stat.health strong { color: #d88f7c; }
+
+.foundry-character-close {
+  width: 30px;
+  height: 30px;
+  align-self: start;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #99856a;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.foundry-character-close:hover { background: #2a2117; color: #eed4a3; }
+
+.foundry-character-tabs {
+  min-height: 42px;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  overflow-x: auto;
+  padding: 0 8px;
+  border-bottom: 1px solid #392d20;
+  background: #0e0c09;
+  scrollbar-width: thin;
+}
+
+.foundry-character-tabs button {
+  flex: 0 0 auto;
+  min-width: 88px;
+  padding: 0 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #8f806b;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.foundry-character-tabs button:hover { color: #d8bc8b; background: #17120e; }
+.foundry-character-tabs button.active { color: #f0cf91; border-bottom-color: #bd8d4c; background: #19130e; }
+
+.foundry-character-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  background:
+    linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+    #0b0907;
+  background-size: 100% 5px, auto;
+  scrollbar-color: #594226 #0b0907;
+}
+
+.foundry-identity-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.foundry-identity-strip > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #342a1f;
+  border-radius: 7px;
+  background: #100d0a;
+}
+
+.foundry-identity-strip span {
+  color: #756a59;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.foundry-identity-strip strong {
+  overflow: hidden;
+  color: #cdb995;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.foundry-tab-overview .slot-abilities,
+.foundry-tab-overview .slot-health,
+.foundry-tab-skills .slot-skills,
+.foundry-tab-combat .slot-attacks,
+.foundry-tab-features .slot-features,
+.foundry-tab-bio .slot-traits,
+.foundry-tab-custom .slot-custom {
+  grid-column: 1 / -1;
+}
+
+.foundry-character-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #3b2f21;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #13100c, #0e0c09);
+}
+
+.foundry-character-section > h3 {
+  margin: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid #33291e;
+  background: #17120e;
+  color: #d0aa6d;
+  font: 700 11px Georgia, serif;
+  letter-spacing: .04em;
+}
+
+.foundry-section-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.slot-abilities .foundry-section-fields { grid-template-columns: repeat(6, minmax(72px,1fr)); }
+.slot-skills .foundry-section-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.slot-traits .foundry-section-fields,
+.slot-features .foundry-section-fields,
+.slot-attacks .foundry-section-fields,
+.slot-proficiencies .foundry-section-fields,
+.slot-equipment .foundry-section-fields,
+.slot-custom .foundry-section-fields { grid-template-columns: repeat(2, minmax(0,1fr)); }
+
+.foundry-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255,255,255,.045);
+  border-radius: 6px;
+  background: rgba(5,4,3,.28);
+}
+
+.foundry-field > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.foundry-field > span strong {
+  overflow: hidden;
+  color: #b9aa91;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-field small {
+  overflow: hidden;
+  color: #6f6659;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-field input[type="text"],
+.foundry-field input[type="number"],
+.foundry-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #3c3022;
+  border-radius: 5px;
+  outline: none;
+  background: #0b0907;
+  color: #e0d4bf;
+}
+
+.foundry-field input[type="text"],
+.foundry-field input[type="number"] {
+  height: 31px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.foundry-field textarea {
+  min-height: 86px;
+  resize: vertical;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.foundry-field input:focus,
+.foundry-field textarea:focus { border-color: #8a6537; box-shadow: 0 0 0 2px rgba(156,111,55,.1); }
+.foundry-field input:disabled,
+.foundry-field textarea:disabled { color: #948775; opacity: .78; }
+
+.foundry-textarea { grid-column: 1 / -1; }
+
+.foundry-ability {
+  min-height: 92px;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  align-items: center;
+  padding: 7px 4px;
+}
+
+.foundry-ability > span {
+  max-width: 100%;
+  overflow: hidden;
+  color: #8e806a;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foundry-ability > strong {
+  color: #eed29b;
+  font: 700 21px Georgia, serif;
+}
+
+.foundry-ability > input {
+  width: 48px !important;
+  height: 24px !important;
+  padding: 0 3px !important;
+  color: #9f917c !important;
+  text-align: center;
+  font-size: 9px !important;
+}
+
+.foundry-skill {
+  min-height: 38px;
+  grid-template-columns: 17px minmax(0,1fr) 48px;
+  align-items: center;
+  gap: 7px;
+}
+
+.foundry-skill > span strong { color: #c7b597; }
+.foundry-skill > input[type="number"] { height: 26px; padding: 0 4px; text-align: center; }
+
+.foundry-resource {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.foundry-resource > div {
+  display: grid;
+  grid-template-columns: 62px auto 62px;
+  align-items: center;
+  gap: 5px;
+}
+
+.foundry-resource > div input { text-align: center; }
+.foundry-resource > div em { color: #736755; font-style: normal; }
+
+.foundry-checkbox {
+  grid-template-columns: 18px minmax(0,1fr);
+  align-items: center;
+}
+
+.foundry-character-empty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-height: 130px;
+  place-content: center;
+  padding: 18px;
+  border: 1px dashed #493824;
+  border-radius: 8px;
+  color: #837561;
+  text-align: center;
+}
+
+.foundry-character-empty strong { color: #c3aa80; font: 14px Georgia, serif; }
+.foundry-character-empty span { max-width: 440px; font-size: 9px; line-height: 1.5; }
+
+.foundry-inventory {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.foundry-inventory > section {
+  overflow: hidden;
+  border: 1px solid #3b2f21;
+  border-radius: 8px;
+  background: #0e0c09;
+}
+
+.foundry-inventory > section > header {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid #33291e;
+  background: #17120e;
+}
+
+.foundry-inventory > section > header strong { color: #d0aa6d; font: 11px Georgia, serif; }
+.foundry-inventory > section > header span { color: #756957; font-size: 8px; }
+.foundry-inventory > section > p { margin: 0; padding: 11px; color: #6f6556; font-size: 9px; }
+
+.foundry-item-row {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 30px minmax(0,1fr) auto 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-top: 1px solid rgba(255,255,255,.035);
+}
+
+.foundry-item-row:first-of-type { border-top: 0; }
+.foundry-item-icon { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #493722; border-radius: 5px; background: #1c160f; }
+.foundry-item-row > span:nth-child(2) { min-width: 0; display: grid; gap: 1px; }
+.foundry-item-row > span:nth-child(2) strong { overflow: hidden; color: #c9b899; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.foundry-item-row > span:nth-child(2) small { color: #716654; font-size: 7px; }
+.foundry-item-row em { padding: 3px 6px; border: 1px solid #51613b; border-radius: 10px; color: #91a673; font-size: 7px; font-style: normal; }
+.foundry-item-row b { color: #8d7e67; font-size: 9px; text-align: right; }
+
+.foundry-character-footer {
+  min-height: 51px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-top: 1px solid #372b1e;
+  background: #0e0c09;
+}
+
+.foundry-character-footer > span { color: #7c705e; font-size: 9px; }
+.foundry-character-footer > div { display: flex; gap: 7px; }
+.foundry-character-footer .button { min-height: 34px; }
+
+@media (max-width: 900px) {
+  .foundry-character-window { width: calc(100vw - 18px); height: calc(100dvh - 24px); }
+  .foundry-character-head { grid-template-columns: 54px minmax(120px,1fr) auto 28px; min-height: 76px; gap: 8px; padding: 8px; }
+  .foundry-character-portrait { width: 52px; height: 52px; font-size: 30px; }
+  .foundry-character-title h2 { font-size: 20px; }
+  .foundry-quick-stats { grid-template-columns: repeat(2, minmax(64px,1fr)); }
+  .foundry-quick-stat { min-width: 64px; padding: 5px; }
+  .foundry-section-grid { grid-template-columns: 1fr; }
+  .foundry-section-grid > section { grid-column: 1 !important; }
+  .slot-abilities .foundry-section-fields { grid-template-columns: repeat(3, minmax(68px,1fr)); }
+}
+
+@media (max-width: 620px) {
+  .foundry-character-window { width: calc(100vw - 8px); height: calc(100dvh - 8px); border-radius: 7px; }
+  .foundry-character-head { grid-template-columns: 46px minmax(0,1fr) 28px; }
+  .foundry-character-portrait { width: 44px; height: 44px; font-size: 25px; }
+  .foundry-quick-stats { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(4,1fr); width: 100%; }
+  .foundry-character-close { grid-column: 3; grid-row: 1; }
+  .foundry-identity-strip { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .foundry-section-fields { grid-template-columns: 1fr; }
+  .slot-abilities .foundry-section-fields { grid-template-columns: repeat(2, minmax(68px,1fr)); }
+  .foundry-textarea { grid-column: 1; }
+  .foundry-character-footer > span { display: none; }
+  .foundry-character-footer { justify-content: flex-end; }
+}

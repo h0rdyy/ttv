@@ -1,0 +1,375 @@
+.v05-table-layer.player-immersion {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.player-immersion .player-mode .online-table-topbar {
+  height: 50px;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  background: linear-gradient(180deg, rgba(10,8,6,.97), rgba(8,7,5,.9));
+  border-bottom-color: rgba(201,154,89,.18);
+  backdrop-filter: blur(14px);
+}
+
+.player-immersion .player-mode .online-table-brand {
+  font-size: 12px;
+}
+
+.player-immersion .player-mode .online-table-campaign {
+  min-width: 0;
+}
+
+.player-immersion .player-mode .online-table-campaign strong {
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-immersion .player-mode .online-table-campaign small {
+  display: none;
+}
+
+.player-immersion .player-mode .online-table-workspace {
+  height: calc(100vh - 50px) !important;
+  grid-template-columns: minmax(0,1fr) !important;
+  grid-template-areas: "map" !important;
+}
+
+.player-immersion .player-mode .online-map-stage {
+  grid-area: map;
+}
+
+.player-immersion .player-mode .online-table-sidebar {
+  position: fixed;
+  top: 62px;
+  right: 12px;
+  bottom: 86px;
+  z-index: 52;
+  width: min(350px, calc(100vw - 24px));
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #574126;
+  border-radius: 13px;
+  background: linear-gradient(180deg, rgba(18,15,11,.985), rgba(10,9,7,.99));
+  box-shadow: 0 24px 70px rgba(0,0,0,.58);
+  backdrop-filter: blur(16px);
+  transform: translateX(calc(100% + 28px));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+.v05-table-layer.player-immersion.player-immersion-details-open .player-mode .online-table-sidebar {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.player-immersion .player-mode .map-view-hint {
+  display: none;
+}
+
+.player-immersion .player-mode .scene-chip {
+  top: 12px;
+  bottom: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 13px;
+  border-color: rgba(196,151,84,.35);
+  background: rgba(10,8,6,.7);
+  color: #d4b783;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+  backdrop-filter: blur(10px);
+}
+
+.player-immersion .player-mode .token.selected .token-avatar {
+  box-shadow: 0 0 0 3px rgba(226,192,125,.72), 0 0 28px rgba(200,154,82,.24), 0 7px 20px rgba(0,0,0,.68);
+}
+
+.player-turn-banner {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  z-index: 58;
+  min-width: 190px;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 8px 22px 9px;
+  border: 1px solid rgba(199,151,79,.62);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(48,33,18,.94), rgba(18,13,9,.94));
+  box-shadow: 0 16px 48px rgba(0,0,0,.48), inset 0 0 24px rgba(202,151,72,.08);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: player-turn-arrive .28s ease-out both;
+}
+
+.player-turn-banner span {
+  color: #927a58;
+  font-size: 8px;
+  letter-spacing: .16em;
+}
+
+.player-turn-banner strong {
+  color: #efd29a;
+  font: 700 17px Georgia, serif;
+  letter-spacing: .07em;
+}
+
+.player-immersion-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 56;
+  min-height: 58px;
+  max-width: calc(100vw - 150px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid #594329;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(24,19,13,.97), rgba(12,10,8,.98));
+  box-shadow: 0 20px 60px rgba(0,0,0,.58);
+  backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+}
+
+.player-identity {
+  min-width: 150px;
+  display: grid;
+  grid-template-columns: 38px minmax(0,1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 2px;
+}
+
+.player-identity-avatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #6f5330;
+  border-radius: 50%;
+  background: #1c150e;
+  font-size: 22px;
+}
+
+.player-identity > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.player-identity strong {
+  max-width: 150px;
+  overflow: hidden;
+  color: #e4cfaa;
+  font: 14px Georgia, serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-identity small {
+  overflow: hidden;
+  color: #817460;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-vital-chip,
+.player-movement-chip {
+  min-height: 42px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 9px;
+  background: rgba(10,8,6,.48);
+}
+
+.player-vital-chip span,
+.player-movement-chip span {
+  color: #796c5b;
+  font-size: 7px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.player-vital-chip strong,
+.player-movement-chip strong {
+  color: #d8c29c;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.player-movement-chip {
+  min-width: 112px;
+}
+
+.player-movement-chip > i {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #2b241b;
+}
+
+.player-movement-chip > i > b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8da269;
+  transition: width .16s ease;
+}
+
+.player-movement-chip.over > i > b {
+  background: #bb6654;
+}
+
+.player-immersion-dock > button {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #493822;
+  border-radius: 9px;
+  background: #17110c;
+  color: #bda57f;
+  cursor: pointer;
+}
+
+.player-immersion-dock > button:hover,
+.player-immersion-dock > button.active {
+  border-color: #8d6938;
+  background: #24180e;
+  color: #efcf95;
+}
+
+.player-movement-ruler {
+  position: fixed;
+  z-index: 54;
+  height: 2px;
+  transform-origin: 0 50%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(224,191,126,.4), rgba(224,191,126,.96));
+  box-shadow: 0 0 9px rgba(224,191,126,.35);
+  pointer-events: none;
+}
+
+.player-movement-ruler::before,
+.player-movement-ruler::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: 2px solid #e0bf7e;
+  border-radius: 50%;
+  background: #17110c;
+  transform: translateY(-50%);
+}
+
+.player-movement-ruler::before { left: -4px; }
+.player-movement-ruler::after { right: -4px; }
+
+.player-movement-ruler.over {
+  background: linear-gradient(90deg, rgba(187,88,69,.45), rgba(213,105,84,.98));
+  box-shadow: 0 0 10px rgba(205,93,72,.38);
+}
+
+.player-movement-ruler.over::before,
+.player-movement-ruler.over::after {
+  border-color: #d87561;
+}
+
+.player-movement-bubble {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  border: 1px solid #71542d;
+  border-radius: 8px;
+  background: rgba(19,14,9,.96);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  pointer-events: none;
+}
+
+.player-movement-bubble strong {
+  color: #efcf91;
+  font: 700 13px Georgia, serif;
+}
+
+.player-movement-bubble small {
+  color: #8f7d63;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.player-movement-bubble.over {
+  border-color: #984d3e;
+}
+
+.player-movement-bubble.over strong,
+.player-movement-bubble.over small {
+  color: #dc806d;
+}
+
+.player-immersion-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 86px;
+  z-index: 62;
+  padding: 8px 13px;
+  border: 1px solid #6c4c2d;
+  border-radius: 8px;
+  background: rgba(20,15,10,.97);
+  color: #d8bd90;
+  box-shadow: 0 12px 35px rgba(0,0,0,.48);
+  font-size: 10px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.player-immersion .player-mode + .sheet-dock.player,
+.player-immersion .sheet-dock.player {
+  display: none;
+}
+
+.player-immersion .dice-tray-anchor {
+  bottom: 17px;
+}
+
+@keyframes player-turn-arrive {
+  from { opacity: 0; transform: translate(-50%, -12px) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@media (max-width: 900px) {
+  .player-immersion-dock {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    transform: none;
+  }
+  .player-identity { min-width: 0; flex: 1; }
+  .player-vital-chip { display: none; }
+  .player-movement-chip { min-width: 95px; }
+  .player-immersion .dice-tray-anchor { bottom: 82px; }
+}
+
+@media (max-width: 620px) {
+  .player-immersion .player-mode .map-zoom-controls,
+  .player-immersion .player-mode .online-presence { display: none; }
+  .player-immersion-dock { gap: 4px; }
+  .player-identity-avatar { width: 32px; height: 32px; font-size: 18px; }
+  .player-identity { grid-template-columns: 32px minmax(0,1fr); padding-right: 2px; }
+  .player-identity small { display: none; }
+  .player-immersion-dock > button { padding: 0 8px; font-size: 9px; }
+}

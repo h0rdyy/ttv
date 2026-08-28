@@ -8,9 +8,16 @@ import { friendlyError } from '@/lib/friendlyError';
 import { useCampaignRealtime } from './useCampaignRealtime';
 import { OnlineGmWorkshop } from './OnlineGmWorkshop';
 import { OnlineGmSidebar, type GmSidebarTab } from './OnlineGmSidebar';
-import { OnlineSceneTools, type FogReveal } from './OnlineSceneTools';
+import { OnlineSceneTools } from './OnlineSceneTools';
+import { isMeaningfulReveal, isPointRevealed, type FogReveal } from './fog';
 import { DiceTray } from './DiceTray';
 import { type DiceRoll, mergeDiceRollHistory } from './dice';
+import { actorMedia, actorMediaUrl } from './actorMedia';
+import { combatEffectsForActor, combatInitiative, combatCurrentActor, type CombatRuntime } from './combat';
+import { nextTokenSelection } from './tokenSelection';
+import { bulkSummary, partitionBulkResults, safeBulk } from './bulkOperations';
+import { useTopbarLayout, topbarLayoutToSource, type TopbarSlot } from './topbarLayout';
+import { DraggableTopbarItem } from './DraggableTopbarItem';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
 type Campaign = { id: string; name: string; description: string | null; owner_id: string; active_scene_id: string | null };
@@ -48,7 +55,6 @@ type ItemDefinition = {
   properties: Record<string, any>;
   effects: any[];
 };
-type Runtime = { campaign_id: string; combat_active: boolean; combat_round: number; combat_turn: number; combat_order: string[]; updated_at: string };
 type Note = { id: string; title: string | null; body: string; pinned: boolean; created_at: string; updated_at: string };
 type RollTable = { id: string; name: string; die: string; rows: any };
 type Camera = { zoom: number; x: number; y: number };
@@ -70,13 +76,172 @@ type Props = {
   initialItemDefinitions: ItemDefinition[];
   initialNotes: Note[];
   initialRollTables: RollTable[];
-  initialRuntime: Runtime;
+  initialRuntime: CombatRuntime;
   selectedActorId: string;
   onSelectActor: (id: string) => void;
+  onMessage: (message: string) => void;
 };
 
+const SLOT_LABELS: Record<TopbarSlot, string> = {
+  brand: 'Бренд',
+  campaign: 'Название кампании',
+  'scene-select': 'Селектор сцены',
+  zoom: 'Масштаб',
+  menu: 'Меню сессии',
+  presence: 'Сейчас в сети',
+  'scene-menu': 'Меню сцены',
+  workshop: 'Мастерская',
+};
+
+function TopbarSlotContent({
+  slot,
+  mode,
+  campaign,
+  activeScene,
+  scenes,
+  busy,
+  switchScene,
+  topbarMenu,
+  setTopbarMenu,
+  sceneToolsOpen,
+  workshopOpen,
+  setSceneToolsOpen,
+  setWorkshopOpen,
+  patchScene,
+  createScene,
+  zoomLabel,
+  cameraZoom,
+  changeZoom,
+  resetZoom,
+  gmAllowed,
+  onlineTitle,
+  liveStatus,
+  onlineUsers,
+}: {
+  slot: TopbarSlot;
+  mode: 'gm' | 'player';
+  campaign: Campaign;
+  activeScene: Scene | null;
+  scenes: Scene[];
+  busy: boolean;
+  switchScene: (id: string) => Promise<void>;
+  topbarMenu: TopbarMenu;
+  setTopbarMenu: React.Dispatch<React.SetStateAction<TopbarMenu>>;
+  sceneToolsOpen: boolean;
+  workshopOpen: boolean;
+  setSceneToolsOpen: (updater: (value: boolean) => boolean) => void;
+  setWorkshopOpen: (updater: (value: boolean) => boolean) => void;
+  patchScene: (patch: { grid?: boolean; fog?: boolean }) => Promise<void>;
+  createScene: () => Promise<void>;
+  zoomLabel: string;
+  cameraZoom: number;
+  changeZoom: (next: number) => void;
+  resetZoom: () => void;
+  gmAllowed: boolean;
+  onlineTitle: string;
+  liveStatus: 'online' | 'connecting' | 'offline';
+  onlineUsers: { name: string; mode: 'gm' | 'player' }[];
+}) {
+  if (slot === 'brand') {
+    return <div className="online-table-brand">{mode === 'gm' ? '✥ TTV' : '✦ TTV'}</div>;
+  }
+  if (slot === 'campaign') {
+    return (
+      <div className="online-table-campaign" title={campaign.name}>
+        <strong>{campaign.name}</strong>
+        <small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small>
+      </div>
+    );
+  }
+  if (slot === 'scene-select') {
+    if (mode !== 'gm' || scenes.length === 0) return null;
+    return (
+      <div className="online-scene-controls">
+        <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
+          {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+        </select>
+      </div>
+    );
+  }
+  if (slot === 'zoom') {
+    return (
+      <div className="map-zoom-controls">
+        <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(cameraZoom - 0.1)}>−</button>
+        <button className="button zoom-label" title="Сбросить вид" onClick={resetZoom}>{zoomLabel}</button>
+        <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(cameraZoom + 0.1)}>＋</button>
+      </div>
+    );
+  }
+  if (slot === 'menu') {
+    return (
+      <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
+        <button
+          className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={topbarMenu === 'session'}
+          onClick={() => setTopbarMenu(topbarMenu === 'session' ? null : 'session')}
+        >
+          ☰ <span>Меню</span>
+        </button>
+        {topbarMenu === 'session' && (
+          <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
+            {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
+            {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
+            <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (slot === 'presence') {
+    return (
+      <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
+    );
+  }
+  if (slot === 'scene-menu') {
+    if (mode !== 'gm') return null;
+    return (
+      <div className="online-topbar-menu" data-topbar-menu-root="true">
+        <button
+          className={`button online-menu-trigger ${topbarMenu === 'scene' || sceneToolsOpen ? 'active' : ''}`}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={topbarMenu === 'scene'}
+          onClick={() => setTopbarMenu(topbarMenu === 'scene' ? null : 'scene')}
+        >
+          ▣ Сцена <span aria-hidden="true">⌄</span>
+        </button>
+        {topbarMenu === 'scene' && (
+          <div className="online-menu-popover scene-menu" role="menu" aria-label="Действия сцены">
+            <button type="button" role="menuitem" disabled={busy} onClick={() => { setTopbarMenu(null); void createScene(); }}>
+              <span>＋ Новая сцена</span><small>Создать чистую игровую сцену</small>
+            </button>
+            <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.grid_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ grid: !activeScene?.grid_enabled }); }}>
+              <span>▦ Сетка</span><em>{activeScene?.grid_enabled ? 'Включена' : 'Выключена'}</em>
+            </button>
+            <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.fog_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ fog: !activeScene?.fog_enabled }); }}>
+              <span>♟ Туман войны</span><em>{activeScene?.fog_enabled ? 'Включён' : 'Выключен'}</em>
+            </button>
+            <button type="button" role="menuitem" disabled={!activeScene} onClick={() => { setTopbarMenu(null); setSceneToolsOpen((value) => !value); setWorkshopOpen((value) => value); }}>
+              <span>⚙ Настройки сцены</span><small>Карта, фишки, сетка и туман</small>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (slot === 'workshop') {
+    if (mode !== 'gm') return null;
+    return (
+      <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen((value) => value); }}>⚒ Мастерская</button>
+    );
+  }
+  return null;
+}
+
 export function OnlineTable(props: Props) {
-  const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId } = props;
+  const { role, mode, currentUserId, displayName, selectedActorId, onSelectActor: setSelectedActorId, onMessage: setMessage } = props;
   const router = useRouter();
   const [campaign, setCampaign] = useState(props.campaign);
   const [actors, setActors] = useState(props.initialActors);
@@ -97,13 +262,15 @@ export function OnlineTable(props: Props) {
   const [fogDrawMode, setFogDrawMode] = useState(false);
   const [fogDraft, setFogDraft] = useState<FogReveal | null>(null);
   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
+  const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
+  const [failedTokenMediaUrls, setFailedTokenMediaUrls] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [camera, setCamera] = useState<Camera>({ zoom: 1, x: 0, y: 0 });
   const [mapNaturalSize, setMapNaturalSize] = useState<Size | null>(null);
   const [mapStageSize, setMapStageSize] = useState<Size | null>(null);
   const [panning, setPanning] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
   const refreshTimerRef = useRef<number | null>(null);
   const lastBroadcastRef = useRef(0);
   const mapWorldRef = useRef<HTMLDivElement | null>(null);
@@ -114,7 +281,7 @@ export function OnlineTable(props: Props) {
 
   useEffect(() => setCampaign(props.campaign), [props.campaign]);
   useEffect(() => setActors(props.initialActors), [props.initialActors]);
-  useEffect(() => { setTokens(props.initialTokens); setPositions({}); }, [props.initialTokens]);
+  useEffect(() => { setTokens(props.initialTokens); setPositions({}); setSelectedTokenIds([]); }, [props.initialTokens]);
   useEffect(() => setScenes(props.initialScenes), [props.initialScenes]);
   useEffect(() => setInventories(props.initialInventories), [props.initialInventories]);
   useEffect(() => setContainers(props.initialContainers), [props.initialContainers]);
@@ -124,6 +291,7 @@ export function OnlineTable(props: Props) {
   useEffect(() => setRollTables(props.initialRollTables), [props.initialRollTables]);
   useEffect(() => setRuntime(props.initialRuntime), [props.initialRuntime]);
   useEffect(() => setDiceHistory([]), [props.campaign.id]);
+  useEffect(() => setFailedTokenMediaUrls(new Set()), [props.campaign.id]);
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
@@ -170,6 +338,7 @@ export function OnlineTable(props: Props) {
         setFogDrawMode(false);
         setFogDraft(null);
         fogStartRef.current = null;
+        setSelectedTokenIds([]);
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
@@ -207,10 +376,57 @@ export function OnlineTable(props: Props) {
     onDiceRoll,
   });
 
+  const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
+  const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
+  const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
+
+  const { layout: topbarLayout, moveSlot, reset: resetTopbarLayout, editMode, toggleEdit } = useTopbarLayout();
+  const [topbarCopyState, setTopbarCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const copyTopbarForProd = useCallback(async () => {
+    const snippet = topbarLayoutToSource(topbarLayout);
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(snippet);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = snippet;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (!ok) throw new Error('execCommand copy failed');
+      } else {
+        throw new Error('clipboard unavailable');
+      }
+      setTopbarCopyState('copied');
+      window.setTimeout(() => setTopbarCopyState('idle'), 1800);
+    } catch {
+      setTopbarCopyState('error');
+      window.setTimeout(() => setTopbarCopyState('idle'), 2400);
+    }
+  }, [topbarLayout]);
+  const handleTopbarMove = useCallback((fromId: string, toHint: string) => {
+    const [toId, side] = toHint.split(':');
+    if (!toId || fromId === toId) return;
+    const targetItem = topbarLayout.find((item) => item.slot === toId);
+    if (!targetItem) return;
+    const sameRow = topbarLayout
+      .filter((item) => item.slot !== fromId && item.row === targetItem.row)
+      .map((item) => item.slot);
+    const toIndexInRow = sameRow.indexOf(toId as TopbarSlot);
+    const insertAt = side === 'left' ? toIndexInRow : toIndexInRow + 1;
+    moveSlot(fromId as TopbarSlot, insertAt, targetItem.row);
+  }, [moveSlot, topbarLayout]);
+
   const activeScene = scenes.find((scene) => scene.id === campaign.active_scene_id) ?? scenes[0] ?? null;
-  const selectedActor = actors.find((actor) => actor.id === selectedActorId) ?? null;
+  const selectedActor = selectedActorId ? actorById.get(selectedActorId) ?? null : null;
   const ownActor = actors.find((actor) => actor.owner_user_id === currentUserId) ?? null;
   const sidebarActor = mode === 'player' ? ownActor : selectedActor;
+  const selectedInventory = inventoryForActor(sidebarActor?.id);
+  const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(role);
 
   useEffect(() => {
@@ -250,15 +466,10 @@ export function OnlineTable(props: Props) {
 
   useEffect(() => {
     if (mode === 'player' && ownActor && selectedActorId !== ownActor.id) setSelectedActorId(ownActor.id);
-    if (mode === 'gm' && selectedActorId && !actors.some((actor) => actor.id === selectedActorId)) {
+    if (mode === 'gm' && selectedActorId && !actorById.has(selectedActorId)) {
       setSelectedActorId(actors.find((actor) => actor.type === 'player')?.id ?? actors[0]?.id ?? '');
     }
-  }, [actors, mode, ownActor, selectedActorId, setSelectedActorId]);
-
-  const inventoryForActor = (actorId?: string | null) => inventories.find((inventory) => inventory.owner_actor_id === actorId);
-  const selectedInventory = inventoryForActor(sidebarActor?.id);
-  const selectedContainers = selectedInventory ? containers.filter((container) => container.inventory_id === selectedInventory.id) : [];
-  const itemById = useMemo(() => new Map(itemDefinitions.map((item) => [item.id, item])), [itemDefinitions]);
+  }, [actors, actorById, mode, ownActor, selectedActorId, setSelectedActorId]);
 
   const createScene = async () => {
     const name = window.prompt('Название новой сцены', 'Новая сцена')?.trim();
@@ -303,6 +514,7 @@ export function OnlineTable(props: Props) {
       setCampaign((current) => ({ ...current, active_scene_id: sceneId }));
       setTokens([]);
       setPositions({});
+      setSelectedTokenIds([]);
       scheduleRefresh();
     }
     setBusy(false);
@@ -314,8 +526,13 @@ export function OnlineTable(props: Props) {
     const { error } = await supabase.rpc('update_campaign_scene', {
       target_campaign: campaign.id,
       target_scene: activeScene.id,
+      scene_name: null,
       scene_grid_enabled: patch.grid ?? null,
       scene_fog_enabled: patch.fog ?? null,
+      scene_grid_size: null,
+      scene_grid_offset_x: null,
+      scene_grid_offset_y: null,
+      scene_grid_snap: null,
     });
     if (error) {
       setMessage(friendlyError(error, 'Не удалось изменить сцену.'));
@@ -444,7 +661,7 @@ export function OnlineTable(props: Props) {
     const draft = fogDraft;
     fogStartRef.current = null;
     setFogDraft(null);
-    if (!draft || !activeScene || draft.width < 0.5 || draft.height < 0.5) return;
+    if (!draft || !activeScene || !isMeaningfulReveal(draft)) return;
     const reveal = { ...draft, id: crypto.randomUUID() };
     const reveals = [...(activeScene.fog_reveals ?? []), reveal];
     setScenes((current) => current.map((scene) => scene.id === activeScene.id ? { ...scene, fog_reveals: reveals } : scene));
@@ -501,14 +718,96 @@ export function OnlineTable(props: Props) {
     }
   };
 
-  const combatAction = async (action: 'start' | 'next' | 'stop') => {
-    setBusy(true); setMessage('');
+  const selectToken = (tokenId: string, actorId: string, additive: boolean) => {
+    const next = nextTokenSelection(selectedTokenIds, tokenId, mode === 'gm' && additive);
+    const primaryActorId = next.includes(tokenId)
+      ? actorId
+      : tokens.find((token) => next.includes(token.id))?.actor_id ?? '';
+    setSelectedTokenIds(next);
+    setSelectedActorId(primaryActorId);
+  };
+
+  const markTokenMediaFailed = (url: string) => {
+    setFailedTokenMediaUrls((current) => {
+      if (current.has(url)) return current;
+      const next = new Set(current);
+      next.add(url);
+      return next;
+    });
+  };
+
+  const clearTokenSelection = () => {
+    setSelectedTokenIds([]);
+    if (mode === 'gm') setSelectedActorId('');
+  };
+
+  const bulkUpdateHidden = async (hidden: boolean) => {
+    if (mode !== 'gm' || !selectedTokenIds.length || bulkBusy) return;
+    setBulkBusy(true);
+    setMessage('');
     const supabase = createClient();
-    const rpc = action === 'start' ? 'start_campaign_combat' : action === 'next' ? 'next_campaign_combat_turn' : 'stop_campaign_combat';
-    const { error } = await supabase.rpc(rpc, { target_campaign: campaign.id });
-    if (error) setMessage(friendlyError(error, action === 'start' ? 'Не удалось начать бой.' : 'Не удалось изменить ход боя.'));
-    else scheduleRefresh();
-    setBusy(false);
+    const ids = [...selectedTokenIds];
+    const results = await Promise.all(ids.map((tokenId) => safeBulk(supabase.rpc('update_scene_token', {
+      target_campaign: campaign.id,
+      target_token: tokenId,
+      token_hidden: hidden,
+      token_size: null,
+    }))));
+    const { succeeded, failed } = partitionBulkResults(ids, results);
+    const succeededIds = new Set(succeeded.map((entry) => entry.item));
+    if (succeededIds.size) {
+      setTokens((current) => current.map((token) => succeededIds.has(token.id) ? { ...token, hidden } : token));
+    }
+    const verb = hidden ? 'Скрыто фишек' : 'Показано фишек';
+    if (failed.length) {
+      const firstError = failed[0]?.error;
+      const fallback = hidden ? 'Не удалось скрыть все фишки.' : 'Не удалось показать все фишки.';
+      const base = firstError ? friendlyError(firstError, fallback) : fallback;
+      setMessage(`${base} ${bulkSummary(verb, succeeded.length, failed.length)}`);
+    } else {
+      setMessage(bulkSummary(verb, succeeded.length, 0));
+    }
+    if (succeeded.length) scheduleRefresh();
+    setBulkBusy(false);
+  };
+
+  const bulkRemoveFromScene = async () => {
+    if (mode !== 'gm' || !selectedTokenIds.length || bulkBusy) return;
+    if (!window.confirm(`Убрать выбранные фишки со сцены (${selectedTokenIds.length})? Персонажи останутся в кампании.`)) return;
+    setBulkBusy(true);
+    setMessage('');
+    const supabase = createClient();
+    const ids = [...selectedTokenIds];
+    const results = await Promise.all(ids.map((tokenId) => safeBulk(supabase.rpc('remove_scene_token', {
+      target_campaign: campaign.id,
+      target_token: tokenId,
+    }))));
+    const { succeeded, failed } = partitionBulkResults(ids, results);
+    const succeededIds = new Set(succeeded.map((entry) => entry.item));
+    if (succeededIds.size) {
+      setTokens((current) => current.filter((token) => !succeededIds.has(token.id)));
+      setSelectedTokenIds((current) => current.filter((id) => !succeededIds.has(id)));
+    }
+    if (failed.length) {
+      const firstError = failed[0]?.error;
+      const base = firstError ? friendlyError(firstError, 'Не удалось убрать все фишки со сцены.') : 'Не удалось убрать все фишки со сцены.';
+      setMessage(`${base} ${bulkSummary('Убрано со сцены', succeeded.length, failed.length)}`);
+    } else {
+      setMessage(bulkSummary('Убрано со сцены', succeeded.length, 0));
+    }
+    if (succeeded.length) scheduleRefresh();
+    setBulkBusy(false);
+  };
+
+  const selectAllNpcTokens = () => {
+    if (mode !== 'gm' || !activeScene) return;
+    const npcTokenIds = tokens.filter((token) => {
+      const actor = actorById.get(token.actor_id);
+      return actor && actor.type !== 'player';
+    }).map((token) => token.id);
+    setSelectedTokenIds(npcTokenIds);
+    const primary = tokens.find((token) => npcTokenIds.includes(token.id));
+    setSelectedActorId(primary?.actor_id ?? '');
   };
 
   if (!activeScene && mode === 'player') {
@@ -530,76 +829,112 @@ export function OnlineTable(props: Props) {
 
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
-      <header className="online-table-topbar">
-        <div className="online-table-brand">{mode === 'gm' ? '✥ ПАНЕЛЬ МАСТЕРА' : '✦ TTV'}</div>
-        <div className="online-table-campaign"><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
+      <header className="online-table-topbar" data-edit-mode={editMode ? 'true' : 'false'}>
+        <div className="online-table-topbar-primary" data-topbar-row="primary">
+          {topbarLayout.filter((item) => item.row === 'primary').map((item) => (
+            <DraggableTopbarItem
+              key={item.slot}
+              id={item.slot}
+              label={SLOT_LABELS[item.slot]}
+              editMode={editMode}
+              onMove={handleTopbarMove}
+            >
+              <TopbarSlotContent
+                slot={item.slot}
+                mode={mode}
+                campaign={campaign}
+                activeScene={activeScene}
+                scenes={scenes}
+                busy={busy}
+                switchScene={switchScene}
+                topbarMenu={topbarMenu}
+                setTopbarMenu={setTopbarMenu}
+                sceneToolsOpen={sceneToolsOpen}
+                workshopOpen={workshopOpen}
+                setSceneToolsOpen={setSceneToolsOpen}
+                setWorkshopOpen={setWorkshopOpen}
+                patchScene={patchScene}
+                createScene={createScene}
+                zoomLabel={zoomLabel}
+                cameraZoom={camera.zoom}
+                changeZoom={changeZoom}
+                resetZoom={() => setCamera({ zoom: 1, x: 0, y: 0 })}
+                gmAllowed={gmAllowed}
+                onlineTitle={onlineTitle}
+                liveStatus={liveStatus}
+                onlineUsers={onlineUsers}
+              />
+            </DraggableTopbarItem>
+          ))}
+        </div>
 
-        {mode === 'gm' && scenes.length > 0 && (
-          <div className="online-scene-controls">
-            <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
-              {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-            </select>
+        <div className="online-table-topbar-secondary" data-topbar-row="secondary">
+          {topbarLayout.filter((item) => item.row === 'secondary').map((item) => (
+            <DraggableTopbarItem
+              key={item.slot}
+              id={item.slot}
+              label={SLOT_LABELS[item.slot]}
+              editMode={editMode}
+              onMove={handleTopbarMove}
+            >
+              <TopbarSlotContent
+                slot={item.slot}
+                mode={mode}
+                campaign={campaign}
+                activeScene={activeScene}
+                scenes={scenes}
+                busy={busy}
+                switchScene={switchScene}
+                topbarMenu={topbarMenu}
+                setTopbarMenu={setTopbarMenu}
+                sceneToolsOpen={sceneToolsOpen}
+                workshopOpen={workshopOpen}
+                setSceneToolsOpen={setSceneToolsOpen}
+                setWorkshopOpen={setWorkshopOpen}
+                patchScene={patchScene}
+                createScene={createScene}
+                zoomLabel={zoomLabel}
+                cameraZoom={camera.zoom}
+                changeZoom={changeZoom}
+                resetZoom={() => setCamera({ zoom: 1, x: 0, y: 0 })}
+                gmAllowed={gmAllowed}
+                onlineTitle={onlineTitle}
+                liveStatus={liveStatus}
+                onlineUsers={onlineUsers}
+              />
+            </DraggableTopbarItem>
+          ))}
+        </div>
+
+        {editMode && (
+          <div className="online-table-topbar-editor" data-wheel-isolation="true">
+            <span className="online-table-topbar-editor-hint">Перетащи блоки · изменения сохранятся</span>
+            <button
+              type="button"
+              className="button"
+              onClick={copyTopbarForProd}
+              title="Скопировать раскладку как DEFAULT_TOPBAR, чтобы вставить в код и задеплоить"
+              aria-label="Скопировать раскладку для продакшна"
+            >
+              {topbarCopyState === 'copied' ? 'Скопировано ✓' : topbarCopyState === 'error' ? 'Ошибка копирования' : 'Copy for prod'}
+            </button>
+            <button type="button" className="button" onClick={resetTopbarLayout}>Сбросить</button>
+            <button type="button" className="button primary" onClick={toggleEdit}>Готово</button>
           </div>
         )}
 
-        <div className="map-zoom-controls">
-          <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
-          <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
-          <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
-        </div>
-
-        {mode === 'gm' && (
-          <>
-            <div className="online-topbar-menu" data-topbar-menu-root="true">
-              <button
-                className={`button online-menu-trigger ${topbarMenu === 'scene' || sceneToolsOpen ? 'active' : ''}`}
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={topbarMenu === 'scene'}
-                onClick={() => setTopbarMenu((current) => current === 'scene' ? null : 'scene')}
-              >
-                ▣ Сцена <span aria-hidden="true">⌄</span>
-              </button>
-              {topbarMenu === 'scene' && (
-                <div className="online-menu-popover scene-menu" role="menu" aria-label="Действия сцены">
-                  <button type="button" role="menuitem" disabled={busy} onClick={() => { setTopbarMenu(null); void createScene(); }}>
-                    <span>＋ Новая сцена</span><small>Создать чистую игровую сцену</small>
-                  </button>
-                  <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.grid_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ grid: !activeScene?.grid_enabled }); }}>
-                    <span>▦ Сетка</span><em>{activeScene?.grid_enabled ? 'Включена' : 'Выключена'}</em>
-                  </button>
-                  <button type="button" role="menuitemcheckbox" aria-checked={Boolean(activeScene?.fog_enabled)} disabled={!activeScene} onClick={() => { setTopbarMenu(null); void patchScene({ fog: !activeScene?.fog_enabled }); }}>
-                    <span>♟ Туман войны</span><em>{activeScene?.fog_enabled ? 'Включён' : 'Выключен'}</em>
-                  </button>
-                  <button type="button" role="menuitem" disabled={!activeScene} onClick={() => { setTopbarMenu(null); setSceneToolsOpen((value) => !value); setWorkshopOpen(false); }}>
-                    <span>⚙ Настройки сцены</span><small>Карта, фишки, сетка и туман</small>
-                  </button>
-                </div>
-              )}
-            </div>
-            <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
-          </>
-        )}
-        <div className="online-table-spacer" />
-        <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
-        <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
+        {!editMode && (
           <button
-            className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
             type="button"
-            aria-haspopup="menu"
-            aria-expanded={topbarMenu === 'session'}
-            onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
+            className="online-table-topbar-edit-toggle"
+            onClick={toggleEdit}
+            title="Перетащить блоки"
+            aria-label="Перетащить блоки"
           >
-            ☰ <span>Меню</span>
+            <span className="online-table-topbar-edit-toggle-icon">⋮⋮</span>
+            <span>Перетащить</span>
           </button>
-          {topbarMenu === 'session' && (
-            <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
-              {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
-              {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
-              <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
-            </div>
-          )}
-        </div>
+        )}
       </header>
 
       <main className="online-table-workspace">
@@ -634,7 +969,12 @@ export function OnlineTable(props: Props) {
                   transform: `${fittedMapSize ? 'translate(-50%, -50%) ' : ''}translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
                   backgroundImage: activeScene.background_url ? `url(${activeScene.background_url})` : undefined,
                 }}
-                onPointerDown={beginFogDraw}
+                onPointerDown={(event) => {
+                  if (mode === 'gm' && event.button === 0 && !fogDrawMode && event.target === event.currentTarget) {
+                    clearTokenSelection();
+                  }
+                  beginFogDraw(event);
+                }}
                 onPointerMove={(event) => { moveDraggingToken(event); moveFogDraw(event); }}
                 onPointerUp={() => { void finishTokenDrag(); void finishFogDraw(); }}
                 onPointerCancel={() => { cancelTokenDrag(); fogStartRef.current = null; setFogDraft(null); }}
@@ -652,7 +992,7 @@ export function OnlineTable(props: Props) {
                 )}
 
                 {tokens.map((token) => {
-                  const actor = actors.find((value) => value.id === token.actor_id);
+                  const actor = actorById.get(token.actor_id);
                   if (!actor) return null;
                   const hp = actor.system_data?.hp;
                   const hpPct = hp?.max ? Math.max(0, Math.min(100, (hp.current / hp.max) * 100)) : 100;
@@ -660,10 +1000,17 @@ export function OnlineTable(props: Props) {
                   const hiddenByFog = mode === 'player' && activeScene.fog_enabled && actor.owner_user_id !== currentUserId && !isPointRevealed(position, reveals);
                   if (hiddenByFog && draggingTokenId !== token.id) return null;
                   const canMove = !fogDrawMode && (mode === 'gm' || actor.owner_user_id === currentUserId);
+                  const media = actorMedia(actor.system_data);
+                  const rawTokenArtUrl = actorMediaUrl(campaign.id, actor.id, 'token', media.tokenPath);
+                  const rawAvatarUrl = actorMediaUrl(campaign.id, actor.id, 'avatar', media.avatarPath);
+                  const tokenArtUrl = rawTokenArtUrl && !failedTokenMediaUrls.has(rawTokenArtUrl) ? rawTokenArtUrl : null;
+                  const avatarUrl = rawAvatarUrl && !failedTokenMediaUrls.has(rawAvatarUrl) ? rawAvatarUrl : null;
+                  const tokenEffects = runtime.combat_active ? combatEffectsForActor(runtime, actor.id) : [];
+                  const isSelected = selectedTokenIds.includes(token.id) || (selectedTokenIds.length === 0 && selectedActorId === actor.id);
                   return (
                     <button
                       key={token.id}
-                      className={`token ${token.enemy ? 'enemy' : ''} ${selectedActorId === actor.id ? 'selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
+                      className={`token ${tokenArtUrl ? 'token-custom-art' : ''} ${token.enemy ? 'enemy' : ''} ${isSelected ? 'selected' : ''} ${selectedTokenIds.length > 1 && selectedTokenIds.includes(token.id) ? 'multi-selected' : ''} ${token.hidden ? 'online-hidden-token' : ''}`}
                       style={{
                         left: `${position.x}%`,
                         top: `${position.y}%`,
@@ -671,22 +1018,49 @@ export function OnlineTable(props: Props) {
                         '--token-avatar-size': `${Math.max(12, Math.round(46 * (token.size || 1)))}px`,
                         '--token-avatar-font-size': `${Math.max(9, Math.round(20 * (token.size || 1)))}px`,
                         '--token-border-size': `${Math.max(1, Math.round(3 * Math.min(token.size || 1, 1)))}px`,
+                        '--token-art-scale': String(media.tokenScale),
+                        '--token-art-offset-x': `${media.tokenOffsetX}%`,
+                        '--token-art-offset-y': `${media.tokenOffsetY}%`,
                       } as React.CSSProperties}
                       onPointerDown={(event) => {
                         event.stopPropagation();
-                        setSelectedActorId(actor.id);
-                        if (!canMove) return;
+                        const additive = mode === 'gm' && (event.shiftKey || event.metaKey || event.ctrlKey);
+                        selectToken(token.id, actor.id, additive);
+                        if (additive || !canMove) return;
                         event.preventDefault();
                         event.currentTarget.setPointerCapture(event.pointerId);
                         lastBroadcastRef.current = 0;
                         setDraggingTokenId(token.id);
                       }}
-                      onClick={() => setSelectedActorId(actor.id)}
-                      title={canMove ? `${actor.name} — можно перемещать` : actor.name}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (event.detail !== 0) return;
+                        const additive = mode === 'gm' && (event.shiftKey || event.metaKey || event.ctrlKey);
+                        selectToken(token.id, actor.id, additive);
+                      }}
+                      title={mode === 'gm'
+                        ? `${actor.name}${tokenEffects.length ? ` · ${tokenEffects.map((effect) => effect.name).join(', ')}` : ''} · Shift+клик — несколько`
+                        : canMove ? `${actor.name} — можно перемещать` : actor.name}
                     >
-                      <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+                      {tokenArtUrl ? (
+                        <span className="token-character-art" aria-hidden="true"><img src={tokenArtUrl} alt="" draggable={false} onError={() => markTokenMediaFailed(tokenArtUrl)} /></span>
+                      ) : avatarUrl ? (
+                        <span className="token-avatar token-avatar-image"><img src={avatarUrl} alt="" draggable={false} onError={() => markTokenMediaFailed(avatarUrl)} /></span>
+                      ) : (
+                        <span className="token-avatar">{actor.avatar || (actor.type === 'player' ? '🧙' : '👤')}</span>
+                      )}
                       <span className="token-name">{actor.name}</span>
                       <span className="token-hp"><i style={{ width: `${hpPct}%` }}/></span>
+                      {tokenEffects.length > 0 && (
+                        <span className="token-combat-effects" aria-label={`Эффекты: ${tokenEffects.map((effect) => effect.name).join(', ')}`}>
+                          {tokenEffects.map((effect) => (
+                            <span key={effect.id} className={`token-combat-effect ${effect.kind}`} title={`${effect.name}${effect.remainingRounds === null ? ' · без срока' : ` · ${effect.remainingRounds} раунд.`}`}>
+                              <b>{effect.name}</b>
+                              {effect.remainingRounds !== null && <i>{effect.remainingRounds}</i>}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       {token.hidden && mode === 'gm' && <em className="hidden-token-mark">скрыт</em>}
                     </button>
                   );
@@ -748,7 +1122,6 @@ export function OnlineTable(props: Props) {
             busy={busy}
             onCreateHero={() => void createPlayerActor()}
             onHp={(actor, delta) => void changeHp(actor, delta)}
-            onCombat={(action) => void combatAction(action)}
             onOpenWorkshop={() => { setWorkshopOpen(true); setSceneToolsOpen(false); }}
             onChanged={scheduleRefresh}
             onMessage={setMessage}
@@ -768,6 +1141,17 @@ export function OnlineTable(props: Props) {
         )}
       </main>
 
+      {mode === 'gm' && selectedTokenIds.length > 0 && (
+        <div className="gm-token-bulk-bar" data-wheel-isolation="true" role="toolbar" aria-label="Действия с выбранными фишками">
+          <span className="gm-token-bulk-count">Выбрано: <strong>{selectedTokenIds.length}</strong></span>
+          <button type="button" className="button" disabled={bulkBusy} onClick={() => void bulkUpdateHidden(true)} title="Скрыть от игроков">Скрыть</button>
+          <button type="button" className="button" disabled={bulkBusy} onClick={() => void bulkUpdateHidden(false)} title="Показать игрокам">Показать</button>
+          <button type="button" className="button" disabled={bulkBusy} onClick={() => void bulkRemoveFromScene()} title="Убрать со сцены">Убрать</button>
+          <button type="button" className="button" disabled={bulkBusy} onClick={selectAllNpcTokens} title="Выделить всех NPC на сцене">Все NPC</button>
+          <button type="button" className="button" disabled={bulkBusy} onClick={clearTokenSelection} title="Снять выделение">×</button>
+        </div>
+      )}
+
       <DiceTray
         campaignId={campaign.id}
         mode={mode}
@@ -777,7 +1161,6 @@ export function OnlineTable(props: Props) {
         onMessage={setMessage}
       />
 
-      {message && <div className="auth-status online-table-message online-global-message" onClick={() => setMessage('')}>{message}</div>}
     </div>
   );
 }
@@ -798,10 +1181,6 @@ function FogLayer({ reveals, draft, gm }: { reveals: FogReveal[]; draft: FogReve
       {gm && draft && <rect x={draft.x} y={draft.y} width={draft.width} height={draft.height} className="fog-draft-outline" />}
     </svg>
   );
-}
-
-function isPointRevealed(position: { x: number; y: number }, reveals: FogReveal[]) {
-  return reveals.some((reveal) => position.x >= reveal.x && position.x <= reveal.x + reveal.width && position.y >= reveal.y && position.y <= reveal.y + reveal.height);
 }
 
 function ActorCard({ actor }: { actor: Actor }) {
@@ -829,14 +1208,28 @@ function InventoryCard({ actor, containers, instances, itemById }: { actor: Acto
   );
 }
 
-function CombatCard({ runtime, actors }: { runtime: Runtime; actors: Actor[] }) {
+function CombatCard({ runtime, actors }: { runtime: CombatRuntime; actors: Actor[] }) {
+  const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
   const order = runtime.combat_order
-    .map((id, index) => ({ actor: actors.find((value) => value.id === id) ?? null, index }))
+    .map((id, index) => ({ actor: actorById.get(id) ?? null, index }))
     .filter((entry): entry is { actor: Actor; index: number } => Boolean(entry.actor));
-  const currentId = runtime.combat_active ? runtime.combat_order[runtime.combat_turn] : null;
-  const current = currentId ? actors.find((actor) => actor.id === currentId) ?? null : null;
+  const current = runtime.combat_active ? combatCurrentActor(runtime, actors) : null;
   return (
     <section className="online-combat-card">
+      {runtime.combat_active && (
+        <div className="combat-v06-player-summary" aria-label="Инициатива и эффекты">
+          {order.map(({ actor }) => {
+            const effects = combatEffectsForActor(runtime, actor.id);
+            return (
+              <div key={`v06-${actor.id}`}>
+                <span>Инициатива {combatInitiative(runtime, actor.id)}</span>
+                <strong>{actor.name}</strong>
+                {effects.length > 0 && <small>{effects.map((effect) => effect.name).join(' · ')}</small>}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="online-section-title"><strong>Бой</strong>{runtime.combat_active && <span>Раунд {runtime.combat_round}</span>}</div>
       {!runtime.combat_active ? <div className="online-small-empty">Сейчас боя нет.</div> : <><div className="online-combat-current"><span>Сейчас ход</span><b>{current?.name ?? 'Ход мастера'}</b></div><div className="online-combat-order">{order.map(({ actor, index }, visibleIndex) => <div key={actor.id} className={index === runtime.combat_turn ? 'current' : ''}><span>{visibleIndex + 1}</span><b>{actor.name}</b><em>{actor.system_data?.hp?.current ?? '—'} HP</em></div>)}</div></>}
     </section>
@@ -847,7 +1240,8 @@ function EmptyPlayerState({ campaignName, text }: { campaignName: string; text: 
   return <main className="auth-page"><section className="auth-card"><div className="brand">✦ TTV</div><span className="eyebrow">{campaignName}</span><h1>Стол ещё готовится</h1><p>{text}</p><Link className="button" href="/campaigns/online">К кампаниям</Link></section></main>;
 }
 
+const STAT_LABELS: Record<string, string> = { armor: 'Защита', level: 'Уровень', strength: 'Сила', agility: 'Ловкость', mana: 'Мана' };
+
 function statLabel(key: string) {
-  const labels: Record<string,string> = { armor:'Защита', level:'Уровень', strength:'Сила', agility:'Ловкость', mana:'Мана' };
-  return labels[key] ?? key;
+  return STAT_LABELS[key] ?? key;
 }

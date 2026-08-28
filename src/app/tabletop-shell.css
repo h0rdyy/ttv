@@ -1,0 +1,147 @@
+/* Tabletop shell safe zones.
+   Persistent UI owns layout space; only transient drawers/workspaces may float above the map.
+   This is shared by GM and player modes so new chrome must claim a slot instead of adding another z-index layer. */
+
+.v05-table-layer {
+  --ttv-gm-rail: 58px;
+  --ttv-gm-library: 328px;
+  --ttv-gm-inspector: 330px;
+  --ttv-player-topbar: 50px;
+  --ttv-player-bottom-safe: 86px;
+  --ttv-player-drawer: min(410px, 38vw);
+}
+
+/* GM desktop: library + map + inspector are real columns, not stacked overlays. */
+.v05-table-layer .gm-mode .online-table-workspace {
+  grid-template-columns: var(--ttv-gm-library) minmax(0, 1fr) var(--ttv-gm-inspector) !important;
+  grid-template-areas: "library map inspector" !important;
+  gap: 0;
+}
+
+.v05-table-layer .gm-mode .online-table-workspace:has(.gm-library.collapsed) {
+  --ttv-gm-library: var(--ttv-gm-rail);
+}
+
+.v05-table-layer .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
+  --ttv-gm-inspector: 0px;
+}
+
+.v05-table-layer .gm-mode .online-map-stage {
+  grid-area: map;
+  min-width: 0;
+  min-height: 0;
+}
+
+.v05-table-layer .gm-mode .gm-library {
+  grid-area: library;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.v05-table-layer .gm-mode .gm-library-drawer {
+  left: var(--ttv-gm-rail);
+  right: 0;
+  width: auto;
+  box-shadow: none;
+}
+
+.v05-table-layer .gm-mode .gm-inspector {
+  grid-area: inspector;
+  position: relative;
+  inset: auto;
+  width: auto;
+  min-width: 0;
+  height: calc(100% - 16px);
+  margin: 8px 8px 8px 0;
+  z-index: 24;
+}
+
+/* Player mode reserves actual viewport height for the permanent bottom HUD. */
+.v05-table-layer.player-immersion .player-mode .online-table-workspace {
+  height: calc(100dvh - var(--ttv-player-topbar) - var(--ttv-player-bottom-safe)) !important;
+}
+
+.v05-table-layer.player-immersion .player-immersion-dock,
+.v05-table-layer.player-immersion .dice-tray-anchor {
+  bottom: 12px;
+}
+
+/* Keep the dice trigger in its own bottom-left slot and leave enough room for the main player dock. */
+.v05-table-layer.player-immersion .dice-tray-anchor {
+  left: 12px;
+}
+
+.v05-table-layer.player-immersion .player-immersion-dock {
+  left: calc(50% + 58px);
+  max-width: calc(100vw - 300px);
+}
+
+@media (max-width: 1100px) {
+  .v05-table-layer {
+    --ttv-gm-library: 278px;
+    --ttv-gm-inspector: 286px;
+  }
+
+  .v05-table-layer .gm-mode .gm-library-drawer {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .v05-table-layer {
+    --ttv-gm-library: min(220px, 42vw);
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace {
+    grid-template-columns: var(--ttv-gm-library) minmax(0, 1fr) !important;
+    grid-template-areas: "library map" !important;
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace:has(.gm-library.collapsed) {
+    --ttv-gm-library: var(--ttv-gm-rail);
+  }
+
+  .v05-table-layer .gm-mode .online-table-workspace:has(.gm-inspector .gm-inspector-empty) {
+    /* already zero via variable when empty on desktop; on narrow keep inspector off-grid */
+  }
+
+  .v05-table-layer .gm-mode .gm-inspector {
+    position: fixed;
+    top: 58px;
+    right: 8px;
+    bottom: 72px;
+    width: min(320px, calc(100vw - 24px));
+    height: auto;
+    margin: 0;
+    z-index: 40;
+  }
+
+  .v05-table-layer.player-immersion .player-immersion-dock {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    transform: none;
+  }
+
+  .v05-table-layer.player-immersion .dice-tray-anchor {
+    left: 8px;
+    bottom: 90px;
+  }
+}
+
+/* Context-first GM defaults (test/gm-ux-context-first)
+   Library starts collapsed; inspector only claims space when an actor is selected.
+   Keep map as the dominant surface during ordinary play. */
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .online-table-workspace {
+  transition: grid-template-columns 0.18s ease;
+}
+
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .gm-library.collapsed .gm-library-rail {
+  box-shadow: inset -1px 0 0 rgba(201, 154, 89, 0.12);
+}
+
+.v05-table-layer.tabletop-shell-v2.tabletop-shell-v3 .gm-mode .gm-inspector:not(:has(.gm-inspector-empty)) {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
