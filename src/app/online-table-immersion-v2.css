@@ -1,0 +1,89 @@
+.player-immersion .player-mode .online-table-sidebar {
+  display: none !important;
+}
+
+.player-character-window .actor-sheet-overlay {
+  top: calc(50% + 8px);
+  width: min(1120px, calc(100vw - 40px));
+  height: min(820px, calc(100dvh - 108px));
+  border-color: #765630;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #17120d, #0b0907);
+  box-shadow: 0 28px 100px rgba(0,0,0,.78), 0 0 0 1px rgba(214,166,92,.05);
+}
+
+.player-character-window .actor-sheet-overlay::before {
+  background: rgba(0,0,0,.5);
+  backdrop-filter: blur(2px);
+}
+
+.player-character-window .actor-sheet-head {
+  min-height: 64px;
+  padding: 9px 13px;
+  background: linear-gradient(180deg, #1a140e, #100d09);
+}
+
+.player-character-window .actor-sheet-identity {
+  gap: 10px;
+}
+
+.player-character-window .actor-sheet-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+}
+
+.player-character-window .actor-sheet-identity .eyebrow,
+.player-character-window .sheet-template-badge {
+  display: none;
+}
+
+.player-character-window .actor-sheet-identity h2 {
+  margin: 0 0 2px;
+  font-size: 20px;
+}
+
+.player-character-window .actor-sheet-scroll {
+  overscroll-behavior: contain;
+}
+
+.player-character-window .classic-sheet-scroll {
+  padding: 14px;
+}
+
+.player-character-window .actor-sheet-actions {
+  min-height: 52px;
+  padding: 8px 12px;
+  background: #0e0b08;
+}
+
+.player-character-window .actor-sheet-actions .button {
+  min-height: 34px;
+}
+
+@media (max-width: 1000px) {
+  .player-character-window .actor-sheet-overlay {
+    width: calc(100vw - 20px);
+    height: calc(100dvh - 82px);
+  }
+}
+
+@media (max-width: 700px) {
+  .player-character-window .actor-sheet-overlay {
+    top: 50%;
+    width: calc(100vw - 10px);
+    height: calc(100dvh - 62px);
+    border-radius: 7px;
+  }
+
+  .player-character-window .actor-sheet-head {
+    min-height: 56px;
+    padding: 7px 9px;
+  }
+
+  .player-character-window .actor-sheet-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 21px;
+  }
+}

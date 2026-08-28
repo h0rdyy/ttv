@@ -1,0 +1,20 @@
+--- a/src/features/campaign/OnlineTable.tsx
++++ b/src/features/campaign/OnlineTable.tsx
+@@ -98,6 +98,8 @@
+   const [fogDrawMode, setFogDrawMode] = useState(false);
+   const [fogDraft, setFogDraft] = useState<FogReveal | null>(null);
+   const [draggingTokenId, setDraggingTokenId] = useState<string | null>(null);
++  const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
++  const [bulkBusy, setBulkBusy] = useState(false);
+   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+   const [camera, setCamera] = useState<Camera>({ zoom: 1, x: 0, y: 0 });
+   const [mapNaturalSize, setMapNaturalSize] = useState<Size | null>(null);
+@@ -115,7 +117,7 @@
+ 
+   useEffect(() => setCampaign(props.campaign), [props.campaign]);
+   useEffect(() => setActors(props.initialActors), [props.initialActors]);
+-  useEffect(() => { setTokens(props.initialTokens); setPositions({}); }, [props.initialTokens]);
++  useEffect(() => { setTokens(props.initialTokens); setPositions({}); setSelectedTokenIds([]); }, [props.initialTokens]);
+   useEffect(() => setScenes(props.initialScenes), [props.initialScenes]);
+   useEffect(() => setInventories(props.initialInventories), [props.initialInventories]);
+   useEffect(() => setContainers(props.initialContainers), [props.initialContainers]);
