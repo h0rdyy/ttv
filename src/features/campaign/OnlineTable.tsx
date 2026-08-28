@@ -629,25 +629,17 @@ export function OnlineTable(props: Props) {
   return (
     <div className={`online-table-shell ${mode === 'player' ? 'player-mode' : 'gm-mode'}`}>
       <header className="online-table-topbar">
-        <div className="online-table-brand">{mode === 'gm' ? '✥ ПАНЕЛЬ МАСТЕРА' : '✦ TTV'}</div>
-        <div className="online-table-campaign" title={campaign.name}><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
+        <div className="online-table-topbar-row">
+          <div className="online-table-brand">{mode === 'gm' ? '✥ ПАНЕЛЬ МАСТЕРА' : '✦ TTV'}</div>
+          <div className="online-table-campaign"><strong>{campaign.name}</strong><small>{mode === 'gm' ? 'Режим мастера' : 'Режим игрока'}</small></div>
 
-        {mode === 'gm' && scenes.length > 0 && (
-          <div className="online-scene-controls">
-            <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
-              {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
-            </select>
+          <div className="map-zoom-controls">
+            <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
+            <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
+            <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
           </div>
-        )}
 
-        <div className="map-zoom-controls">
-          <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
-          <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
-          <button className="button icon-button" title="Увеличить карту" aria-label="Увеличить карту" onClick={() => changeZoom(camera.zoom + 0.1)}>＋</button>
-        </div>
-
-        {mode === 'gm' && (
-          <>
+          {mode === 'gm' && (
             <div className="online-topbar-menu" data-topbar-menu-root="true">
               <button
                 className={`button online-menu-trigger ${topbarMenu === 'scene' || sceneToolsOpen ? 'active' : ''}`}
@@ -675,27 +667,39 @@ export function OnlineTable(props: Props) {
                 </div>
               )}
             </div>
-            <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
-          </>
-        )}
-        <div className="online-table-spacer" />
-        <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
-        <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
-          <button
-            className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={topbarMenu === 'session'}
-            onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
-          >
-            ☰ <span>Меню</span>
-          </button>
-          {topbarMenu === 'session' && (
-            <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
-              {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
-              {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
-              <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
+          )}
+          <div className="online-table-spacer" />
+          <div className={`online-presence ${liveStatus}`} title={onlineTitle}><i />{liveStatus === 'online' ? `${Math.max(onlineUsers.length, 1)} в сети` : liveStatus === 'connecting' ? 'Подключение…' : 'Нет связи'}</div>
+          <div className="online-topbar-menu session-menu-root" data-topbar-menu-root="true">
+            <button
+              className={`button online-menu-trigger ${topbarMenu === 'session' ? 'active' : ''}`}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={topbarMenu === 'session'}
+              onClick={() => setTopbarMenu((current) => current === 'session' ? null : 'session')}
+            >
+              ☰ <span>Меню</span>
+            </button>
+            {topbarMenu === 'session' && (
+              <div className="online-menu-popover align-right" role="menu" aria-label="Меню игрового стола">
+                {gmAllowed && <Link role="menuitem" href={`/campaign/${campaign.id}/${mode === 'gm' ? 'player' : 'play'}`}><span>{mode === 'gm' ? '👁 Режим игрока' : '✥ Режим мастера'}</span><small>Переключить представление стола</small></Link>}
+                {mode === 'gm' && <Link role="menuitem" href={`/campaign/${campaign.id}/manage`}><span>⚙ Управление кампанией</span><small>Участники, герои и приглашение</small></Link>}
+                <Link role="menuitem" href="/campaigns/online"><span>← К списку кампаний</span><small>Покинуть игровой стол</small></Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="online-table-topbar-secondary">
+          {mode === 'gm' && scenes.length > 0 && (
+            <div className="online-scene-controls">
+              <select value={activeScene?.id ?? ''} onChange={(event) => void switchScene(event.target.value)} disabled={busy} aria-label="Текущая сцена">
+                {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name}</option>)}
+              </select>
             </div>
+          )}
+          {mode === 'gm' && (
+            <button className={`button online-workshop-trigger ${workshopOpen ? 'active' : ''}`} onClick={() => { setTopbarMenu(null); setWorkshopOpen((value) => !value); setSceneToolsOpen(false); }}>⚒ Мастерская</button>
           )}
         </div>
       </header>
