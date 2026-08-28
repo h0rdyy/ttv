@@ -892,10 +892,11 @@ export function OnlineTable(props: Props) {
             type="button"
             className="online-table-topbar-edit-toggle"
             onClick={toggleEdit}
-            title="Изменить расположение блоков"
-            aria-label="Изменить расположение блоков"
+            title="Перетащить блоки"
+            aria-label="Перетащить блоки"
           >
-            ⋮⋮
+            <span className="online-table-topbar-edit-toggle-icon">⋮⋮</span>
+            <span>Перетащить</span>
           </button>
         )}
       </header>
