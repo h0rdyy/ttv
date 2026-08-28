@@ -646,6 +646,7 @@ export function OnlineTable(props: Props) {
           </div>
         )}
 
+        <div className="online-table-spacer" />
         <div className="map-zoom-controls">
           <button className="button icon-button" title="Уменьшить карту" aria-label="Уменьшить карту" onClick={() => changeZoom(camera.zoom - 0.1)}>−</button>
           <button className="button zoom-label" title="Сбросить вид" onClick={() => setCamera({ zoom: 1, x: 0, y: 0 })}>{zoomLabel}</button>
