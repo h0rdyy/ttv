@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/proxy';
+import { DEMO_CAMPAIGN_NAME } from '@/config/demo';
 
 function createProxyClient(request: NextRequest, buildResponse: () => NextResponse) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,12 +59,16 @@ async function handleDemoRoute(request: NextRequest, mode: 'gm' | 'player'): Pro
       console.error('[demo] sign-in failed:', error.message);
       return fallback;
     }
+  } else if (auth.user.email !== process.env.DEMO_USER_EMAIL) {
+    // A signed-in user keeps their own identity and joins the shared tavern
+    // as a GM, so the demo links never fall back to their own campaigns.
+    await supabase.rpc('join_demo_campaign');
   }
 
   const { data: campaign } = await supabase
     .from('campaigns')
     .select('id')
-    .eq('name', 'Демо: таверна у дороги')
+    .eq('name', DEMO_CAMPAIGN_NAME)
     .limit(1)
     .maybeSingle();
 
