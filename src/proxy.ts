@@ -54,11 +54,15 @@ async function handleDemoRoute(request: NextRequest, mode: 'gm' | 'player'): Pro
     const email = process.env.DEMO_USER_EMAIL;
     const password = process.env.DEMO_USER_PASSWORD;
     if (!email || !password) return fallback;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      console.error('[demo] sign-in failed:', error.message);
-      return fallback;
+    // The demo must never show a login wall: retry the invisible sign-in once
+    // before giving up, transient network hiccups were observed in dev.
+    let signedIn = false;
+    for (let attempt = 0; attempt < 2 && !signedIn; attempt++) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error) signedIn = true;
+      else console.error(`[demo] sign-in attempt ${attempt + 1} failed:`, error.message);
     }
+    if (!signedIn) return fallback;
   } else if (auth.user.email !== process.env.DEMO_USER_EMAIL) {
     // A signed-in user keeps their own identity and joins the shared tavern
     // as a GM, so the demo links never fall back to their own campaigns.
