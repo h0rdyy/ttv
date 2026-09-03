@@ -30,9 +30,10 @@ export async function OnlineCampaignHub({ error, notice }: { error?: string; not
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect('/login');
 
-  const [{ data: campaignRows, error: campaignError }, { data: memberships, error: memberError }] = await Promise.all([
+  const [{ data: campaignRows, error: campaignError }, { data: memberships, error: memberError }, { data: profile }] = await Promise.all([
     supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
     supabase.from('campaign_members').select('campaign_id,role').eq('user_id', auth.user.id),
+    supabase.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle(),
   ]);
 
   const roles = new Map((memberships ?? []).map((membership) => [membership.campaign_id, membership.role as Role]));
@@ -42,34 +43,62 @@ export async function OnlineCampaignHub({ error, notice }: { error?: string; not
   })) as CampaignRow[]);
   const loadError = campaignError || memberError ? 'Не удалось загрузить кампании.' : '';
 
+  const metadataName = typeof auth.user.user_metadata?.display_name === 'string'
+    ? auth.user.user_metadata.display_name.trim()
+    : '';
+  const emailName = (auth.user.email ?? '').split('@')[0];
+  const nickname = (profile?.display_name || '').trim() || metadataName || emailName;
+
   return (
     <main className="online-hub">
       <header className="online-hub-header">
-        <div><div className="brand">✥ TTV</div><small>{auth.user.email}</small></div>
-        <form action={signOutOnlineCampaigns}><button className="button" type="submit">Выйти</button></form>
+        <div><div className="brand">✥ TTV</div><small>{nickname}</small></div>
+        <div className="online-hub-actions">
+          <Link className="button" href="/campaign/demo/play">Демо-стол</Link>
+          <form action={signOutOnlineCampaigns}><button className="button" type="submit">Выйти</button></form>
+        </div>
       </header>
 
       <section className="online-hero">
         <span className="eyebrow">МОИ КАМПАНИИ</span>
-        <h1>Куда отправимся сегодня?</h1>
-        <p>Продолжите существующую кампанию или создайте новый мир.</p>
+        {campaigns.length === 0 && !loadError ? (
+          <>
+            <h1>Добро пожаловать, {nickname}!</h1>
+            <p>Здесь появятся ваши приключения. Первую кампанию можно создать за минуту — форма справа.</p>
+          </>
+        ) : (
+          <>
+            <h1>С возвращением, {nickname}</h1>
+            <p>Продолжите существующую кампанию или создайте новый мир.</p>
+          </>
+        )}
       </section>
 
       <div className="online-layout">
         <section className="online-list">
           <div className="hub-section-head"><div><span className="eyebrow">КАМПАНИИ</span><h2>Ваши приключения</h2></div></div>
           {loadError ? <div className="empty-card">{loadError}</div> : campaigns.length === 0 ? (
-            <div className="empty-card">Кампаний пока нет. Создайте первую справа.</div>
+            <div className="newbie-guide">
+              <strong>С чего начать</strong>
+              <ol>
+                <li><b>Придумайте название</b> и нажмите «Создать кампанию» — справа.</li>
+                <li><b>Откройте стол</b> и загрузите карту в разделе «Сцена → Настройки сцены».</li>
+                <li><b>Пригласите игроков</b> — ссылка-приглашение лежит в разделе «Кампания».</li>
+              </ol>
+              <p>Подсказка: удалённую демо-кампанию можно воссоздать — просто создайте новую форму справа.</p>
+            </div>
           ) : (
             <div className="online-cards">
               {campaigns.map((campaign) => {
                 const gmMode = ['owner', 'gm', 'assistant-gm'].includes(campaign.role);
+                const created = new Date(campaign.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
                 return (
                   <article className="online-card" key={campaign.id}>
                     <div><span className="eyebrow">{roleLabels[campaign.role]}</span><h3>{campaign.name}</h3><p>{campaign.description || 'Без описания'}</p></div>
-                    <div className="online-card-meta"><span>{settingLabels[campaign.setting_id] ?? 'Авторский мир'}</span></div>
+                    <div className="online-card-meta"><span>{settingLabels[campaign.setting_id] ?? 'Авторский мир'}</span><span>с {created}</span></div>
                     <div className="online-card-actions">
                       <Link className="button primary" href={`/campaign/${campaign.id}/${gmMode ? 'play' : 'player'}`}>Открыть кампанию</Link>
+                      {gmMode && <Link className="button" href={`/campaign/${campaign.id}/manage`}>Настройки</Link>}
                     </div>
                   </article>
                 );
