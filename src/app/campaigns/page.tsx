@@ -11,7 +11,7 @@ export default async function CampaignsPage() {
       <header className="landing-topbar">
         <div className="brand">✥ TTV</div>
         <nav className="hub-actions">
-          <Link className="button" href="/campaign/demo/play">Демо без регистрации</Link>
+          <Link className="button" href="/campaign/demo/play">Демо-кампания</Link>
           {signedIn ? (
             <Link className="button primary" href="/campaigns/online">Мои кампании</Link>
           ) : (
@@ -38,7 +38,7 @@ export default async function CampaignsPage() {
           )}
           <Link className="button xl" href="/campaign/demo/play">Посмотреть демо</Link>
         </div>
-        <small className="landing-hint">Демо открывается без аккаунта — посмотрите стол глазами мастера.</small>
+        <small className="landing-hint">Демо-кампания «Таверна у дороги» уже ждёт внутри — создаётся автоматически для каждого аккаунта.</small>
       </section>
 
       <section className="landing-steps">

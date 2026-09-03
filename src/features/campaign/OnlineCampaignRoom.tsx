@@ -26,6 +26,9 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
 
   const gmAllowed = ['owner', 'gm', 'assistant-gm'].includes(membership.role);
   const isOwner = membership.role === 'owner';
+  // The shared demo account is signed in for anonymous demo visitors; its only
+  // campaign must stay deletable by maintainers only, not by a passer-by.
+  const isDemoSession = auth.user.email === process.env.DEMO_USER_EMAIL;
   if (mode === 'gm' && !gmAllowed) redirect(`/campaign/${campaignId}/player`);
 
   return (
@@ -61,7 +64,7 @@ export async function OnlineCampaignRoom({ campaignId, mode }: { campaignId: str
             <p className="muted">Откройте сцену, добавьте персонажей и начните игру.</p>
             <Link className="button primary" href={`/campaign/${campaignId}/play`}>Открыть стол</Link>
           </section>
-          {isOwner && <DeleteCampaignPanel campaignId={campaignId} campaignName={campaign.name} />}
+          {isOwner && !isDemoSession && <DeleteCampaignPanel campaignId={campaignId} campaignName={campaign.name} />}
         </div>
       </div>
     </main>
