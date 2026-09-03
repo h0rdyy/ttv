@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { DEMO_CAMPAIGN_NAME } from '@/config/demo';
 import { createOnlineCampaign, signOutOnlineCampaigns } from './onlineCampaignActions';
 
 type Role = 'owner' | 'gm' | 'assistant-gm' | 'player' | 'spectator';
@@ -31,7 +32,7 @@ export async function OnlineCampaignHub({ error, notice }: { error?: string; not
   if (!auth.user) redirect('/login');
 
   const [{ data: campaignRows, error: campaignError }, { data: memberships, error: memberError }, { data: profile }] = await Promise.all([
-    supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
+    supabase.from('campaigns').select('*').neq('name', DEMO_CAMPAIGN_NAME).order('created_at', { ascending: false }),
     supabase.from('campaign_members').select('campaign_id,role').eq('user_id', auth.user.id),
     supabase.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle(),
   ]);
